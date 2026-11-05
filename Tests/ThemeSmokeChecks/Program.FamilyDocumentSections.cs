@@ -71,6 +71,30 @@ internal static partial class Program
             var lh=largeHeader.Rows[0];lh["CashReceived"]=30000m;lh["CashApplied"]=30000m;lh["DiscountApplied"]=0m;lh["BalanceRemaining"]=2761m;lh["CreditRemaining"]=0m;
             using var largeReceipt=FeeReceiptDocuments.BuildData(school,lh,largeStudents,largeLines);
             Check(render("family-six-child-receipt",largeReceipt)==1,"Six child slips and the family totals stay on one continuous receipt");
+            using(var tenStudents=largeStudents.Copy())
+            using(var tenLines=largeLines.Copy())
+            using(var tenHeader=largeHeader.Copy())
+            {
+                string[] additionalNames = { "Ayesha Khan", "Hamza Ali", "Fatima Tariq", "Bilal Shah" };
+                for(int i=6;i<10;i++)
+                {
+                    int id=100+i;
+                    tenStudents.Rows.Add(id,(6591+i).ToString(),additionalNames[i-6],
+                        "Fazal Muhammad Niazi",5000m,0m,0m,0m,0m,5000m);
+                    tenLines.Rows.Add(id,"Admission Fee","Play Group","F","Campus Girls",
+                        new DateTime(2026,10,1),3960m,3960m,0m,0m);
+                    tenLines.Rows.Add(id,"Tuition Fee","Play Group","F","Campus Girls",
+                        new DateTime(2026,11,1),1040m,1040m,0m,0m);
+                }
+                tenHeader.Rows[0]["CashReceived"]=50000m;
+                tenHeader.Rows[0]["CashApplied"]=50000m;
+                tenHeader.Rows[0]["BalanceRemaining"]=0m;
+                using var tenReceipt=FeeReceiptDocuments.BuildData(school,tenHeader.Rows[0],tenStudents,tenLines);
+                Check(tenReceipt.AsEnumerable().Select(row=>row.Field<int>("ReceiptStudentKey")).Distinct().Count()==10,
+                    "Ten-child family receipt keeps a distinct student identity for every sibling");
+                Check(render("family-ten-child-receipt",tenReceipt)>=1,
+                    "The production family receipt layout handles ten children and their combined settlement");
+            }
             using var saved=new DataSet();
             saved.Tables.Add(largeHeader.Copy());saved.Tables.Add(largeStudents.Copy());saved.Tables.Add(largeLines.Copy());
             using var copy=FeeReceiptChildCopy.Extract(saved,100);
@@ -133,6 +157,20 @@ internal static partial class Program
         }
         Check(FeeBillDocuments.Snapshot(bill)==snapshot,"Preparing child bills leaves the saved family bill snapshot intact");
         Check(render("family-separate-child-bills",bill)==1,"Child bills share one long page and one final summary");
+        using(var tenCharges=charges.Copy())
+        {
+            string[] names={"Ayesha Khan","Hamza Ali","Fatima Tariq","Bilal Shah",
+                "Maryam Iqbal","Usman Farooq","Zainab Ahmad"};
+            for(int i=0;i<names.Length;i++)
+                tenCharges.Rows.Add((6701+i).ToString(),names[i],"Monthly Tuition",
+                    new DateTime(2026,11,1),i%3==0?350m:0m,
+                    2050m+(i%4)*275m,2400m+(i%4)*275m,
+                    i%2==0?"Campus Girls":"Campus Boys");
+            using var tenBill=FamilyBillReport.BuildData(school.Name,school.ContactNumber,
+                school.Address,"Muhammad Sajid",tenCharges);
+            Check(render("family-ten-child-bill",tenBill)>=1,
+                "The production family bill layout keeps all ten children and the family total");
+        }
         using(var legacy=FeeDocumentData.Create())
         {
             foreach(var (key,admission,name,amount,refund,balance) in new[]{(1,"8001","Same Name",100m,40m,40m),(2,"8002","Same Name",200m,0m,0m)})
