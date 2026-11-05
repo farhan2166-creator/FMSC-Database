@@ -127,14 +127,19 @@ Typing an admission number clears Campus, Academic Year, Class and Status. Chang
 
 ## Placement Management
 
-Open **Placement Management** in the sidebar. It contains four separate pages under the existing enrollment-management permission, rather than the old single **Student Promotion** screen:
+Open **Students → Placement Management** in the sidebar. It contains four separate pages under the existing enrollment-management permission, rather than the old single **Student Promotion** screen:
 
-- **Annual Promotion:** Choose a source academic year; blank campus, class or section includes all matching active placements. Choose the destination year, then **Load Students**. Use **Suggest** or assign destinations to selected rows. Each student can **Promote**, **Repeat Class** (same placement in the new year) or **Skip for Now**. Review exceptions such as missing next classes before processing. Newly promoted students still require return-admission confirmation before billing for the new year.
+- **Annual Promotion:** Choose a source academic year. The destination defaults to the nearest later configured year, and the promotion date stays within it. Campus/class/section filters follow actual source placements in that year; blank includes all matching placements. **Load Students**, then use **Suggest** or assign destinations to selected rows. Each student can **Promote**, **Repeat Class** (same placement in the new year) or **Skip for Now**. Destination sections come from the configured next class at that campus, including sections with no students. An unconfigured next class is never skipped. Newly promoted students still require return-admission confirmation before billing for the new year.
 - **Transfers & Sections:** Move students between sections, classes or campuses **within the recorded academic year**. Use **Load Students**, **Suggest**, **Assign** and row-level destinations. Section-only moves preserve fees; class/campus moves offer current fees, destination fees from next month, or the school cutoff rule.
 - **Placement Corrections:** Correct a recorded placement within the same year using a correction explanation and date. Review the fee policy and affected records before processing. **History / Dates** opens the existing date/history tools; **Undo Promotion** takes you to **Placement History**.
 - **Placement History:** Use **Refresh History** to review recent saved movements. For an eligible, unchanged annual promotion, select its record, enter a correction date and reason, and choose **Undo Selected Promotion**. The operation retains the original and corrected history; it is refused if later return/billing, payments, certificates, fee changes or subsequent movement make automatic undo unsafe.
 
 **Review** previews a proposed plan and its fee/bill implications before applying it. Processing is all-or-nothing. If a submission's outcome is uncertain, the page locks editing and offers **Check / Retry Plan** for that same request; do not create a duplicate plan. Leaving a page without processing does not save its draft.
+
+Transfers and corrections keep the source academic year. Changing a destination
+campus refreshes its assigned classes and each row's compatible sections. **Assign**
+offers only destinations valid for all highlighted students. Historical corrections
+and repeat decisions retain their established inactive-placement options.
 
 **Earlier Promotion History** is available from the placement-history workflow for older promotion records and retains its report permission check. Placement-management access requires the existing enrollment-management permission; undo additionally requires student-administration access. Individual admission/return/transfer dialogs remain available for specialized cases. See [placement workspace rules](STUDENT_PLACEMENT_WORKSPACE.md).
 

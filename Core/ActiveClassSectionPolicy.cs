@@ -11,6 +11,16 @@ namespace FMSC_SMS.Core;
 // BD-08: active catalog choices govern new placements; later deactivation must not invalidate recorded history.
 internal static class ActiveClassSectionPolicy
 {
+    // The caller supplies the appropriate active/new or historical assignments.
+    // Keep the full catalog order; filtering must not redefine promotion order.
+    internal static DataTable ClassesWithAssignments(DataTable catalog, DataTable assignments)
+    {
+        var ids = assignments.AsEnumerable().Select(row => Convert.ToInt32(row["ClassId"])).ToHashSet();
+        var result = catalog.Clone();
+        foreach (var row in catalog.AsEnumerable())
+            if (ids.Contains(Convert.ToInt32(row["ClassId"]))) result.ImportRow(row);
+        return result;
+    }
     private const string ActiveIdsSql =
         "SELECT ClassSectionId FROM dbo.CampusClassSections WHERE IsActive=1;";
 

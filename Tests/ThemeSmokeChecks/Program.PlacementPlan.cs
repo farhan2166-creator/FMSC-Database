@@ -9,6 +9,7 @@ internal static partial class Program
     private static void CheckPlacementWorkspace()
     {
         CurrentUser.SignIn(7781,"Placement fixture","Administrator",false,Array.Empty<string>());
+        CheckPlacementChoices();
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
         T Field<T>(StudentPlacementPage page,string name)=>(T)typeof(StudentPlacementPage).GetField(name,flags)!.GetValue(page)!;
         void Call(StudentPlacementPage page,string name)=>typeof(StudentPlacementPage).GetMethod(name,flags)!.Invoke(page,null);
