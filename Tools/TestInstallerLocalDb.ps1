@@ -24,6 +24,14 @@ for ($parent = $calls[0].Parent; $null -ne $parent; $parent = $parent.Parent) {
     }
 }
 Invoke-Expression $fn[0].Extent.Text
+$confirm = @($ast.FindAll({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Confirm-FmscInstallerChoice'
+}, $true))
+if ($confirm.Count -ne 1) { throw 'Expected one graphical-or-console installation choice helper.' }
+Invoke-Expression $confirm[0].Extent.Text
+$GraphicalInstall = $false
 
 function Write-Log { param([string]$Message) }
 function Write-Step { param([string]$Message) }
