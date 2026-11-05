@@ -1341,7 +1341,7 @@ try {
     }
     if ($PreparedRoot) { Test-PreparedUpdate -Root $PreparedRoot -Version $AppVersion -Schema ([int]$DatabaseVersion) }
     Show-Banner
-    Write-Section 'Installing - preparing and activating the application update'
+    Write-Section $(if ($PreparedRoot) { 'Installing - preparing and activating the application update' } else { 'Installing - preparing the first-time application setup' })
     Write-Log '================================================'
     Write-Log 'FMSC SMS installation started.'
     Write-Log "Application version: $AppVersion"
@@ -1877,7 +1877,7 @@ try {
         '  ============================================================' `
         -ForegroundColor $ColorSuccess
     Write-Host `
-        '                FMSC SMS UPDATE COMPLETED' `
+        $(if ($PreparedRoot) { '                FMSC SMS UPDATE COMPLETED' } else { '              FMSC SMS INSTALLATION COMPLETED' }) `
         -ForegroundColor $ColorSuccess
     Write-Host `
         '  ============================================================' `
