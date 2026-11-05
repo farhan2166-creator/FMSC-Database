@@ -37,7 +37,7 @@ same Windows reporting engine used by print preview and its PDF export.
 They do not exercise the Save File dialog, school SQL queries or every screen's
 column/filter setup. They are not screenshots or recreated PDF designs.
 
-The data and school/operator names are fictional. The review combines these
+The student and parent names look natural (for example, Ayesha Khan and Hamza Ali), but are fictional fixtures. Dates, classes, payment methods, discounts, advances and rupee figures vary realistically; financial rows reconcile within each illustrative scenario. No real school database is queried. The review combines these
 dashboard report exports (individual files remain available when running locally):
 
 - `collections-receipts-export.pdf`: the actual Whole School receipt preparation,
@@ -57,7 +57,13 @@ fixtures are included too. Those samples also use `GridReportPreview.ExportPdf`.
 Class & Section Summary, Class Outstanding Charges, Class Marks Sheet, Class Exam
 Attendance Sheet and Class Monthly Attendance Register are included from their
 RDLC templates. Heading checks verify centered text, full report/copy widths and
-the school heading's position in the rendered PDF. The scenario count and number of pages are reported by each workflow run; the generated review expands existing multi-page and grouping scenarios.
+the school heading's position in the rendered PDF. The review now includes **41 scenarios** covering individual, three-child and ten-child
+receipts; whole-school, campus, class and section grouping; long receipt
+runs; student admissions, strength and changes; collections details and
+payment-method summaries; outstanding charges, aging and families; billing
+summaries, discounts, assignments and concessions; student and family
+advance balances; monthly reconciliation; class sheets; and one empty
+result. The exact page count is recorded in each workflow run.
 
 The combined file is published only after all fixture suites and the merge checks
 pass. A failed PDF check cannot publish a partial review or reuse a previous
