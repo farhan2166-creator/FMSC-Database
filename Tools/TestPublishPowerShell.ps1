@@ -49,7 +49,7 @@ try {
         'FMSC_SMS/FMSC_SMS.deps.json', 'FMSC_SMS/FMSC_SMS.runtimeconfig.json',
         'FMSC_SMS/UpdateSupport/core.ps1', 'FMSC_SMS/UpdateSupport/UpdateRecovery.ps1',
         'FMSC_SMS/UpdateSupport/Launch-FMSC.ps1', 'FMSC_SMS/UpdateSupport/FMSC.Launcher.exe',
-        'UpdateRecovery.ps1', 'core.ps1', 'Install FMSC_SMS.bat', 'Tools/SqlLocalDB.msi')) {
+        'UpdateRecovery.ps1', 'core.ps1', 'Install FMSC_SMS.bat', 'FMSC.Setup.exe', 'Tools/SqlLocalDB.msi')) {
         $file = Join-Path $release $relative
         if (-not (Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -eq 0) {
             throw "Full publish did not copy its required output: $relative"
@@ -67,6 +67,20 @@ try {
         if ($actual -ne $expected) { throw "Published installer asset differs from checked-out source: $($pair[1])" }
     }
     & (Join-Path $ProjectDirectory 'Tools/TestWindowlessLauncher.ps1') -LauncherPath (Join-Path $application 'UpdateSupport/FMSC.Launcher.exe')
+    # The first-install entry point must not itself open a console.
+    $setup = Join-Path $release 'FMSC.Setup.exe'
+    $setupBytes = [IO.File]::ReadAllBytes($setup)
+    $peOffset = [BitConverter]::ToInt32($setupBytes, 0x3c)
+    if ($peOffset -lt 64 -or $peOffset + 96 -ge $setupBytes.Length -or
+        [BitConverter]::ToUInt16($setupBytes, $peOffset + 24 + 68) -ne 2) {
+        throw 'First-install bootstrap must use the Windows GUI subsystem.'
+    }
+    $bootstrap = Get-Content (Join-Path $ProjectDirectory 'Installer/Start-FMSC-Install.cs') -Raw
+    if (-not $bootstrap.Contains('Verb = "runas"') -or
+        -not $bootstrap.Contains('-GraphicalInstall') -or
+        -not $bootstrap.Contains('WindowStyle = ProcessWindowStyle.Hidden')) {
+        throw 'First-install bootstrap must retain hidden-console UAC handoff to core.ps1.'
+    }
     if (-not (Test-Path -LiteralPath (Join-Path $release 'Migrations') -PathType Container)) { throw 'Package must include its migrations folder even when empty.' }
     $sourceSql = @(Get-ChildItem -LiteralPath (Join-Path $ProjectDirectory 'Migrations') -Filter '*.sql' -File)
     $copiedSql = @(Get-ChildItem -LiteralPath (Join-Path $release 'Migrations') -Filter '*.sql' -File)
