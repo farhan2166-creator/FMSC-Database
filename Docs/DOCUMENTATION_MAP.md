@@ -1,5 +1,7 @@
 # Documentation consolidation and authority map
 
+**Correction — 5 November 2026:** Actual numbered Markdown files now appear in [Audit](../Audit/README.md) (`01_`–`05_`) and [Docs](README.md) (`01_`–`10_`). They consolidate explanations and references while preserving the original files and paths. The original inventory date and reviewed commit below remain historical.
+
 **Reviewed:** 5 November 2026 against `FMSC-Source` main `906177db31`. **Scope:** organization, topic ownership and cross-references; no application/SQL changes, removal, test reruns or release certification.
 
 ## 01. Reading order and authority
