@@ -3109,6 +3109,9 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             {
                 return false;
             }
+            /* Reflect the student actually loaded, including a selected sibling,
+               without firing UserSelectionChanged or starting another load. */
+            UpdateQuickStudentToLoadedRecord(row);
             UpdateStudentWorkspace();
             SwitchTab(0);
             SetStatus(
@@ -3144,6 +3147,10 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
         CaptureAdmissionBaseline();
         Defer(() => RefreshConfirmReturnAvailabilityAsync(admissionId, version));
         return true;
+    }
+    private void UpdateQuickStudentToLoadedRecord(DataRow row)
+    {
+        quickStudent.SetStudent(currentAdmissionId, StudentPickerRowProjector.DisplayFor(row));
     }
     /* Version fee-structure reads so older context changes cannot overwrite newer results. */
     private int feeStructureLoadVersion;
