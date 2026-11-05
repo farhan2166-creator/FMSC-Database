@@ -1,5 +1,16 @@
 # Changelog
 
+## Compatible placement choices — 2026-11-05
+
+- Automatically choose the nearest later academic year for Annual Promotion and
+  keep its date in that year. Filter source campus/classes/sections by actual
+  active enrollments in the selected year, including after a completed batch.
+- Scope each row and bulk Assign to compatible campus assignments; retain the
+  immediate-next-class rule, configured empty destination sections, same-year
+  transfers/corrections and historical repeat/correction options.
+- Filter individual transfer/readmission classes by campus assignments; preserve
+  same-year higher/lower class transfers and existing save/recovery safeguards.
+
 ## Compact setup editors — 2026-11-05
 
 - Fit campus, class and section catalog entry cards to their actual field/button

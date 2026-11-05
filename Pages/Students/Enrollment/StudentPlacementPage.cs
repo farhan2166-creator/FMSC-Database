@@ -10,7 +10,7 @@ public enum StudentPlacementTask { AnnualPromotion, Transfer, Correction, Histor
 /// <summary>Dedicated placement pages sharing the same lifecycle and recovery rules.</summary>
 // BD-08/09: same-year transfer/correction is distinct from next-year promotion; section-only moves do not reprice fees.
 // Keep reviewed plan/recovery identity and require return confirmation before new-placement billing.
-public sealed class StudentPlacementPage : V2Page, IBusyPage
+public sealed partial class StudentPlacementPage : V2Page, IBusyPage
 {
     private readonly int operation;
     private readonly Action<Func<Control>,string,string>? navigate;
@@ -81,6 +81,7 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         students.CellValueChanged+=(_,e)=> {
             if(binding || e.RowIndex<0 || students.Rows[e.RowIndex].DataBoundItem is not DataRowView row)return;
             if(e.ColumnIndex==students.Columns["Decision"].Index && Convert.ToString(row["Decision"])=="HOLD")row["Destination"]=row["SourcePlacementId"];
+            if(e.ColumnIndex==students.Columns["Decision"].Index)RefreshDestinationCell(students.Rows[e.RowIndex]);
             UpdateTotals();
         };
         students.DataError+=(_,e)=>{e.ThrowException=false;SetStatus("Choose a destination from the available placements.",true);};
@@ -109,8 +110,7 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         pageContent=ViewingHistory?historyRoot:body;
         SetContent(pageContent);
         if(!ViewingHistory)ConfigureTask();
-        foreach(var lookup in new[]{sourceYear,sourceCampus,sourceClass,sourceSection})lookup.UserSelectionChanged+=(_,_)=>InvalidatePlan();
-        targetYear.UserSelectionChanged+=(_,_)=>{if(!binding && !Annual && sourceYear.SelectedId>0)targetYear.SelectedValue=sourceYear.SelectedId;};
+        WirePlacementChoices();
         Disposed+=(_,_)=>{
             unusedContent.Dispose();
             foreach(var control in PlanChoices.Cast<Control>().Concat(new Control[]{effective,reason,historyReason,historyDate,fees,carry,students,history}))
@@ -204,10 +204,10 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         if(ViewingHistory){await LoadHistory();SetStatus("Select a movement to review its history or promotion correction.");return;}
         binding=true;
         try {
-            var campuses=await Task.Run(()=>DatabaseHelper.QueryUser("GetCampuses"));
-            var years=await Task.Run(()=>DatabaseHelper.QueryUser("GetAcademicYears"));
+            campusCatalog=await Task.Run(()=>DatabaseHelper.QueryUser("GetCampuses"));
+            yearCatalog=await Task.Run(()=>DatabaseHelper.QueryUser("GetAcademicYears"));
             catalog=await Task.Run(()=>DatabaseHelper.QueryUser("GetClasses"));
-            var sections=await Task.Run(()=>DatabaseHelper.QueryUser("GetSections"));
+            sectionCatalog=await Task.Run(()=>DatabaseHelper.QueryUser("GetSections"));
             placements=await DatabaseHelper.QuerySqlAsync("""
                 EXEC dbo.RequirePermission @UserId,N'Enrollment.Manage';
                 SELECT P.ClassSectionId,P.CampusId,P.ClassId,P.SectionId,P.IsActive,
@@ -218,11 +218,7 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
                 WHERE P.IsActive=1 OR @IncludeInactive=1 ORDER BY C.CampusName,K.DisplayOrder,S.DisplayOrder;
                 """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),
                 DatabaseHelper.Bit("@IncludeInactive",Annual || operation==2));
-            Bind(sourceCampus,campuses,"CampusId","CampusName",true);Bind(targetCampus,campuses,"CampusId","CampusName",true,"Keep current campus");
-            Bind(sourceYear,years,"AcademicYearId","YearName",false);Bind(targetYear,years,"AcademicYearId","YearName",false);
-            Bind(sourceClass,catalog,"ClassId","ClassName",true);Bind(targetClass,catalog,"ClassId","ClassName",true,"Keep current class");Bind(sourceSection,sections,"SectionId","SectionName",true);
-            var choices=placements.Copy();var empty=choices.NewRow();empty["ClassSectionId"]=0;empty["Display"]="Choose a destination";choices.Rows.InsertAt(empty,0);
-            ((DataGridViewComboBoxColumn)students.Columns["Destination"]).DataSource=choices;
+            BindPlacementChoices();
             fees.Enabled=!Annual && CurrentUser.HasPermission("Fees.Adjust");carry.Enabled=Annual && CurrentUser.HasPermission("Fees.Adjust");targetClass.Enabled=!Annual;
             SetStatus("Choose a source year. Blank campus, class and section include all active placements. Load students to begin.");
         }finally{binding=false;}
@@ -282,7 +278,12 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
     {
         if(pending is not null)throw new InvalidOperationException(BusyMessage);
         if(sourceYear.SelectedId<=0)throw new InvalidOperationException("Choose the source academic year.");
-        data=await PlacementPlan.ReadAsync(sourceYear.SelectedId,sourceCampus.SelectedId,sourceClass.SelectedId,sourceSection.SelectedId);
+        var scope=(Campus:sourceCampus.SelectedId,Class:sourceClass.SelectedId,Section:sourceSection.SelectedId);
+        InvalidatePlan();
+        if(choicesReady)await RefreshSourceContext(false);
+        if((scope.Campus>0 && sourceCampus.SelectedId!=scope.Campus) || (scope.Class>0 && sourceClass.SelectedId!=scope.Class) || (scope.Section>0 && sourceSection.SelectedId!=scope.Section))
+            throw new InvalidOperationException("The selected source no longer has matching placements. Check the source filters and load again.");
+        data=await ReadStudents(sourceYear.SelectedId,sourceCampus.SelectedId,sourceClass.SelectedId,sourceSection.SelectedId);
         foreach(var column in new[]{"Current","Decision","Note"})data.Columns.Add(column,typeof(string));
         data.Columns.Add("Selected",typeof(bool));data.Columns.Add("Destination",typeof(int));
         binding=true;
@@ -290,7 +291,9 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         students.DataSource=data;binding=false;
         if(!Annual)targetYear.SelectedValue=sourceYear.SelectedId;
         Suggest();
-        SetStatus($"Loaded {data.Rows.Count:N0} active placements. Completed promotions leave this source list; skipped students remain available for a later batch.");
+        SetStatus(Annual && targetYear.SelectedId<=0
+            ? $"Loaded {data.Rows.Count:N0} active placements. Configure a later academic year before processing promotion."
+            : $"Loaded {data.Rows.Count:N0} active placements. Completed promotions leave this source list; skipped students remain available for a later batch.");
     }
     private void Suggest()
     {
@@ -302,19 +305,24 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
             if(decision=="HOLD"){row["Destination"]=row["SourcePlacementId"];continue;}
             if(Annual){var next=PromotionChoices.NextClass(catalog,cls);cls=next is null?0:Convert.ToInt32(next["ClassId"]);}
             else if(targetClass.SelectedId>0)cls=targetClass.SelectedId;
-            var match=placements.AsEnumerable().Where(p=>Convert.ToInt32(p["CampusId"])==campus && Convert.ToInt32(p["ClassId"])==cls && Convert.ToInt32(p["SectionId"])==Convert.ToInt32(row["SectionId"]) && Convert.ToBoolean(p["IsActive"])).ToArray();
+            var match=placements.AsEnumerable().Where(p=>Convert.ToInt32(p["CampusId"])==campus && Convert.ToInt32(p["ClassId"])==cls && Convert.ToInt32(p["SectionId"])==Convert.ToInt32(row["SectionId"]) && (operation==2 || Convert.ToBoolean(p["IsActive"]))).ToArray();
             row["Destination"]=match.Length==1?match[0]["ClassSectionId"]:0;
-            row["Note"]=cls==0?"Final class: review departure, repeat or skip":match.Length!=1?"Map a destination section":Convert.ToString(row["PlacementState"]);
+            bool configured=placements.AsEnumerable().Any(p=>Convert.ToInt32(p["CampusId"])==campus && Convert.ToInt32(p["ClassId"])==cls && (operation==2 || Convert.ToBoolean(p["IsActive"])));
+            row["Note"]=cls==0?"Final class: review departure, repeat or skip":!configured?"Configure this destination class/section at the campus":match.Length!=1?"Choose a configured destination section":Convert.ToString(row["PlacementState"]);
             if(Convert.ToBoolean(row["LegacySetupPending"]) || row.IsNull("PlacementConfirmedAt"))row["Note"]="Complete admission / legacy verification before movement";
         }
         binding=false;UpdateTotals();
+        RefreshDestinationCells();
     }
     private void SelectRows(bool selected){if(pending is not null)return;students.EndEdit();foreach(DataRow row in data.Rows)row["Selected"]=selected;UpdateTotals();}
     private void AssignHighlighted()
     {
         if(pending is not null || students.SelectedRows.Count==0)return;
-        var lookup=new LookupBox();lookup.Bind(placements.Copy(),"ClassSectionId","Display");lookup.SelectedIndex=-1;
+        var selectedRows=students.SelectedRows.Cast<DataGridViewRow>().Where(row=>row.DataBoundItem is DataRowView).Select(row=>((DataRowView)row.DataBoundItem!).Row).ToArray();
+        var lookup=new LookupBox();
         var decision=HumanUi.Combo();decision.ValueMember="Value";decision.DisplayMember="Label";decision.DataSource=((DataView)((DataGridViewComboBoxColumn)students.Columns["Decision"]).DataSource!).ToTable();decision.SelectedIndex=0;
+        void BindDestinations(){string action=Convert.ToString(decision.SelectedValue)??"";lookup.Bind(CommonDestinations(selectedRows,action),"ClassSectionId","Display");lookup.SelectedIndex=-1;lookup.Enabled=action is not ("HOLD" or "SKIP");}
+        decision.SelectedIndexChanged+=(_,_)=>BindDestinations();BindDestinations();
         var panel=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(12)};
         panel.Controls.Add(HumanUi.Field("Decision",decision));panel.Controls.Add(HumanUi.Field("Destination Placement",lookup));
         using var dialog=Window("Assign Highlighted Students",panel);dialog.ClientSize=new Size(AppScale.Scale(700),AppScale.Scale(240));
@@ -324,7 +332,7 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         if(selectedDecision!="HOLD" && selectedDecision!="SKIP" && lookup.SelectedId<=0){Warn("Choose a destination placement.");return;}
         students.EndEdit();binding=true;
         foreach(DataGridViewRow gridRow in students.SelectedRows)if(gridRow.DataBoundItem is DataRowView item){item["Decision"]=selectedDecision;item["Destination"]=selectedDecision=="HOLD"?item["SourcePlacementId"]:lookup.SelectedId;item["Selected"]=selectedDecision!="SKIP";}
-        binding=false;UpdateTotals();
+        binding=false;RefreshDestinationCells();UpdateTotals();
     }
     private void UpdateTotals()
     {
@@ -348,6 +356,9 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         if(selected.Any(r=>Annual ? Convert.ToString(r["Decision"]) is not ("PROMOTE" or "HOLD") : Convert.ToString(r["Decision"]) is not ("MOVE" or "CORRECT")))throw new InvalidOperationException("Choose decisions that match the selected action.");
         if(Annual && carry.Checked && !CurrentUser.HasPermission("Fees.Adjust"))
             throw new UnauthorizedAccessException("Carrying monthly concessions requires fee adjustment access.");
+        // Check promotion order against the current catalog, not an old screen load.
+        catalog=await Task.Run(()=>DatabaseHelper.QueryUser("GetClasses"));
+        ValidatePlacementChoices(selected);
         // NEW PROMOTE/MOVE targets must be active. HOLD retains its old section,
         // and CORRECT may refer to an inactive historical section by design.
         foreach(var target in selected.Where(r=>Convert.ToString(r["Decision"]) is "PROMOTE" or "MOVE")
@@ -397,6 +408,7 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         if(!ViewingHistory){students.DataSource=null;data=new();totals.Text="Plan saved. Reload students to see remaining placements.";}
         SetStatus(ViewingHistory?$"Promotion correction saved: {plan.Id}. Both placements remain in history.":Annual?$"Placement plan saved: {plan.Id}. Confirm Return Admission before billing the new placements.":$"Placement changes saved: {plan.Id}.");
         if(ViewingHistory)await LoadHistory();
+        else if(choicesReady)await RefreshSourceContext(false);
     }
     private async Task LoadHistory()
     {

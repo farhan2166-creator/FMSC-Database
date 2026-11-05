@@ -244,6 +244,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         campus.SelectedIndexChanged += (_, _) => {
             if (suppressDestinationEvents)
                 return;
+            LoadClasses();
             LoadClassSections();
         };
         cls.SelectedIndexChanged += (_, _) => {
@@ -704,6 +705,13 @@ public sealed class StudentTransferReadmissionPage : V2Page
             Fail(ex);
         }
     }
+    private static bool IsCurrentPlacement(DataRow? row) => row is not null
+        && row.Table.Columns.Contains("PlacementYearStart") && row.Table.Columns.Contains("PlacementYearEnd")
+        && row["PlacementYearStart"] is DateTime start && row["PlacementYearEnd"] is DateTime end
+        && DateTime.Today >= start.Date && DateTime.Today <= end.Date;
+    private bool RequiresActivePlacementChoices => selectedOperation == "Re-Admit" || IsCurrentPlacement(
+        enrollmentsRaw.AsEnumerable().FirstOrDefault(row => Convert.ToInt32(row["EnrollmentId"]) == enrollment.SelectedId));
+
     private void LoadDestinationLists()
     {
         destinationCampuses = new DataTable();
@@ -743,7 +751,13 @@ public sealed class StudentTransferReadmissionPage : V2Page
                 DatabaseHelper.QueryUser("GetClasses");
             if (selectedOperation == "Transfer Class")
             {
-                destinationClasses = AdjacentClasses(classes, currentEnrollmentClassId);
+                using var rawAssignments = DatabaseHelper.QueryUser("GetClassSections",
+                    DatabaseHelper.Int("@CampusId",currentEnrollmentCampusId),DatabaseHelper.Int("@ClassId",0),DatabaseHelper.Int("@SectionId",0));
+                using var assignments = RequiresActivePlacementChoices ? ActiveClassSectionPolicy.OnlyActive(rawAssignments) : rawAssignments.Copy();
+                using var assigned = ActiveClassSectionPolicy.ClassesWithAssignments(classes,assignments);
+                destinationClasses = assigned.Clone();
+                foreach (var row in assigned.AsEnumerable().Where(row=>Convert.ToInt32(row["ClassId"])!=currentEnrollmentClassId))
+                    destinationClasses.ImportRow(row);
             }
             else if (excludeCurrent &&
                 classes.Columns.Contains("ClassId"))
@@ -761,10 +775,9 @@ public sealed class StudentTransferReadmissionPage : V2Page
             }
             else
             {
-                destinationClasses =
-                    classes;
+                destinationClasses = classes.Clone(); // Choose the destination campus first.
             }
-            var sections =
+            using var rawSections =
                 DatabaseHelper.QueryUser(
                     "GetClassSections",
                     DatabaseHelper.Int(
@@ -774,6 +787,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
                         "@ClassId",
                         currentEnrollmentClassId),
                     DatabaseHelper.Int("@SectionId", 0));
+            using var sections = RequiresActivePlacementChoices ? ActiveClassSectionPolicy.OnlyActive(rawSections) : rawSections.Copy();
             if (excludeCurrent &&
                 sections.Columns.Contains("SectionId"))
             {
@@ -791,8 +805,9 @@ public sealed class StudentTransferReadmissionPage : V2Page
             else
             {
                 destinationSections =
-                    sections;
+                    sections.Copy();
             }
+            if (selectedOperation == "Re-Admit") destinationSections = sections.Clone();
             BindDestinationLookups();
             suppressDestinationEvents = true;
             try
@@ -840,8 +855,19 @@ public sealed class StudentTransferReadmissionPage : V2Page
     {
         try
         {
-            cls.Bind(
-                DatabaseHelper.QueryUser("GetClasses"), "ClassId", "ClassName");
+            int selected = cls.SelectedId;
+            cls.ClearLookup();
+            if (campus.SelectedId <= 0) return;
+            using var catalog = DatabaseHelper.QueryUser("GetClasses");
+            using var raw = DatabaseHelper.QueryUser("GetClassSections",DatabaseHelper.Int("@CampusId",campus.SelectedId),
+                DatabaseHelper.Int("@ClassId",0),DatabaseHelper.Int("@SectionId",0));
+            using var assignments = RequiresActivePlacementChoices ? ActiveClassSectionPolicy.OnlyActive(raw) : raw.Copy();
+            using var assigned = ActiveClassSectionPolicy.ClassesWithAssignments(catalog,assignments);
+            suppressDestinationEvents = true;
+            try {
+                cls.Bind(assigned,"ClassId","ClassName");
+                if (assigned.AsEnumerable().Any(row=>Convert.ToInt32(row["ClassId"])==selected)) cls.SelectedValue=selected;
+            } finally { suppressDestinationEvents=false; }
         }
         catch (Exception ex)
         {
@@ -849,19 +875,6 @@ public sealed class StudentTransferReadmissionPage : V2Page
         }
     }
 
-    private static DataTable AdjacentClasses(DataTable classes, int currentClassId)
-    {
-        var result = classes.Clone();
-        if (currentClassId <= 0 || !classes.Columns.Contains("ClassId")) return result;
-        // Class IDs are identifiers; the configured display order defines the progression.
-        var ordered = LookupDisplayOrder.ForBinding(classes, "ClassId").AsEnumerable();
-        var rows = ordered.ToList();
-        int index = rows.FindIndex(row => Convert.ToInt32(row["ClassId"]) == currentClassId);
-        if (index < 0) return result;
-        if (index > 0) result.ImportRow(rows[index - 1]);
-        if (index + 1 < rows.Count) result.ImportRow(rows[index + 1]);
-        return result;
-    }
     private void LoadClassSections()
     {
         classSection.ClearLookup();
@@ -886,7 +899,8 @@ public sealed class StudentTransferReadmissionPage : V2Page
             dt.Columns.Add("ClassSectionId", typeof(int));
             dt.Columns.Add("SectionId", typeof(int));
             dt.Columns.Add("Display", typeof(string));
-            foreach (DataRow row in raw.Rows)
+            using var available = RequiresActivePlacementChoices ? ActiveClassSectionPolicy.OnlyActive(raw) : raw.Copy();
+            foreach (DataRow row in available.Rows)
             {
                 dt.Rows.Add(
                     Convert.ToInt32(
@@ -1053,11 +1067,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
             Warn("Transfer date cannot be before the placement date.");
             return;
         }
-        bool currentTransferPlacement=selectedEnrollment is not null
-            && selectedEnrollment.Table.Columns.Contains("PlacementYearStart")
-            && selectedEnrollment["PlacementYearStart"] is DateTime yearStart
-            && selectedEnrollment["PlacementYearEnd"] is DateTime yearEnd
-            && DateTime.Today>=yearStart.Date && DateTime.Today<=yearEnd.Date;
+        bool currentTransferPlacement=IsCurrentPlacement(selectedEnrollment);
         bool canSyncTransferFees=currentTransferPlacement && selectedEnrollment!["BillingReady"] is bool ready && ready;
         if(operation!="Re-Admit" && !currentTransferPlacement && string.IsNullOrWhiteSpace(remarks.Text))
         { Warn("Enter a reason for recording this historical transfer. Its date must be within the recorded academic year; existing fees will be preserved."); return; }

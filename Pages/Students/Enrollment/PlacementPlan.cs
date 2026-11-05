@@ -9,6 +9,13 @@ internal sealed record PlacementPlanItem(int EnrollmentId, int SourcePlacementId
 
 internal static class PlacementPlan
 {
+    internal static Task<DataTable> ReadSourcesAsync(int year) => DatabaseHelper.QuerySqlAsync("""
+        EXEC dbo.RequirePermission @UserId,N'Enrollment.Manage';
+        SELECT DISTINCT P.ClassSectionId,P.CampusId,P.ClassId,P.SectionId
+        FROM dbo.Enrollments E JOIN dbo.CampusClassSections P ON P.ClassSectionId=E.ClassSectionId
+        WHERE E.Status=N'Active' AND E.AcademicYearId=@Year;
+        """, DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Year",year));
+
     internal static string Serialize(IEnumerable<PlacementPlanItem> items) => JsonSerializer.Serialize(items);
 
     internal static Task<DataTable> ReadAsync(int year, int campus, int cls, int section) => DatabaseHelper.QuerySqlAsync("""
