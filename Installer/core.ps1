@@ -3,7 +3,8 @@ param(
     [int]$OriginalProcessId = 0,
     [long]$OriginalStartTicks = 0,
     [string]$OriginalUserSid = '',
-    [switch]$ResumeUpdate
+    [switch]$ResumeUpdate,
+    [switch]$GraphicalInstall
 )
 $ErrorActionPreference = 'Stop'
 . ([IO.Path]::Combine($PSScriptRoot,'UpdateRecovery.ps1'))
@@ -134,34 +135,100 @@ function Pause-Long {
     Start-Sleep -Milliseconds 1200
 }
 function Open-UpdateWindow {
-    if (-not $PreparedRoot) { return }
+    # Prepared updates and requested graphical first installs use one window.
+    # Unattended/disposable installer execution remains console-only.
+    if (-not $PreparedRoot -and -not $GraphicalInstall) { return }
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
     [Windows.Forms.Application]::EnableVisualStyles()
-    $script:UpdateWindow = New-Object Windows.Forms.Form
-    $script:UpdateWindow.Text = 'FMSC - Installing Update'
-    $script:UpdateWindow.ClientSize = New-Object Drawing.Size(540,155)
+    $updating = [bool]$PreparedRoot
+    $script:UpdateWindow = [Windows.Forms.Form]::new()
+    $script:UpdateWindow.Text = if ($updating) { 'FMSC - Installing Update' } else { 'FMSC - Setup' }
+    $script:UpdateWindow.ClientSize = [Drawing.Size]::new(640, 330)
     $script:UpdateWindow.StartPosition = 'CenterScreen'
     $script:UpdateWindow.FormBorderStyle = 'FixedDialog'
     $script:UpdateWindow.ControlBox = $false
-    $script:UpdateWindow.Font = New-Object Drawing.Font('Segoe UI',10)
-    $script:UpdateWindow.BackColor = [Drawing.Color]::FromArgb(250,248,247)
-    $script:UpdateStatus = New-Object Windows.Forms.Label
-    $script:UpdateStatus.SetBounds(20,15,500,85)
-    $script:UpdateStatus.TextAlign = 'MiddleCenter'
-    $script:UpdateBar = New-Object Windows.Forms.ProgressBar
-    $script:UpdateBar.SetBounds(25,115,490,16)
+    $script:UpdateWindow.MaximizeBox = $false
+    $script:UpdateWindow.MinimizeBox = $false
+    $script:UpdateWindow.ShowInTaskbar = $true
+    $script:UpdateWindow.Font = [Drawing.Font]::new('Segoe UI', 10)
+    $script:UpdateWindow.BackColor = [Drawing.Color]::White
+
+    $header = [Windows.Forms.Panel]::new()
+    $header.SetBounds(0, 0, 640, 104)
+    $header.BackColor = [Drawing.Color]::FromArgb(24, 42, 60)
+    $brand = [Windows.Forms.Label]::new()
+    $brand.SetBounds(26, 24, 52, 52)
+    $brand.BackColor = [Drawing.Color]::FromArgb(20, 184, 166)
+    $brand.ForeColor = [Drawing.Color]::White
+    $brand.Font = [Drawing.Font]::new('Segoe UI', 22, [Drawing.FontStyle]::Bold)
+    $brand.TextAlign = 'MiddleCenter'
+    $brand.Text = 'F'
+    $heading = [Windows.Forms.Label]::new()
+    $heading.SetBounds(94, 20, 376, 35)
+    $heading.Text = 'FMSC'
+    $heading.Font = [Drawing.Font]::new('Segoe UI', 20, [Drawing.FontStyle]::Bold)
+    $heading.ForeColor = [Drawing.Color]::White
+    $subtitle = [Windows.Forms.Label]::new()
+    $subtitle.SetBounds(96, 61, 410, 25)
+    $subtitle.Text = if ($updating) { 'School Management  /  Secure Update' } else { 'School Management  /  First-Time Setup' }
+    $subtitle.ForeColor = [Drawing.Color]::FromArgb(197, 215, 228)
+    $version = [Windows.Forms.Label]::new()
+    $version.SetBounds(500, 27, 115, 28)
+    $version.Text = "v$AppVersion"
+    $version.TextAlign = 'MiddleCenter'
+    $version.BackColor = [Drawing.Color]::FromArgb(41, 66, 85)
+    $version.ForeColor = [Drawing.Color]::White
+    $header.Controls.AddRange(@($brand, $heading, $subtitle, $version))
+
+    $caption = [Windows.Forms.Label]::new()
+    $caption.SetBounds(32, 124, 560, 22)
+    $caption.Font = [Drawing.Font]::new('Segoe UI', 9, [Drawing.FontStyle]::Bold)
+    $caption.ForeColor = [Drawing.Color]::FromArgb(12, 131, 119)
+    $caption.Text = 'INSTALLATION PROGRESS'
+    $script:UpdateStage = [Windows.Forms.Label]::new()
+    $script:UpdateStage.SetBounds(30, 152, 578, 30)
+    $script:UpdateStage.Font = [Drawing.Font]::new('Segoe UI', 14, [Drawing.FontStyle]::Bold)
+    $script:UpdateStage.ForeColor = [Drawing.Color]::FromArgb(29, 47, 66)
+    $script:UpdateStage.Text = if ($updating) { 'Preparing your update' } else { 'Preparing your installation' }
+    $script:UpdateStatus = [Windows.Forms.Label]::new()
+    $script:UpdateStatus.SetBounds(32, 187, 570, 50)
+    $script:UpdateStatus.ForeColor = [Drawing.Color]::FromArgb(75, 91, 108)
+    $script:UpdateStatus.Text = 'Installing'
+    $script:UpdateBar = [Windows.Forms.ProgressBar]::new()
+    $script:UpdateBar.SetBounds(32, 250, 576, 12)
     $script:UpdateBar.Style = 'Marquee'
-    $script:UpdateWindow.Controls.AddRange(@($script:UpdateStatus,$script:UpdateBar))
+    $script:UpdateBar.MarqueeAnimationSpeed = 30
+    $script:UpdateBar.Maximum = 100
+    $script:UpdateFooter = [Windows.Forms.Label]::new()
+    $script:UpdateFooter.SetBounds(32, 279, 576, 35)
+    $script:UpdateFooter.ForeColor = [Drawing.Color]::FromArgb(102, 118, 132)
+    $script:UpdateFooter.Font = [Drawing.Font]::new('Segoe UI', 9)
+    $script:UpdateFooter.Text = "Database schema $DatabaseVersion   |   Keep this window open until setup finishes."
+    $script:UpdateWindow.Controls.AddRange(@($header, $caption, $script:UpdateStage,
+        $script:UpdateStatus, $script:UpdateBar, $script:UpdateFooter))
     $script:UpdateWindow.Show()
-    Set-UpdateWindowStatus 'Waiting for FMSC to close safely...'
+    Set-UpdateWindowStatus $(if ($updating) { 'Waiting for FMSC to close safely...' } else { 'Checking installation prerequisites...' })
 }
 function Set-UpdateWindowStatus {
     param([string]$Message)
     if ($script:UpdateWindow -and -not $script:UpdateWindow.IsDisposed) {
-        $script:UpdateStatus.Text = "Installing`r`n$Message`r`nPlease keep this computer switched on."
+        if ($Message -match '^STEP ([1-8]) OF 8\s+-\s+(.+)$') {
+            $script:UpdateStage.Text = "Step $($Matches[1]) of 8  /  $($Matches[2].Trim().ToLowerInvariant())"
+            $script:UpdateStatus.Text = 'Installing' + [Environment]::NewLine + 'Checking the next required operation...'
+        } else {
+            $script:UpdateStatus.Text = 'Installing' + [Environment]::NewLine + $Message
+        }
         [Windows.Forms.Application]::DoEvents()
     }
+}
+function Confirm-FmscInstallerChoice {
+    param([string]$Question, [string]$ConsolePrompt)
+    if ($GraphicalInstall) {
+        return [Windows.Forms.MessageBox]::Show($script:UpdateWindow, $Question,
+            'FMSC - Setup Confirmation', 'YesNo', 'Question') -eq [Windows.Forms.DialogResult]::Yes
+    }
+    return (Read-Host $ConsolePrompt) -match '^[Yy]$'
 }
 function Get-FmscDesktopShell {
     # Delegate restart to the existing desktop shell; never launch the school app
@@ -179,18 +246,28 @@ function Start-UpdatedFmsc {
 }
 function Start-FmscAfterInstallation {
     param([string]$Application)
-    if ($PreparedRoot) {
+    if ($PreparedRoot -or $GraphicalInstall) {
         if ($script:UpdateWindow) {
-            $script:UpdateWindow.Text = 'FMSC - Completed'
-            $script:UpdateStatus.Text = "Completed`r`nUpdate installed and verified. Starting FMSC..."
-            $script:UpdateBar.Style = 'Continuous'; $script:UpdateBar.Value = 100
+            $script:UpdateWindow.Text = 'FMSC - Setup Completed'
+            $script:UpdateStage.Text = 'Setup completed successfully'
+            $script:UpdateStatus.Text = if ($PreparedRoot) {
+                'Verified update installed.' + [Environment]::NewLine + 'Starting FMSC...'
+            } else {
+                'Application and database checks passed.' + [Environment]::NewLine + 'FMSC is ready to use.'
+            }
+            $script:UpdateBar.Style = 'Continuous'
+            $script:UpdateBar.Value = 100
+            $script:UpdateFooter.Text = "Application v$AppVersion   |   Database schema $DatabaseVersion"
             [Windows.Forms.Application]::DoEvents()
+        }
+        if ($GraphicalInstall -and -not $PreparedRoot) {
+            if (-not (Confirm-FmscInstallerChoice -Question 'FMSC was installed and verified successfully. Start the application now?' -ConsolePrompt 'Start FMSC SMS now? (Y/N)')) { return }
         }
         try { Start-UpdatedFmsc -Application $Application }
         catch {
-            Write-Log "Update completed; automatic restart failed: $($_.Exception.Message)"
-            [Windows.Forms.MessageBox]::Show('The update was installed successfully. Open FMSC from its desktop shortcut.',
-                'FMSC - Update Completed', 'OK', 'Information') | Out-Null
+            Write-Log "Installation completed; automatic start failed: $($_.Exception.Message)"
+            [Windows.Forms.MessageBox]::Show('Installation succeeded. Open FMSC from its desktop shortcut.',
+                'FMSC - Setup Completed', 'OK', 'Information') | Out-Null
         }
         return
     }
@@ -1164,8 +1241,8 @@ function Invoke-LocalDbMsiInstallation {
         throw "LocalDB repair requires support. Update stopped without opening an installation wizard. Log: $silentLog"
     }
     Write-Host '  You can complete LocalDB setup using the official Microsoft installer wizard.' -ForegroundColor $ColorInfo
-    $choice = Read-Host 'Open Microsoft LocalDB installation wizard now? (Y/N)'
-    if ($choice -notmatch '^[Yy]$') {
+    $choice = Confirm-FmscInstallerChoice -Question "The silent Microsoft LocalDB setup did not complete (MSI code $silentCode).`r`n`r`nOpen Microsoft's official installer wizard?`r`nDetailed diagnostic log:`r`n$silentLog" -ConsolePrompt 'Open Microsoft LocalDB installation wizard now? (Y/N)'
+    if (-not $choice) {
         throw "LocalDB not installed. Silent MSI code: $silentCode. Check $silentLog and rerun the installer."
     }
     Write-Step 'Starting the official Microsoft LocalDB installer wizard...'
@@ -1904,10 +1981,10 @@ catch {
         "  $LogFile" `
         -ForegroundColor $ColorInfo
     Write-Host ''
-    if ($PreparedRoot) {
+    if ($PreparedRoot -or $GraphicalInstall) {
         [Windows.Forms.MessageBox]::Show(
-            "Update could not be completed. FMSC has not been restarted.`r`n`r`n$($_.Exception.Message)`r`n`r`nLog: $LogFile`r`nPrevious application: $AppRollbackDir`r`nDatabase backup: $RecoveryBackupPath",
-            'FMSC - Update Needs Attention', 'OK', 'Error') | Out-Null
+            "Installation could not be completed. FMSC has not been restarted.`r`n`r`n$($_.Exception.Message)`r`n`r`nLog: $LogFile`r`nPrevious application: $AppRollbackDir`r`nDatabase backup: $RecoveryBackupPath",
+            'FMSC - Setup Needs Attention', 'OK', 'Error') | Out-Null
     } else { Read-Host '  Press ENTER to close' }
     exit 1
 }
