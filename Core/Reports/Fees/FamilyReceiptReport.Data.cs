@@ -24,7 +24,7 @@ internal static partial class FamilyReceiptReport
         {
             var row=data.NewRow();
             for(int index=0;index<source.Columns.Count;index++) row[index]=template[index];
-            row["ReceiptPageKey"]=1;row["DocumentTitle"]="FAMILY PAYMENT RECEIPT";
+            row["ReceiptPageKey"]=1;row["DocumentTitle"]="STUDENT PAYMENT RECEIPT";row["CopyLabel"]="";
             row["StudentName"]=first["FatherName"];row["FatherName"]="";row["AdmissionNumberText"]=references;row["ClassSection"]="";row["CampusName"]=campusHeading;
             row["ReceiptStatus"]=string.Join("; ",children.Select(child=>Convert.ToString(child.First()["ReceiptStatus"])).Where(text=>!string.IsNullOrWhiteSpace(text)).Distinct());
             row["FamilyBatch"]=$"{children.Length} students";row["FeeDescription"]=description;row["FeePeriod"]="";

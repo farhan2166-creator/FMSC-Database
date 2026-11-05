@@ -36,7 +36,6 @@ internal static class FeeReceiptDocuments
         await FeeCarryForwardLabels.ApplyAsync(printableLines,receiptNumber);
         // Issued documents never acquire today's fees, concessions or balances.
         using var data=BuildData(institution,document.Tables[0].Rows[0],document.Tables[1],printableLines);
-        if(child>0)foreach(DataRow row in data.Rows){row["DocumentTitle"]="STUDENT COPY OF FAMILY RECEIPT";row["CopyLabel"]="CHILD COPY";}
         await FeeDocumentParents.ApplyAsync(data);
         if(!Current())return true;
         Show(owner,data);

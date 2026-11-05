@@ -23,7 +23,7 @@ internal static partial class FeeReceiptDataBuilder
         DataRow? currentStudent=null;DataRow[] currentLines=Array.Empty<DataRow>();
         void Add(string description,string period,decimal amount,string kind,DataRow? detail=null)
         {
-            var row=data.Rows.Add(1,institution.Name,family?"FAMILY PAYMENT RECEIPT":"STUDENT PAYMENT RECEIPT","PARENT COPY",
+            var row=data.Rows.Add(1,institution.Name,"STUDENT PAYMENT RECEIPT","",
                 Text(header,"ReceiptNumber"),family?parent:Text(first,"StudentName"),references,
                 family || detail is null?"":Text(detail,"ClassName")+(string.IsNullOrWhiteSpace(Text(detail,"SectionName"))?"":" - "+Text(detail,"SectionName")),
                 Convert.ToDateTime(header["TransactionDate"]).ToString("dd-MM-yyyy hh:mm tt"),family?$"{students.Rows.Count} students":"",

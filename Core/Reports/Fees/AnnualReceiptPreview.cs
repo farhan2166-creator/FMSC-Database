@@ -65,7 +65,7 @@ internal static class AnnualReceiptPreview
                     decimal total = enrollment.Sum(row => Convert.ToDecimal(row["Amount"]));
                     foreach (var line in enrollment)
                     {
-                        var row = receipts.Rows.Add(pageKey,institution.Name,"STUDENT PAYMENT RECEIPT","STUDENT COPY",
+                        var row = receipts.Rows.Add(pageKey,institution.Name,"STUDENT PAYMENT RECEIPT","",
                             receipt.Key,first["StudentName"],AdmissionNumbers.ForId(admissionId),
                             $"{first["ClassName"]} - {first["SectionName"]}",
                             Convert.ToDateTime(header["PaymentDate"]).ToString("dd-MM-yyyy hh:mm tt"),

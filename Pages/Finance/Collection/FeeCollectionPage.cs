@@ -4637,7 +4637,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                     receiptPageKey: childIndex + 1,
                     institution,
                     documentTitle: "STUDENT PAYMENT RECEIPT",
-                    copyLabel: "STUDENT COPY",
+                    copyLabel: "",
                     receiptNumber,
                     studentName: first.StudentName,
                     admissionNumberText: first.AdmissionId > 0
@@ -4699,7 +4699,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 receiptPageKey: 1,
                 institution,
                 documentTitle: showActualAmount ? "STUDENT PAYMENT RECEIPT" : "STUDENT FEE BILL",
-                copyLabel: showActualAmount ? "STUDENT COPY" : "CUSTOMER COPY",
+                copyLabel: "",
                 receiptNumber,
                 studentName,
                 admissionNumberText: admissionId > 0 ? AdmissionNumbers.ForId(admissionId) : string.Empty,

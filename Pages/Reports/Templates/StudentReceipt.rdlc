@@ -189,30 +189,6 @@
                                 <FontWeight>Bold</FontWeight>
                               </Style>
                             </TextRun>
-                            <TextRun>
-                              <Value> (</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>6.25pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=Replace(Replace(First(Fields!CopyLabel.Value, "ReceiptPageGroup"), "STUDENT COPY", "Student Copy"), "CUSTOMER COPY", "Customer Copy")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>6.25pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>)</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>6.25pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                              </Style>
-                            </TextRun>
                           </TextRuns>
                           <Style>
                             <TextAlign>Center</TextAlign>

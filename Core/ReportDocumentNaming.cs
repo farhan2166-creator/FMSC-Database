@@ -14,10 +14,8 @@ internal static class ReportDocumentNaming
             "FamilyBill.rdlc" => ("Family Fee Bill", "Family Fee Bills", "bills"),
             "StudentReceipt.rdlc" when requestedTitle.Contains("Annual", StringComparison.OrdinalIgnoreCase)
                 => ("Annual Fee Receipt", "Annual Fee Receipts", "receipts"),
-            "StudentReceipt.rdlc" when Unique(data,"DocumentTitle")=="STUDENT COPY OF FAMILY RECEIPT"
-                => ("Student Copy of Family Receipt", "Student Copies of Family Receipts", "copies"),
             "StudentReceipt.rdlc" => ("Student Payment Receipt", "Student Payment Receipts", "receipts"),
-            "FamilyReceipt.rdlc" => ("Family Payment Receipt", "Family Payment Receipts", "receipts"),
+            "FamilyReceipt.rdlc" => ("Student Payment Receipt", "Student Payment Receipts", "receipts"),
             "FeeChanges.rdlc" => ("Fee Change Note", "Fee Change Notes", "notes"),
             _ => (requestedTitle, requestedTitle, "documents")
         };
