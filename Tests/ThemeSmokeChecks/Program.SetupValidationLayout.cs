@@ -62,4 +62,61 @@ internal static partial class Program
             }
         }
     }
+
+    private static void CheckCompactCatalogLayouts()
+    {
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        foreach (var size in new[] { new Size(1100, 670), new Size(850, 530) })
+        foreach (var catalog in Enum.GetValues<SetupCatalog>())
+        {
+            using MasterPage page = catalog switch {
+                SetupCatalog.Campuses => new CampusesPage(false),
+                SetupCatalog.Classes => new ClassesPage(false, initialize: false),
+                _ => new SectionsPage(false, initialize: false)
+            };
+            page.PrepareForEmbedding(keepActions: true);
+            page.HideRecordsChrome();
+            page.UseCompactCatalogEditor();
+            using var host = new Form { ClientSize = size };
+            page.Dock = DockStyle.Fill; host.Controls.Add(page); host.Show(); Application.DoEvents();
+            var card = (HumanCard)typeof(MasterPage).GetField("_editorCard", flags)!.GetValue(page)!;
+            var editor = (TableLayoutPanel)typeof(MasterPage).GetField("_editor", flags)!.GetValue(page)!;
+            Check(!card.Content.VerticalScroll.Visible, catalog + " has no unnecessary editor scrollbar at " + size.Width);
+            Check(editor.Bottom <= card.Content.ClientSize.Height - card.Content.Padding.Bottom,
+                catalog + " fields fit fully inside the editor card");
+            var messages = (Dictionary<Control, Label>)typeof(MasterPage).GetField("_editorValidationLabels", flags)!.GetValue(page)!;
+            Check(messages.Values.All(label => ((TableLayoutPanel)label.Parent!).RowStyles[1].Height == 0),
+                catalog + " reserves no empty validation lines");
+            int compactHeight = card.Height;
+            if (catalog == SetupCatalog.Campuses)
+            {
+                var fields = (Dictionary<string, Control>)typeof(MasterPage).GetField("_controls", flags)!.GetValue(page)!;
+                fields["CampusName"].Text = "Fictional campus";
+                ((ModernComboBox)fields["CampusType"]).SelectedIndex = 0;
+                fields["ContactNumber"].Text = "123"; fields["Email"].Text = "invalid";
+                Check(!(bool)page.GetType().GetMethod("CanSaveRecord", flags)!.Invoke(page, null)!, "Compact campus editor retains contact validation");
+                Application.DoEvents();
+                Check(card.Height > compactHeight && !card.Content.VerticalScroll.Visible,
+                    $"Campus errors expand the editor without an unnecessary scrollbar: width={size.Width}, compact={compactHeight}, expanded={card.Height}, scroll={card.Content.VerticalScroll.Visible}, rows={string.Join(',', editor.RowStyles.Cast<RowStyle>().Select(row => row.Height))}, labels={string.Join(',', messages.Values.Select(label => label.Visible + ":" + label.Height))}");
+                foreach (string key in new[] { "ContactNumber", "Email" })
+                {
+                    var label = messages[fields[key]];
+                    var measured = TextRenderer.MeasureText(label.Text, label.Font, new Size(label.Width, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl);
+                    Check(label.Visible && measured.Height <= label.Height, key + " validation remains readable in the compact editor");
+                }
+                fields["ContactNumber"].Text = "03001234567"; fields["Email"].Text = "office@example.com";
+                Application.DoEvents();
+                Check(card.Height == compactHeight, "Correcting campus contacts collapses their error rows again");
+            }
+            host.ClientSize = new Size(size.Width == 1100 ? 850 : 1100, size.Height);
+            Application.DoEvents();
+            Check(!card.Content.VerticalScroll.Visible && editor.Bottom <= card.Content.ClientSize.Height,
+                catalog + " remains fully visible after resizing");
+            host.ClientSize = size; Application.DoEvents();
+            Directory.CreateDirectory("artifacts/compact-catalogs");
+            using var picture = new Bitmap(host.ClientSize.Width, host.ClientSize.Height);
+            host.DrawToBitmap(picture, new Rectangle(Point.Empty, picture.Size));
+            picture.Save("artifacts/compact-catalogs/" + catalog + "-" + size.Width + ".png");
+        }
+    }
 }

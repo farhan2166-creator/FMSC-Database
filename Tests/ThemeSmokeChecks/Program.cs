@@ -72,6 +72,7 @@ internal static partial class Program
         }
         if (args.Contains("--class-section-setup"))
         {
+            CheckCompactCatalogLayouts();
             CheckAssignmentLayout();
             CheckSelectiveWorkspaceGuards();
             Console.WriteLine($"PASS: {checks} class/section catalog, draft and dialog checks (no database connection).");

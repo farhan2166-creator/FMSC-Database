@@ -29,6 +29,7 @@ internal sealed class ClassSectionCatalogDialog : ApplicationWindowForm, IBusyPa
         };
         Editor.PrepareForEmbedding(keepActions: true);
         Editor.HideRecordsChrome();
+        Editor.UseCompactCatalogEditor();
         Editor.Dock = DockStyle.Fill;
         var close = new ModernButton { Text = UiText.Actions.Close, ThemeRole = "Secondary", AutoSize = true };
         close.Click += (_, _) => Close();

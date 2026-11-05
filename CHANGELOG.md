@@ -1,5 +1,13 @@
 # Changelog
 
+## Compact setup editors — 2026-11-05
+
+- Fit campus, class and section catalog entry cards to their actual field/button
+  heights. Remove unnecessary vertical editor scrollbars and collapse blank campus
+  validation rows; display the existing messages when input needs correction.
+- Keep genuine overflow scrolling available on smaller windows and preserve the
+  existing layout of other master-data pages.
+
 ## Main navigation groups — 2026-11-05
 
 - Add Fees and Students below Daily Work. Keep Daily Work to six frequently used

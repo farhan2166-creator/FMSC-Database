@@ -5,6 +5,61 @@ namespace FMSC_SMS.Core;
 
 public partial class MasterPage
 {
+    // Catalog dialogs share this compact layout; other master editors retain
+    // their established split/tab sizing and reserved validation rows.
+    internal void UseCompactCatalogEditor()
+    {
+        if (_compactCatalogEditor || _stackedEditorLayout is null || _editorCard is null || _editor is null) return;
+        _compactCatalogEditor = true;
+        _editor.AutoSize = false;
+        _stackedEditorLayout.SizeChanged += (_, _) => SizeCatalogEditor();
+        _editorCard.Content.Layout += (_, _) => SizeCatalogEditor();
+        foreach (var label in _editorValidationLabels.Values)
+        {
+            label.VisibleChanged += (_, _) => SizeCatalogEditor();
+            label.TextChanged += (_, _) => SizeCatalogEditor();
+        }
+        SizeCatalogEditor();
+        // The button row gets its final preferred height only after the dialog
+        // has laid out at its real width, rather than the control's initial size.
+        Defer(SizeCatalogEditor);
+    }
+
+    private void SizeCatalogEditor()
+    {
+        if (!_compactCatalogEditor || _sizingCatalogEditor || _editor is null || _editorCard is null || _stackedEditorLayout is null) return;
+        _sizingCatalogEditor = true;
+        try
+        {
+            foreach (var label in _editorValidationLabels.Values)
+                if (label.Parent is TableLayoutPanel field)
+                    field.RowStyles[1].Height = label.Visible && label.Text.Length > 0 ? EditorValidationHeight : 0;
+            for (int row = 0; row < _editor.RowCount; row++)
+            {
+                var fields = _editorFields.Where(field => _editor.GetRow(field.Control) == row).ToArray();
+                int validation = _editorValidationLabels.Values.Where(label => fields.Any(field => ReferenceEquals(label.Parent, field.Control)))
+                    .Select(label => label.Visible && label.Text.Length > 0 ? EditorValidationHeight : 0).DefaultIfEmpty().Max();
+                int input = fields.Any(field => field.Multiline) ? AppMetrics.MultilineInputHeight(72) : AppMetrics.InputControlHeight;
+                _editor.RowStyles[row].Height = input + EditorFieldGap + EditorInputVerticalInset * 2 + validation;
+            }
+            // Row styles are authoritative. AutoSize/GetPreferredSize can retain
+            // the old reserved-error height for a layout pass and create a scrollbar.
+            _editor.Height = (int)Math.Ceiling(_editor.RowStyles.Cast<RowStyle>().Sum(row => row.Height)) + _editor.Padding.Vertical;
+            int bodyHeight = _editorCard.Content.Padding.Vertical;
+            foreach (Control control in _editorCard.Content.Controls)
+                if (control.Dock == DockStyle.Top)
+                    bodyHeight += ReferenceEquals(control, _editor) ? _editor.Height
+                        : control.GetPreferredSize(new Size(_editorCard.Content.ClientSize.Width, 0)).Height;
+            int wanted = _editorCard.Header.Height + _editorCard.Padding.Vertical + bodyHeight + 2;
+            int available = Math.Max(0, _stackedEditorLayout.ClientSize.Height - AppScale.Scale(140));
+            if (available <= 0) return;
+            int height = Math.Min(wanted, available);
+            _editorCard.Content.AutoScroll = wanted > available;
+            _stackedEditorLayout.RowStyles[0].Height = height;
+            _stackedEditorLayout.PerformLayout();
+        }
+        finally { _sizingCatalogEditor = false; }
+    }
     private static bool IsOperatorHidden(FieldSpec field)
     {
         if (field.Kind == FieldKind.ComboString &&
@@ -104,6 +159,7 @@ public partial class MasterPage
             }
         }
         _editor.ResumeLayout(true);
+        SizeCatalogEditor();
     }
     private Control CreateField(FieldSpec field)
     {

@@ -2,7 +2,7 @@ using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Setup.Academics;
 public sealed class ClassesPage : MasterPage
 {
-    public ClassesPage(bool splitEditorAndRecords = true)
+    public ClassesPage(bool splitEditorAndRecords = true, bool initialize = true)
         : base(
             "Classes",
             "Create the classes students can join under each academic program.",
@@ -98,7 +98,7 @@ public sealed class ClassesPage : MasterPage
                 DatabaseHelper.Int(
                     "@AcademicProgramId",
                     0)
-            })
+            }, initialize: initialize)
     {
     }
 }

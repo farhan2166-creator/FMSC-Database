@@ -2,7 +2,7 @@ using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Setup.Academics;
 public sealed class SectionsPage : MasterPage
 {
-    public SectionsPage(bool splitEditorAndRecords = true) : base(
+    public SectionsPage(bool splitEditorAndRecords = true, bool initialize = true) : base(
         "Sections",
         "Create reusable section names such as A, B or Morning.",
         "GetSections",
@@ -31,7 +31,7 @@ public sealed class SectionsPage : MasterPage
         usageCountIdParameter: "@SectionId",
         usageCountLabel: "active student(s) enrolled",
         deleteBlockedProcedure: "GetSectionDeleteBlockedIds",
-        getParams: () => new[] { DatabaseHelper.Int("@UserId", CurrentUser.UserId) })
+        getParams: () => new[] { DatabaseHelper.Int("@UserId", CurrentUser.UserId) }, initialize: initialize)
     {
     }
 }

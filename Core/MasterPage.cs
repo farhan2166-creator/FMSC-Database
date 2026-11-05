@@ -14,6 +14,9 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
     protected virtual bool EditorValidationSpansCaption => false;
     private int EditorValidationHeight => ReserveEditorValidationSpace ? AppMetrics.TextHeight(AppTheme.SmallFont) * EditorValidationLines + 4 : 0;
     private readonly Dictionary<Control, Label> _editorValidationLabels = new();
+    private TableLayoutPanel? _stackedEditorLayout;
+    private bool _compactCatalogEditor;
+    private bool _sizingCatalogEditor;
     protected void BindEditorValidationMessages(FormValidator validator)
     {
         foreach (var pair in _editorValidationLabels)
@@ -426,6 +429,7 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
                     100));
             stacked.Controls.Add(editorCard, 0, 0);
             stacked.Controls.Add(gridCard, 0, 1);
+            _stackedEditorLayout = stacked;
             host = stacked;
         }
         SetContent(host, _guidance);
