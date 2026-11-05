@@ -1,6 +1,6 @@
-# Direct Export → PDF samples
+# Dashboard Reports — PDF and Print Review
 
-The **Direct PDF export samples** Windows workflow runs `--direct-pdf-review`:
+The **Dashboard Reports (PDF and Print)** Windows workflow runs `--direct-pdf-review`:
 the shared grid, student-identity and class-template fixtures, followed by a verified merge of
 their exported PDFs. It starts on relevant main/PR changes or can be run manually.
 Desktop CI runs the same fixture and publishes the same single-file download.
@@ -18,10 +18,9 @@ the production R/FR formats; an unissued credit entry stays labelled Credit #.
 Titles include the report view, and the deliberately artificial wide table is
 labelled as a layout check rather than an application report.
 
-Download **REVIEW-ALL.pdf** from the workflow run or its summary link. It downloads
+Download **FMSC-Dashboard-Reports-Review.pdf** from the workflow run or its summary link. It downloads
 directly as a PDF, without a ZIP, individual duplicate files or PNG previews,
-matching the fee-document review workflow. PDF bookmarks navigate sixteen report
-scenarios. Every source page, paper size, orientation and page order is preserved;
+matching the fee-document review workflow. PDF bookmarks navigate all generated report scenarios. Every source page, paper size, orientation and page order is preserved;
 wide reports retain all of their pages. The download is retained for seven days,
 separately from installer downloads.
 
@@ -39,7 +38,7 @@ They do not exercise the Save File dialog, school SQL queries or every screen's
 column/filter setup. They are not screenshots or recreated PDF designs.
 
 The data and school/operator names are fictional. The review combines these
-direct exports (individual files remain available when running locally):
+dashboard report exports (individual files remain available when running locally):
 
 - `collections-receipts-export.pdf`: the actual Whole School receipt preparation,
   including the grand total.
@@ -58,8 +57,7 @@ fixtures are included too. Those samples also use `GridReportPreview.ExportPdf`.
 Class & Section Summary, Class Outstanding Charges, Class Marks Sheet, Class Exam
 Attendance Sheet and Class Monthly Attendance Register are included from their
 RDLC templates. Heading checks verify centered text, full report/copy widths and
-the school heading's position in the rendered PDF. The current combined review
-contains 16 scenarios and 22 pages.
+the school heading's position in the rendered PDF. The scenario count and number of pages are reported by each workflow run; the generated review expands existing multi-page and grouping scenarios.
 
 The combined file is published only after all fixture suites and the merge checks
 pass. A failed PDF check cannot publish a partial review or reuse a previous
