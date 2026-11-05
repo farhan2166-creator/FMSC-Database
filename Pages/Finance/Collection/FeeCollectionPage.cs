@@ -1375,9 +1375,15 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 DefaultCellStyle = new DataGridViewCellStyle { Format = "0.##", Alignment = DataGridViewContentAlignment.MiddleCenter }
             });
         recentPayments.Columns.Add(new DataGridViewTextBoxColumn {
-            Name = "ReceiptTotal", HeaderText = "Family Receipt Total", ReadOnly = true,
+            Name = "ReceiptTotal", HeaderText = "Receipt Total (Rs.)", ReadOnly = true,
             MinimumWidth = AppScale.Scale(100),
             DefaultCellStyle = new DataGridViewCellStyle { Format = "#,0.##" }
+        });
+        recentPayments.Columns.Add(new DataGridViewTextBoxColumn {
+            Name = "BalanceThen", HeaderText = "Balance Then (Rs.)", ReadOnly = true,
+            MinimumWidth = AppScale.Scale(110),
+            ToolTipText = "This student's saved remaining fee balance immediately after this receipt, before any later payments or changes. A dash means it was not recorded.",
+            DefaultCellStyle = new DataGridViewCellStyle { Format = "#,0.##", NullValue = "—", Alignment = DataGridViewContentAlignment.MiddleCenter }
         });
         recentPayments.Columns["Adjusted"].DisplayIndex = 5;
         // Keep the database receipt key for reprinting/recovery; format credit
@@ -1402,12 +1408,15 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         };
         recentPayments.Columns["NetPaid"].DisplayIndex = 6;
         recentPayments.Columns["Adjusted"].Visible = recentPayments.Columns["NetPaid"].Visible = false;
-        recentPayments.Columns["ReceiptNumber"].HeaderText = "Reference";
-        recentPayments.Columns["TransactionType"].HeaderText = "Activity";
-        recentPayments.Columns["ChargeType"].HeaderText = "Fee / Details";
-        recentPayments.Columns["Amount"].HeaderText = "Student Amount";
+        recentPayments.Columns["ReceiptNumber"].HeaderText = "Receipt / Reference";
+        recentPayments.Columns["TransactionType"].HeaderText = "Transaction";
+        recentPayments.Columns["ChargeType"].HeaderText = "Details";
+        recentPayments.Columns["Amount"].HeaderText = "Original Student Amount (Rs.)";
+        recentPayments.Columns["Amount"].ToolTipText = "The amount recorded for this student in this transaction, before later adjustments.";
+        recentPayments.Columns["ReceiptTotal"].ToolTipText = "The original full receipt amount for all included students. For an individual receipt, this equals the student's payment. A dash means the receipt total is unavailable.";
+        recentPayments.Columns["PaymentMethod"].HeaderText = "Payment Method";
         int order = 0;
-        foreach (string name in new[] { "PaymentDate", "ReceiptNumber", "TransactionType", "ChargeType", "Amount", "PaymentMethod", "ReceiptTotal" })
+        foreach (string name in new[] { "PaymentDate", "ReceiptNumber", "TransactionType", "ChargeType", "Amount", "PaymentMethod", "ReceiptTotal", "BalanceThen" })
             recentPayments.Columns[name].DisplayIndex = order++;
         foreach (string name in new[] { "Amount", "Adjusted", "NetPaid", "ReceiptTotal" })
             recentPayments.Columns[name].DefaultCellStyle.Format = "#,0.##";
@@ -1460,9 +1469,9 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             ? value.ToString("#,0.##") : "—";
         var details = new List<(string Label, string Value)> {
             ("Receipt / reference", reference),
-            ("This student's amount", $"Rs. {Money("Amount")}"),
+            ("Original student amount", $"Rs. {Money("Amount")}"),
             ("This student's adjustments", $"Rs. {Money("Adjusted")}"),
-            ("After adjustments", $"Rs. {Money("NetPaid")}") };
+            ("Net student amount", $"Rs. {Money("NetPaid")}") };
         string split = row.Cells["Amount"].ToolTipText;
         if (split.StartsWith("New money applied:", StringComparison.Ordinal))
         {
@@ -1486,7 +1495,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 }
         }
         if (row.Cells["ReceiptTotal"].Value is not null and not DBNull)
-            details.Add(("Whole family receipt total", $"Rs. {Money("ReceiptTotal")}"));
+            details.Add(("Receipt total · all students", $"Rs. {Money("ReceiptTotal")}"));
+        details.Add(("Student balance after receipt", $"Rs. {Money("BalanceThen")}"));
         ShowPaymentHistoryDetails(details);
     }
     private void ShowPaymentHistoryDetails(IEnumerable<(string Label, string Value)> details)
@@ -1525,7 +1535,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         {
             return;
         }
-        reprintReceiptButton.Text = historyReceiptChild > 0 ? "Reprint Child Receipt" : recentPayments.CurrentRow?.Cells["ReceiptTotal"].Value is not null and not DBNull ? "Reprint Family Receipt" : "Reprint Receipt";
+        reprintReceiptButton.Text = historyReceiptChild > 0 ? "Reprint Student Receipt" : recentPayments.CurrentRow?.Cells["ReceiptTotal"].Value is not null and not DBNull ? "Reprint Full Receipt" : "Reprint Receipt";
         reprintReceiptButton.Enabled =
             recentPayments.CurrentRow is not null &&
             recentPayments.CurrentRow.Tag is true &&
@@ -2576,7 +2586,11 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                     settled,GetText(receipt,"PaymentMethod"),0);
                 recentPayments.Rows[index].Cells["Adjusted"].Value=GetDecimal(receipt,"Adjusted");
                 recentPayments.Rows[index].Cells["NetPaid"].Value=GetDecimal(receipt,"NetSettled");
-                recentPayments.Rows[index].Cells["ReceiptTotal"].Value=GetInt(receipt,"StudentCount")>1?receipt["TotalSettled"]:null;
+                recentPayments.Rows[index].Cells["ReceiptTotal"].Value=receipt["TotalSettled"];
+                var savedBalance=familyPaymentBreakdowns.AsEnumerable().FirstOrDefault(member=>
+                    GetInt(member,"AdmissionId")==selectedAdmission && string.Equals(GetText(member,"ReceiptNumber"),GetText(receipt,"ReceiptNumber"),StringComparison.OrdinalIgnoreCase));
+                recentPayments.Rows[index].Cells["BalanceThen"].Value=savedBalance is not null && savedBalance.Table.Columns.Contains("BalanceRemaining")
+                    ? savedBalance["BalanceRemaining"] : null;
                 recentPayments.Rows[index].Cells["Amount"].ToolTipText=$"New money applied: Rs. {GetDecimal(receipt,"CashApplied"):N0}; credit used: Rs. {GetDecimal(receipt,"CreditApplied"):N0}.";
                 recentPayments.Rows[index].Cells["TransactionType"].ToolTipText="Status applies to this student's share of the original receipt.";
                 recentPayments.Rows[index].Tag=true;

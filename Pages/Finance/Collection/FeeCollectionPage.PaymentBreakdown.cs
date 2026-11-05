@@ -54,7 +54,7 @@ public sealed partial class FeeCollectionPage
         grid.Name="receiptSiblingBreakdown";grid.Dock=DockStyle.Fill;grid.ReadOnly=true;
         grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill;
         grid.Columns.Add("Student","Student");
-        foreach(var (name,title) in new[]{("Original","Original share"),("Adjusted","Adjustments"),("Net","Still recorded")})
+        foreach(var (name,title) in new[]{("Original","Original Payment"),("Adjusted","Adjustments"),("Net","Net Payment")})
         {
             grid.Columns.Add(name,title);
             grid.Columns[name].ValueType=typeof(decimal);
@@ -64,6 +64,9 @@ public sealed partial class FeeCollectionPage
             grid.Columns[name].FillWeight=20;
         }
         grid.Columns.Add("Status","Status");grid.Columns["Status"].MinimumWidth=AppScale.Scale(112);grid.Columns["Status"].FillWeight=24;
+        grid.Columns["Original"].ToolTipText="The student's original payment on this receipt, including any advance used (Rs.).";
+        grid.Columns["Adjusted"].ToolTipText="Changes to the original payment, such as refunds, corrections or reversals (Rs.).";
+        grid.Columns["Net"].ToolTipText="Payment remaining after adjustments (Rs.). This is not the student's outstanding fee balance.";
         grid.Columns["Student"].MinimumWidth=AppScale.Scale(170);grid.Columns["Student"].FillWeight=44;
         foreach(DataGridViewColumn column in grid.Columns)column.SortMode=DataGridViewColumnSortMode.NotSortable;
         HumanUi.ApplyGridStyle(grid,AppTheme.Primary);
@@ -83,10 +86,9 @@ public sealed partial class FeeCollectionPage
         grid.CellClick+=(_,e)=>{if(e.RowIndex>=0)SelectHistoryReceipt(grid);};
         grid.CurrentCellChanged+=(_,_)=>{if(grid.ContainsFocus)SelectHistoryReceipt(grid);};
         grid.Layout+=(_,_)=>FitFamilyPaymentBreakdown(grid);
-        string totals=$"Original receipt total: Rs. {original:N0}    Adjustments: Rs. {adjusted:N0}    Still recorded: Rs. {net:N0}";
-        string heading=$"{reference} · Original shares and current adjustments";
-        if(GetDecimal(members[0],"ReceiptCreditApplied")>0||GetDecimal(members[0],"ReceiptCashReceived")!=original)
-            heading+=$"\r\nCash received then: Rs. {GetDecimal(members[0],"ReceiptCashReceived"):N0}; existing credit used: Rs. {GetDecimal(members[0],"ReceiptCreditApplied"):N0}.";
+        string totals=$"Receipt total: Rs. {original:N0}    Adjustments: Rs. {adjusted:N0}    Net payment: Rs. {net:N0}";
+        string heading=$"{reference} · Payments by student on this receipt";
+        heading+=$"\r\nCash received: Rs. {GetDecimal(members[0],"ReceiptCashReceived"):N0} · Advance used: Rs. {GetDecimal(members[0],"ReceiptCreditApplied"):N0}";
         panel.SuspendLayout();
         try
         {

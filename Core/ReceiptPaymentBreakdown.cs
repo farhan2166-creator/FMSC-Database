@@ -8,7 +8,7 @@ internal static class ReceiptPaymentBreakdown
     internal const string Sql = """
         EXEC dbo.RequirePermission @UserId,N'Fees.View';
         SELECT R.ReceiptNumber,S.AdmissionId,S.AdmissionNumber,S.StudentName,
-            S.CashApplied,S.CreditApplied,R.CashApplied+R.CreditApplied OriginalTotal,
+            S.CashApplied,S.CreditApplied,S.BalanceRemaining,R.CashApplied+R.CreditApplied OriginalTotal,
             R.CashReceived ReceiptCashReceived,R.CreditApplied ReceiptCreditApplied,
             S.CashApplied+S.CreditApplied-COALESCE(N.NetSettled,0) Adjusted,
             COALESCE(N.NetSettled,0) NetSettled,
@@ -18,7 +18,7 @@ internal static class ReceiptPaymentBreakdown
                  WHEN S.CashApplied+S.CreditApplied>0 THEN N'Paid' ELSE N'No payment' END PaymentStatus
         FROM dbo.CollectionReceipts R
         CROSS APPLY OPENJSON(R.SnapshotJson,'$.Students') WITH
-            (AdmissionId int,AdmissionNumber nvarchar(50),StudentName nvarchar(200),CashApplied decimal(12,2),CreditApplied decimal(12,2)) S
+            (AdmissionId int,AdmissionNumber nvarchar(50),StudentName nvarchar(200),CashApplied decimal(12,2),CreditApplied decimal(12,2),BalanceRemaining decimal(12,2)) S
         OUTER APPLY(SELECT COUNT(*) PaymentCount,
             SUM(CASE WHEN P.Status=N'Reversed' THEN 1 ELSE 0 END) ReversedCount,
             SUM(CASE WHEN P.Status<>N'Completed' THEN 0 ELSE
@@ -31,7 +31,6 @@ internal static class ReceiptPaymentBreakdown
                 WHERE FP.RelatedFeePaymentId=P.FeePaymentId AND FP.Status=N'Completed') X
             WHERE L.CollectionReceiptId=R.CollectionReceiptId AND P.AdmissionId=S.AdmissionId) N
         WHERE R.PaymentMethod<>N'Fee changes'
-            AND (SELECT COUNT(*) FROM OPENJSON(R.SnapshotJson,'$.Students'))>1
             AND EXISTS(SELECT 1 FROM OPENJSON(R.SnapshotJson,'$.Students') WITH(AdmissionId int) M WHERE M.AdmissionId=@AdmissionId)
         ORDER BY R.CreatedAt DESC,S.AdmissionId;
         """;
