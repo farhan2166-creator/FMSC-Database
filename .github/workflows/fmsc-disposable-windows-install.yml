@@ -45,6 +45,7 @@ jobs:
         run: .\Tools\TestAutomaticBilling.ps1
 
       - name: Recover interrupted migrations and restore verified backup on disposable databases
+        if: ${{ !cancelled() }}
         shell: pwsh
         timeout-minutes: 10
         run: .\Tools\TestUpdateRecoverySql.ps1

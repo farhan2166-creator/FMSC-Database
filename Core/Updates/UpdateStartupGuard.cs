@@ -28,11 +28,7 @@ internal static class UpdateStartupGuard
             if (!File.Exists(journal)) return true;
             ValidateRecoveryStorage(root);
             if (new FileInfo(journal).Length > 32768) throw new InvalidDataException("The update recovery record is invalid. Contact support.");
-            using var record = JsonDocument.Parse(File.ReadAllBytes(journal));
-            if (!record.RootElement.TryGetProperty("Format", out var format) || format.GetString() != "fmsc-recovery/v1" ||
-                !record.RootElement.TryGetProperty("Phase", out var phase))
-                throw new InvalidDataException("The update recovery record is invalid. Contact support.");
-            if (phase.GetString() == "Completed") return true;
+            if (!RequiresRecovery(File.ReadAllBytes(journal))) return true;
             string launcher = Path.Combine(root, "Launch-FMSC.ps1");
             if (!File.Exists(launcher)) throw new IOException("FMSC needs update recovery. Contact support; do not replace the school database.");
             var start = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
@@ -47,6 +43,18 @@ internal static class UpdateStartupGuard
             ModernMessageDialog.ShowWarning(null, error.Message, "FMSC - Update Recovery");
             return false;
         }
+    }
+
+    internal static bool RequiresRecovery(byte[] journal)
+    {
+        if (journal.Length > 32768) throw new InvalidDataException("The update recovery record is invalid. Contact support.");
+        using var record = JsonDocument.Parse(journal);
+        if (record.RootElement.ValueKind != JsonValueKind.Object ||
+            !record.RootElement.TryGetProperty("Format", out var format) || format.ValueKind != JsonValueKind.String ||
+            format.GetString() != "fmsc-recovery/v1" || !record.RootElement.TryGetProperty("Phase", out var phase) ||
+            phase.ValueKind != JsonValueKind.String || phase.GetString() is not ("Prepared" or "Migrating" or "Activating" or "Verified" or "Completed"))
+            throw new InvalidDataException("The update recovery record is invalid. Contact support.");
+        return phase.GetString() != "Completed";
     }
 
     private static void ValidateRecoveryStorage(string root)

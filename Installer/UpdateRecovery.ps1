@@ -89,6 +89,11 @@ function Read-FmscRecoveryJournal {
     if ($record.Backup -and ($record.BackupSha256 -notmatch '^[a-fA-F0-9]{64}$' -or $record.BeforeSchema -le 0)) {
         throw 'Recorded migration backup information is invalid.'
     }
+    $databaseGuid = [Guid]::Empty
+    if ($record.Phase -in @('Migrating','Activating','Verified','Completed') -and
+        -not [Guid]::TryParse([string]$record.DatabaseIdentity,[ref]$databaseGuid)) {
+        throw 'Recorded database identity is invalid.'
+    }
     if ($record.UserSid -eq [Security.Principal.WindowsIdentity]::GetCurrent().User.Value) {
         $download = [IO.Path]::GetFullPath($record.DownloadRoot).TrimEnd('\')
         if ((Split-Path -Leaf $download) -notmatch '^prepared-[a-f0-9]{32}$' -or
@@ -198,6 +203,20 @@ function Confirm-FmscRecoveryBackup {
     }
     $sqlPath = $script:RecoveryBackupPath.Replace("'", "''")
     Invoke-SqlMaster -Query "RESTORE VERIFYONLY FROM DISK = N'$sqlPath' WITH CHECKSUM" | Out-Null
+}
+function Initialize-FmscRecoveryConnection {
+    # Cleanup recovery may run after reboot and after snapshot deletion. Use the
+    # existing installer SQL dependency resolver, not a new transport or engine.
+    $script:SqlCmdPath = Resolve-SqlCmd
+    $localDb = Get-Command sqllocaldb.exe -ErrorAction SilentlyContinue
+    $executable = if ($localDb) { $localDb.Source } else { Join-Path $env:ProgramFiles 'Microsoft SQL Server/160/Tools/Binn/SqlLocalDB.exe' }
+    $null = & $executable start MSSQLLocalDB 2>&1
+    if ($LASTEXITCODE -ne 0) { throw 'LocalDB could not start for recovery verification.' }
+    $info = @(& $executable info MSSQLLocalDB 2>&1)
+    $pattern = '(?:np:)?(' + [regex]::Escape('\\.\pipe\LOCALDB#') + '[A-Za-z0-9]+' + [regex]::Escape('\tsql\query') + ')'
+    $endpoint = [regex]::Match(($info -join "`n"),$pattern)
+    if (-not $endpoint.Success) { throw 'Cannot confirm the LocalDB endpoint for recovery.' }
+    $script:SqlInstance = 'np:' + $endpoint.Groups[1].Value
 }
 function Complete-FmscRecoveryTransaction {
     if (-not $script:RecoveryJournal) { return }

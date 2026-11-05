@@ -151,11 +151,12 @@ DECLARE @Bill bigint=(SELECT TOP(1) B.BillingChargeId FROM dbo.BillingCharges B
  WHERE B.EnrollmentId=1 AND B.FeeTypeId=1 AND
  B.BillingMonth=DATEADD(month,-2,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1)) AND B.Status<>N'Cancelled');
 DECLARE @Before decimal(12,2)=dbo.GetFeeChargeBalance(@Bill);
+DECLARE @TransactionDate date=CONVERT(date,GETDATE());
 DECLARE @CreditJson nvarchar(max)=(SELECT @Bill ChargeId,1 AdmissionId,1 EnrollmentId,
  CONVERT(decimal(12,2),5000) Amount,@Before ExpectedBalance,
  CONVERT(decimal(12,2),5000) ExpectedCredit FOR JSON PATH);
 BEGIN TRAN;
-EXEC dbo.ApplyCollectionCredit @UserId=1,@TransactionDate=CONVERT(date,GETDATE()),@CreditsJson=@CreditJson;
+EXEC dbo.ApplyCollectionCredit @UserId=1,@TransactionDate=@TransactionDate,@CreditsJson=@CreditJson;
 DECLARE @PaymentId int=(SELECT TOP(1) FeePaymentId FROM dbo.FeePayments
  WHERE AdmissionId=1 AND IsCreditApplication=1 ORDER BY FeePaymentId DESC);
 DECLARE @Lines nvarchar(max)=(SELECT @Bill ChargeId,1 AdmissionId,1 EnrollmentId,
@@ -163,7 +164,7 @@ DECLARE @Lines nvarchar(max)=(SELECT @Bill ChargeId,1 AdmissionId,1 EnrollmentId
  CONVERT(decimal(12,2),0) Cash,CONVERT(decimal(12,2),5000) Credit FOR JSON PATH);
 DECLARE @Payments nvarchar(max)=CONCAT('[',@PaymentId,']');
 EXEC dbo.IssueCollectionReceipt @UserId=1,@PrimaryAdmissionId=1,
- @TransactionDate=CONVERT(date,GETDATE()),@PaymentMethod=N'Account Credit',
+ @TransactionDate=@TransactionDate,@PaymentMethod=N'Account Credit',
  @Remarks=N'Explicit fictional credit settlement',@StudentIdsJson=N'[1]',
  @PaymentIdsJson=@Payments,@LinesJson=@Lines,
  @CashReceived=0,@CreditApplied=5000,@DiscountApplied=0;

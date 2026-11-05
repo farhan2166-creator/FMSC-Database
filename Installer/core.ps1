@@ -1244,6 +1244,9 @@ try {
         throw 'Close all FMSC windows before recovering the update.'
     }
     if ($ResumeUpdate -and $script:RecoveryJournal.Phase -eq 'Verified') {
+        Initialize-FmscRecoveryConnection
+        Assert-FmscRecoveryDatabaseIdentity
+        Confirm-FmscRecoveryBackup -CurrentSchema (Convert-ToDbVersion (Get-DatabaseVersion))
         Complete-VerifiedApplicationUpdate -ApplicationDirectory $AppDir -Source $AppDir -Prepared (Join-Path $script:RecoveryRoot 'verification')
         Remove-FmscCompletedSnapshot
         Start-FmscAfterInstallation -Application (Join-Path $AppDir 'FMSC_SMS.exe')

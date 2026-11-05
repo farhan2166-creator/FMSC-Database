@@ -99,6 +99,7 @@ try {
     $script:RecoveryJournal = Initialize-FmscRecoveryTransaction $prepared $script:RecoveryRoot $version $schema $sid
     Require $script:shortcutInstalled 'Stable shortcut must be installed before journaling permits SQL.'
     $record = Read-FmscRecoveryJournal $script:RecoveryRoot
+    $record.DatabaseIdentity = '11111111-1111-4111-8111-111111111111'
     Assert-FmscResumeIdentity $record $script:RecoveryRoot $version $schema (Join-Path $script:RecoveryRoot 'Recovery.ps1')
     Refuse { Assert-FmscResumeIdentity $record $script:RecoveryRoot '9999.0.0' $schema (Join-Path $script:RecoveryRoot 'Recovery.ps1') }
     $record.UserSid = 'S-1-5-21-1-2-3-1234'

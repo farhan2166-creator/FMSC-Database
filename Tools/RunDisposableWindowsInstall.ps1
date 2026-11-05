@@ -296,6 +296,18 @@ EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@
         throw 'Installer did not activate application and attach the synthetic database.'
     }
     $checks.Add('Ran actual core.ps1; application and LocalDB database installed successfully')
+    . (Join-Path $project 'Installer/UpdateRecovery.ps1')
+    Assert-FmscRecoveryStorage $recoveryStorage
+    $installedShortcut=(New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
+    if (-not $installedShortcut.TargetPath.EndsWith('powershell.exe',[StringComparison]::OrdinalIgnoreCase) -or
+        -not $installedShortcut.Arguments.Contains((Join-Path $recoveryStorage 'Launch-FMSC.ps1'))) {
+        throw 'Installed shortcut does not use the stable external launcher.'
+    }
+    foreach ($asset in @('UpdateRecovery.ps1','Launch-FMSC.ps1')) {
+        if ((Get-FileHash (Join-Path $recoveryStorage $asset) -Algorithm SHA256).Hash -ne
+            (Get-FileHash (Join-Path $project "Installer/$asset") -Algorithm SHA256).Hash) { throw 'Installed recovery launcher asset differs from source.' }
+    }
+    $checks.Add('Actual installer created protected stable launcher and desktop shortcut outside the application folder')
 
     Stage 'Installed app schema verification'
     $version=@(Sql 'FMSC_DB' 'SET NOCOUNT ON; SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC;')

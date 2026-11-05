@@ -55,6 +55,18 @@ internal static partial class Program
             }
         }
         var prepared = new PreparedUpdate("1.2.0", "unused-stage", "unused-metadata", UpdateDownloadChoice.Full, false);
+        foreach (string phase in new[] { "Prepared", "Migrating", "Activating", "Verified", "Completed" })
+            Check(UpdateStartupGuard.RequiresRecovery(System.Text.Encoding.UTF8.GetBytes(
+                "{\"Format\":\"fmsc-recovery/v1\",\"Phase\":\"" + phase + "\"}")) == (phase != "Completed"),
+                "Direct startup requires recovery until completion: " + phase);
+        foreach (string invalid in new[] { "{}", "[]", "{\"Format\":\"fmsc-recovery/v1\",\"Phase\":\"Unknown\"}",
+            "{\"Format\":\"other\",\"Phase\":\"Completed\"}", "{\"Format\":\"fmsc-recovery/v1\",\"Phase\":100}" })
+        {
+            bool refused = false;
+            try { UpdateStartupGuard.RequiresRecovery(System.Text.Encoding.UTF8.GetBytes(invalid)); }
+            catch (InvalidDataException) { refused = true; }
+            Check(refused, "Malformed recovery state cannot enable direct startup");
+        }
         using (var parent = new Form())
         using (var dialog = new UpdateConnectionForm(() => (true, "ssh-rsa fixture")))
         {
