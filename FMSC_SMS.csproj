@@ -6,6 +6,13 @@
         <MakeDir Directories="$(BaseIntermediateOutputPath)FmscLauncher/$(Configuration)" />
         <Exec Command="&quot;$(windir)\Microsoft.NET\Framework64\v4.0.30319\csc.exe&quot; /nologo /target:winexe /optimize+ /out:&quot;$(BaseIntermediateOutputPath)FmscLauncher\$(Configuration)\FMSC.Launcher.exe&quot; &quot;$(MSBuildProjectDirectory)\Installer\Launch-FMSC.cs&quot;" />
     </Target>
+    <!-- A GUI-subsystem first-install launcher: the script remains the only installer engine. -->
+    <Target Name="BuildGraphicalInstallLauncher" BeforeTargets="PrepareForBuild"
+            Inputs="$(MSBuildProjectDirectory)/Installer/Start-FMSC-Install.cs"
+            Outputs="$(BaseIntermediateOutputPath)FmscInstaller/$(Configuration)/FMSC.Setup.exe">
+        <MakeDir Directories="$(BaseIntermediateOutputPath)FmscInstaller/$(Configuration)" />
+        <Exec Command="&quot;$(windir)\Microsoft.NET\Framework64\v4.0.30319\csc.exe&quot; /nologo /target:winexe /optimize+ /out:&quot;$(BaseIntermediateOutputPath)FmscInstaller\$(Configuration)\FMSC.Setup.exe&quot; &quot;$(MSBuildProjectDirectory)\Installer\Start-FMSC-Install.cs&quot;" />
+    </Target>
     <!-- Opt-in test binary; normal builds contain no disposable-target override. -->
     <PropertyGroup Condition="'$(FmscLevel2)' == 'true'">
         <DefineConstants>$(DefineConstants);FMSC_LEVEL2</DefineConstants>
@@ -21,6 +28,7 @@
         <!-- Standalone update packaging CLI is not part of the WinForms executable. -->
         <Compile Remove="Tools/**/*.cs" />
         <Compile Remove="Installer/Launch-FMSC.cs" />
+        <Compile Remove="Installer/Start-FMSC-Install.cs" />
     </ItemGroup>
 	<PropertyGroup>
 		<!-- Local verification repositories and generated files are not application inputs. -->
@@ -179,6 +187,7 @@
 		<Copy SourceFiles="@(MigrationFiles)" DestinationFiles="@(MigrationFiles->'$(ReleaseRoot)Migrations\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="@(MigrationApplierFiles)" DestinationFolder="$(ReleaseRoot)Migrations" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\core.ps1" DestinationFiles="$(ReleaseRoot)core.ps1" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(BaseIntermediateOutputPath)FmscInstaller/$(Configuration)/FMSC.Setup.exe" DestinationFiles="$(ReleaseRoot)FMSC.Setup.exe" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\UpdateRecovery.ps1" DestinationFiles="$(ReleaseRoot)UpdateRecovery.ps1" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\Install FMSC_SMS.bat" DestinationFiles="$(ReleaseRoot)Install FMSC_SMS.bat" SkipUnchangedFiles="true" />
 	</Target>
