@@ -53,16 +53,26 @@ try {
     if ($script:UpdateWindow) { $script:UpdateWindow.Dispose(); $script:UpdateWindow = $null }
 }
 $installerEntry = Get-Content (Join-Path $PSScriptRoot '../Installer/Install FMSC_SMS.bat') -Raw
-if ($installerEntry -notmatch '-STA -WindowStyle Hidden' -or
-    $installerEntry -notmatch '-ShowInstallerWindow') {
-    throw 'First-install launcher must hide the console and request the native setup dialog.'
+if ($installerEntry -notmatch 'FMSC[.]Setup[.]exe' -or
+    $installerEntry -match 'powershell[.]exe') {
+    throw 'The compatibility batch file must delegate to the graphical EXE only.'
+}
+$launcherSource = Get-Content (Join-Path $PSScriptRoot '../Installer/FMSC.Setup.cs') -Raw
+if (-not $launcherSource.Contains('-ShowInstallerWindow') -or
+    -not $launcherSource.Contains('-PreparedRoot') -or
+    -not $launcherSource.Contains('Verb = "runas"') -or
+    -not $launcherSource.Contains('-STA -WindowStyle Hidden') -or
+    -not $launcherSource.Contains('Path.GetFullPath') -or
+    -not $launcherSource.Contains('FMSC update process identity is invalid.')) {
+    throw 'Shared GUI setup executable must retain the guarded first-install/update modes.'
 }
 $finish = $source.IndexOf('    Start-FmscAfterInstallation -Application $InstalledExe')
 $verified = $source.IndexOf('    Complete-VerifiedApplicationUpdate -ApplicationDirectory $AppDir -Source $AppSource')
 $catch = $source.IndexOf("'                    INSTALLATION FAILED'")
 if ($finish -le $verified -or $finish -ge $catch) { throw 'Restart must occur only on the verified success path.' }
 $handoff = Get-Content (Join-Path $PSScriptRoot '../Core/Updates/UpdateInstallerHandoff.cs') -Raw
-if (-not $handoff.Contains('-STA -WindowStyle Hidden') -or -not $handoff.Contains('Verb = "runas"')) {
-    throw 'Prepared updates must elevate while hiding the PowerShell console.'
+if (-not $handoff.Contains('FMSC.Setup.exe') -or -not $handoff.Contains('--update') -or
+    -not $handoff.Contains('UseShellExecute = true, Verb = "runas"')) {
+    throw 'Prepared updates must request UAC through the verified shared GUI executable.'
 }
-Write-Output 'PASS: prompt-free prepared update, no cosmetic waits, normal-user shell restart exactly once after verification, shared first-install and update progress dialog, hidden elevated handoff.'
+Write-Output 'PASS: shared GUI setup launcher used by fresh installs and prepared updates; no console, UAC retained, eight-stage progress and safe restart preserved.'

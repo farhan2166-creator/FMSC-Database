@@ -233,7 +233,7 @@ try {
         '-p:PublishSingleFile=false','-p:PublishTrimmed=false')
     & dotnet @arguments
     NativeOk 'Full PortableRelease publish'
-    foreach ($file in @('FMSC_SMS/FMSC_SMS.exe','core.ps1','Install FMSC_SMS.bat',
+    foreach ($file in @('FMSC_SMS/FMSC_SMS.exe','FMSC_SMS/UpdateSupport/FMSC.Setup.exe','core.ps1','Install FMSC_SMS.bat','FMSC.Setup.exe',
         'Tools/SqlLocalDB.msi','Tools/sqlcmd.exe')) {
         if (-not (Test-Path -LiteralPath (Join-Path $release $file) -PathType Leaf)) {
             throw "Real installer asset missing: $file"
@@ -375,7 +375,7 @@ VALUES(1,N'Fictional Level 3 Install School',SYSUTCDATETIME(),SYSUTCDATETIME(),@
         $archive=[IO.Compression.ZipFile]::OpenRead($zipPath)
         try {
             $entries=@($archive.Entries | ForEach-Object { $_.FullName.Replace('\','/') })
-            foreach ($required in @('FMSC_SMS/FMSC_SMS.exe','core.ps1','Install FMSC_SMS.bat','Tools/SqlLocalDB.msi','Tools/sqlcmd.exe','Database/PUT_MDF_AND_LDF_HERE.txt','READ_ME_FIRST.txt','SHA256SUMS.txt')) {
+            foreach ($required in @('FMSC_SMS/FMSC_SMS.exe','FMSC_SMS/UpdateSupport/FMSC.Setup.exe','core.ps1','Install FMSC_SMS.bat','FMSC.Setup.exe','Tools/SqlLocalDB.msi','Tools/sqlcmd.exe','Database/PUT_MDF_AND_LDF_HERE.txt','READ_ME_FIRST.txt','SHA256SUMS.txt')) {
                 if ($required -notin $entries) { throw "ZIP is missing $required" }
             }
             if (@($entries | Where-Object { $_ -match '(?i)\.(mdf|ldf|ndf|bak)$' }).Count) { throw 'Database file entered the installer ZIP.' }
