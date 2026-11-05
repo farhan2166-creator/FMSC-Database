@@ -42,7 +42,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip=[IO.Compression.ZipFile]::OpenRead((Join-Path $root 'fmsc.dacpac'))
 try{$r=[IO.StreamReader]::new($zip.GetEntry('model.xml').Open());try{[xml]$model=$r.ReadToEnd()}finally{$r.Dispose()}}finally{$zip.Dispose()}
 $ns=[Xml.XmlNamespaceManager]::new($model.NameTable);$ns.AddNamespace('d',$model.DocumentElement.NamespaceURI)
-$sql=[IO.File]::ReadAllText((Join-Path $root 'Migrations/59.sql'))
+$sql=[IO.File]::ReadAllText((Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/59.sql'))
 $count=0
 foreach($batch in [regex]::Split($sql,'(?im)^\s*GO\s*\r?$')){
  $match=[regex]::Match($batch,'(?im)^CREATE OR ALTER PROCEDURE\s+([\w.\[\]]+)')

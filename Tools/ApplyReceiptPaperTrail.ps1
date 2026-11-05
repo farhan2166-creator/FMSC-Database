@@ -36,7 +36,7 @@ FROM sys.tables T JOIN sys.schemas S ON S.schema_id=T.schema_id
 WHERE S.name=N'dbo' AND T.name<>N'DatabaseVersion' AND T.is_ms_shipped=0 ORDER BY T.name;
 '@
  $before=@{};foreach($table in $tables.Rows){$before[[string]$table.TableName]=Hash $table.TableName $table.ColumnsSql $table.OrderSql}
- foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $root 'Migrations/55.sql')),'(?im)^\s*GO\s*\r?$')){
+ foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/55.sql')),'(?im)^\s*GO\s*\r?$')){
   if(![string]::IsNullOrWhiteSpace($batch)){[void](Query $batch)}
  }
  if([int](Query 'SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC;').Rows[0][0] -ne 55){throw 'Upgrade did not reach schema 55.'}

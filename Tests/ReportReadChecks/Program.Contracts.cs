@@ -23,8 +23,8 @@ internal static partial class Program
         var folder=new DirectoryInfo(AppContext.BaseDirectory);
         while(folder is not null && !File.Exists(Path.Combine(folder.FullName,"fmsc.dacpac")))folder=folder.Parent;
         if(folder is null)throw new InvalidOperationException("Run checks from a checkout containing fmsc.dacpac.");
-        string migration=File.ReadAllText(Path.Combine(folder.FullName,"Migrations","70.sql"));
-        string collectionMigration=File.ReadAllText(Path.Combine(folder.FullName,"Migrations","75.sql"));
+        string migration=File.ReadAllText(Path.Combine(folder.FullName,"Tests","LifecycleSqlChecks","Migrations","70.sql"));
+        string collectionMigration=File.ReadAllText(Path.Combine(folder.FullName,"Tests","LifecycleSqlChecks","Migrations","75.sql"));
         new TSql160Parser(true).Parse(new StringReader(collectionMigration),out var collectionErrors);
         Check(collectionErrors.Count==0,"Migration 75 parses: "+string.Join("; ",collectionErrors.Select(e=>e.Message)));
         Check(collectionMigration.Contains("[__ReceiptStudents]")&&collectionMigration.Contains("A.__ReceiptSnapshot")&&!collectionMigration.Contains("THEN N'Mixed'"),"Collections exposes roster metadata and actual distinct methods");
@@ -36,7 +36,7 @@ internal static partial class Program
             "All three debt views expose missing-date money instead of losing it from the split");
         Check(migration.Contains("DueDate < @AsOfDate") && migration.Contains("DueDate = @AsOfDate") && migration.Contains("DueDate > @AsOfDate"),
             "Debt reader separates overdue, due today and future charges");
-        string identityMigration=File.ReadAllText(Path.Combine(folder.FullName,"Migrations","74.sql"));
+        string identityMigration=File.ReadAllText(Path.Combine(folder.FullName,"Tests","LifecycleSqlChecks","Migrations","74.sql"));
         new TSql160Parser(true).Parse(new StringReader(identityMigration),out var identityErrors);
         Check(identityErrors.Count==0,"Migration 74 parses as SQL Server syntax: "+string.Join("; ",identityErrors.Select(e=>e.Message)));
         Check(System.Text.RegularExpressions.Regex.Matches(identityMigration,@"FatherName \[__StudentFatherName\], Gender \[__StudentGender\]").Count==2,

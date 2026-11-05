@@ -13,10 +13,10 @@ $version=($versionLines | ForEach-Object { $_.Trim() } | Where-Object { $_ -matc
 if($version -notin @('63','64','65','66','67')){throw 'Registration tests require schema 63 through 67.'}
 # Upgrade only the disposable clone, in order; never rerun a source migration.
 $migration=(@(
- if($version -eq '63'){[IO.File]::ReadAllText((Join-Path $root 'Migrations/64.sql'))}
- if($version -in @('63','64')){[IO.File]::ReadAllText((Join-Path $root 'Migrations/65.sql'))}
- if($version -in @('63','64','65')){[IO.File]::ReadAllText((Join-Path $root 'Migrations/66.sql'))}
- if($version -in @('63','64','65','66')){[IO.File]::ReadAllText((Join-Path $root 'Migrations/67.sql'))}
+ if($version -eq '63'){[IO.File]::ReadAllText((Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/64.sql'))}
+ if($version -in @('63','64')){[IO.File]::ReadAllText((Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/65.sql'))}
+ if($version -in @('63','64','65')){[IO.File]::ReadAllText((Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/66.sql'))}
+ if($version -in @('63','64','65','66')){[IO.File]::ReadAllText((Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/67.sql'))}
 ) -join "`r`n")
 $header=@"
 SET NOCOUNT ON; SET XACT_ABORT ON; SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON;

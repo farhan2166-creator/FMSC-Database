@@ -80,7 +80,8 @@ static void ValidateReleaseInput(string current, string version, int schema)
         .ProductVersion?.Split('+')[0] ?? "";
     if (version != actualVersion || version != declaredVersion || schema.ToString() != declaredSchema)
         throw new InvalidDataException("Requested version/schema does not match the published application and installer.");
-    if (!Directory.EnumerateFiles(Path.Combine(current, "UpdateSupport", "Migrations"), "*.sql").Any())
+    string migrations = Path.Combine(current, "UpdateSupport", "Migrations");
+    if (schema > 1 && (!Directory.Exists(migrations) || !Directory.EnumerateFiles(migrations, "*.sql").Any()))
         throw new InvalidDataException("Numbered installer migrations are missing from the published update.");
 }
 

@@ -28,7 +28,7 @@ function Fingerprint {
 }
 try {
     $before=Fingerprint
-    $migration=[IO.File]::ReadAllText((Join-Path $PSScriptRoot "../Migrations/$MigrationVersion.sql"))
+    $migration=[IO.File]::ReadAllText((Join-Path $PSScriptRoot "../Tests/LifecycleSqlChecks/Migrations/$MigrationVersion.sql"))
     foreach($batch in [regex]::Split($migration,'(?im)^\s*GO\s*$')) {
         if([string]::IsNullOrWhiteSpace($batch)){continue}
         $command=$connection.CreateCommand();$command.Transaction=$transaction;$command.CommandText=$batch

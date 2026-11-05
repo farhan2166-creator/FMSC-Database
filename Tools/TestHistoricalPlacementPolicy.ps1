@@ -17,7 +17,7 @@ function Query([string]$sql){$c=Connect;try{$q=$c.CreateCommand();$q.CommandText
 function Number([string]$sql){return (Query $sql).Tables[0].Rows[0][0]}
 function Apply([int]$version,[bool]$commit){
  $c=Connect;$tx=$c.BeginTransaction()
- try{foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $root ('Migrations/'+$version+'.sql'))),'(?im)^\s*GO\s*\r?$')){
+ try{foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $root ('Tests/LifecycleSqlChecks/Migrations/'+$version+'.sql'))),'(?im)^\s*GO\s*\r?$')){
   if([string]::IsNullOrWhiteSpace($batch)){continue};$q=$c.CreateCommand();$q.Transaction=$tx;$q.CommandText=$batch;$q.CommandTimeout=90;[void]$q.ExecuteNonQuery()
  };if($commit){$tx.Commit()}else{$tx.Rollback()}}catch{if($tx.Connection){$tx.Rollback()};throw}finally{$c.Dispose()}
 }

@@ -51,11 +51,13 @@ class PermissionPolicyChecks(unittest.TestCase):
         self.assertIsNotNone(installer)
         required = int(application.group(1))
         migrations = {int(path.stem) for path in (ROOT/'Migrations').glob('*.sql')}
-        self.assertGreaterEqual(required, 20)
-        self.assertEqual(required, max(migrations))
+        self.assertGreaterEqual(required, 1)
+        self.assertEqual(set(range(2, required + 1)), migrations)
         self.assertEqual(int(installer.group(1)), required)
-        self.assertEqual({f'{version}.sql' for version in range(20, required + 1)},
+        self.assertEqual({f'{version}.sql' for version in range(2, required + 1)},
                          {path.name for path in (ROOT/'Migrations').glob('*.sql')})
+        self.assertEqual(set(range(7, 77)),
+                         {int(path.stem) for path in (ROOT/'Tests/LifecycleSqlChecks/Migrations').glob('*.sql')})
 
     def test_release_schema_package_integrity(self):
         with zipfile.ZipFile(ROOT/'fmsc.dacpac') as package:

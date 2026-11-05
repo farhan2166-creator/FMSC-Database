@@ -44,7 +44,7 @@ WHERE S.name=N'dbo' AND T.name<>N'DatabaseVersion' AND T.is_ms_shipped=0 ORDER B
   $before=@{}
   foreach($table in $tables.Rows){$before[[string]$table.TableName]=Fingerprint $table.TableName $table.ColumnsSql $table.OrderSql}
   foreach($migration in 49..52 | Where-Object {$_ -gt $version}){
-   $path=Join-Path $project "Migrations/$migration.sql"
+   $path=Join-Path $project "Tests/LifecycleSqlChecks/Migrations/$migration.sql"
    foreach($batch in [regex]::Split([IO.File]::ReadAllText($path),'(?im)^\s*GO\s*\r?$')){
     if(![string]::IsNullOrWhiteSpace($batch)){[void](Query $batch)}
    }

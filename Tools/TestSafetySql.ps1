@@ -31,7 +31,7 @@ try{
  $command.CommandText="RESTORE DATABASE [CommunicationFixture] FROM DISK=N'$($Snapshot.Replace("'","''"))' WITH "+($moves -join ',')+',CHECKSUM,RECOVERY;';[void]$command.ExecuteNonQuery()
  $command.CommandText='USE CommunicationFixture; SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;'
  $current=[int]$command.ExecuteScalar()
- foreach($file in Get-ChildItem (Join-Path $project 'Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName}){
+ foreach($file in Get-ChildItem (Join-Path $project 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName}){
   if([int]$file.BaseName -le $current){continue}
   $transaction=$connection.BeginTransaction()
   try{

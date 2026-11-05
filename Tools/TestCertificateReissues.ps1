@@ -31,7 +31,7 @@ try{
  $transaction=$connection.BeginTransaction()
  try{
   foreach($migration in @(46,47,48,49,50,51,52)|Where-Object {$_ -gt $sourceVersion}){
-  foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $project "Migrations/$migration.sql")),'(?im)^\s*GO\s*\r?$')){
+  foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $project "Tests/LifecycleSqlChecks/Migrations/$migration.sql")),'(?im)^\s*GO\s*\r?$')){
    if([string]::IsNullOrWhiteSpace($batch)){continue};$q=$connection.CreateCommand();$q.Transaction=$transaction;$q.CommandTimeout=90;$q.CommandText=$batch;try{[void]$q.ExecuteNonQuery()}finally{$q.Dispose()}
   }
   }

@@ -1,8 +1,6 @@
 # FMSC private Git updater — manual publishing, no publisher signing keys
 
-**Status:** The update-packaging, private-repository authorization, integrity
-checks and staging foundations are on the DRAFT feature branch. No update feed
-has been published and no school installation has been updated.
+**Status:** The updater is integrated. The owner-approved first production baseline is application 1.0.0, database 1; the private distribution was reset before its first production publication. See [the baseline decision](FIRST_RELEASE_BASELINE.md).
 
 ## Owner decisions
 
@@ -460,3 +458,9 @@ installation retries removal of the fixed rollback directory. Older staging
 directories from installations predating this change are not swept automatically.
 Disposable-folder tests exercise verification failures, successful cleanup,
 locked files, scope refusal and preservation of enrollment and database backups.
+# First production version
+
+The owner-approved first production baseline is application **1.0.0**, database
+**1**. Historical development migrations are test fixtures and are excluded from
+release packages. Future database changes start at `Migrations/2.sql`. See
+[the reset and preservation decision](FIRST_RELEASE_BASELINE.md).

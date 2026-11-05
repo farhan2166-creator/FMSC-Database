@@ -52,7 +52,8 @@ try {
  # schema-only fixture does not install the communication service itself.
  [void](Query "IF SCHEMA_ID(N'comm') IS NULL EXEC(N'CREATE SCHEMA comm AUTHORIZATION dbo');")
  # Migration changes run under the same transaction boundary used by deployment.
- foreach($file in @(Get-ChildItem (Join-Path $projectRoot 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql'; Get-ChildItem (Join-Path $projectRoot 'Migrations') -Filter '*.sql') | Sort-Object {[int]$_.BaseName}) {
+ $fixtureScripts=@(Get-ChildItem (Join-Path $projectRoot 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName}) + @(Get-Item (Join-Path $projectRoot 'Tools/ReleaseBaseline/Reset-Version.sql')) + @(Get-ChildItem (Join-Path $projectRoot 'Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName})
+ foreach($file in $fixtureScripts) {
   $content=Get-Content -LiteralPath $file.FullName -Raw
   $connection=[Data.SqlClient.SqlConnection]::new("Server=$instance;Database=$catalog;Integrated Security=True;TrustServerCertificate=True")
   $connection.Open();$transaction=$connection.BeginTransaction()

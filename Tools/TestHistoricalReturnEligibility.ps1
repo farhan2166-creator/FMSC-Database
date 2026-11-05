@@ -37,7 +37,7 @@ try{
  if($version -eq 56){
   $migrationTransaction=$cn.BeginTransaction()
   try{
-   foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $root 'Migrations/57.sql')),'(?im)^\s*GO\s*\r?$')){
+   foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/57.sql')),'(?im)^\s*GO\s*\r?$')){
     if([string]::IsNullOrWhiteSpace($batch)){continue}
     $command=$cn.CreateCommand();$command.Transaction=$migrationTransaction;$command.CommandText=$batch
     try{[void]$command.ExecuteNonQuery()}finally{$command.Dispose()}

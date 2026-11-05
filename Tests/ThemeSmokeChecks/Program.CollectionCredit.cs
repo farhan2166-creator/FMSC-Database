@@ -6,8 +6,8 @@ internal static partial class Program
 {
     private static void CheckCollectionCredit()
     {
-        Check(int.TryParse(FMSC_SMS.DatabaseHelper.RequiredDatabaseSchemaVersion, out int schema) && schema >= 24,
-            "Application requires the credit migration or a later compatible schema");
+        Check(int.TryParse(FMSC_SMS.DatabaseHelper.RequiredDatabaseSchemaVersion, out int schema) && schema >= 1,
+            "Application requires the complete first-release baseline or a later schema");
         using var page = new FeeCollectionPage(false);
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         // Family summaries resolve official numbers; keep this UI check independent of SQL.

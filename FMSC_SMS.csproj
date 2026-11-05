@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <!-- Schools receive this small GUI binary; no compiler is installed there. -->
     <Target Name="BuildStableUpdateLauncher" BeforeTargets="PrepareForBuild"
             Inputs="$(MSBuildProjectDirectory)/Installer/Launch-FMSC.cs"
@@ -34,9 +34,9 @@
 		<SatelliteResourceLanguages>en;en-US;en-GB;ur;ur-PK;ur-IN</SatelliteResourceLanguages>
 		<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 		<ApplicationIcon>Assets\FMSC_Logo Icon.ico</ApplicationIcon>
-		<Version>1.1.0-rc.4</Version>
-		<AssemblyVersion>1.1.0.0</AssemblyVersion>
-		<FileVersion>1.1.0.0</FileVersion>
+		<Version>1.0.0</Version>
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<FileVersion>1.0.0.0</FileVersion>
 	</PropertyGroup>
 	<ItemGroup>
 		<Content Include="Installer/core.ps1" Link="UpdateSupport/core.ps1" CopyToPublishDirectory="PreserveNewest" />

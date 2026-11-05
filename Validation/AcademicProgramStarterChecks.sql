@@ -7,7 +7,7 @@ BEGIN TRANSACTION;
 SELECT * INTO #ProgramsBefore FROM dbo.AcademicPrograms;
 SELECT ClassId,AcademicProgramId INTO #ClassProgramsBefore FROM dbo.Classes;
 GO
-:r Migrations/71.sql
+:r Tests/LifecycleSqlChecks/Migrations/71.sql
 GO
 IF EXISTS
 (

@@ -11,7 +11,7 @@ internal static class UpdateInstallerHandoff
         var manifest = UpdateManifestPolicy.ReadValidated(File.ReadAllBytes(
             Path.Combine(prepared.ManifestDirectory, "update-manifest.json")));
         if (manifest.Version != prepared.Version) throw new InvalidDataException("Prepared version changed.");
-        if (!manifest.Files.Any(file => file.Path.StartsWith("UpdateSupport/Migrations/", StringComparison.Ordinal) &&
+        if (manifest.RequiredDatabaseSchema > 1 && !manifest.Files.Any(file => file.Path.StartsWith("UpdateSupport/Migrations/", StringComparison.Ordinal) &&
             file.Path.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)))
             throw new InvalidDataException("The update does not include numbered installer migrations.");
         var entries = Directory.GetFileSystemEntries(prepared.StageDirectory, "*", SearchOption.AllDirectories);

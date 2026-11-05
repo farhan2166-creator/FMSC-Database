@@ -17,7 +17,7 @@ function Query([string]$sql){$c=Connect;try{$q=$c.CreateCommand();$q.CommandText
 function Number([string]$sql){return (Query $sql).Tables[0].Rows[0][0]}
 function Apply([bool]$commit){
  $c=Connect;$tx=$c.BeginTransaction()
- try{foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $root 'Migrations/59.sql')),'(?im)^\s*GO\s*\r?$')){
+ try{foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/59.sql')),'(?im)^\s*GO\s*\r?$')){
   if([string]::IsNullOrWhiteSpace($batch)){continue};$q=$c.CreateCommand();$q.Transaction=$tx;$q.CommandText=$batch;$q.CommandTimeout=90;[void]$q.ExecuteNonQuery()
  };if($commit){$tx.Commit()}else{$tx.Rollback()}}catch{if($tx.Connection){$tx.Rollback()};throw}finally{$c.Dispose()}
 }
@@ -38,7 +38,7 @@ try {
  $originalLogs=Number 'SELECT COUNT(*) FROM dbo.AuditLogs'
  $originalOperations=Number 'SELECT COUNT(*) FROM dbo.AuditOperations'
  Check ($originalLogs -gt 0 -and $originalOperations -gt 0) 'Fixture contains historical generic audit records before migration.'
- $names=@([regex]::Matches([IO.File]::ReadAllText((Join-Path $root 'Migrations/59.sql')),'(?im)^CREATE OR ALTER PROCEDURE\s+([\w.\[\]]+)') | ForEach-Object{$_.Groups[1].Value.Replace('[','').Replace(']','')})
+ $names=@([regex]::Matches([IO.File]::ReadAllText((Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/59.sql')),'(?im)^CREATE OR ALTER PROCEDURE\s+([\w.\[\]]+)') | ForEach-Object{$_.Groups[1].Value.Replace('[','').Replace(']','')})
  Check ($names.Count -eq 19) 'All 19 reviewed procedures are included.'
  $signatures=@{};$refusals=@{};$invocations=@{}
  foreach($name in $names){
@@ -79,7 +79,7 @@ try {
  Check ((Number 'SELECT COUNT(*) FROM dbo.AuditLogs') -eq $originalLogs) 'Successful revised workflows create no generic audit logs and retain existing logs.'
  Check ((Number 'SELECT COUNT(*) FROM dbo.AuditOperations') -eq $originalOperations) 'Successful revised workflows create no generic audit operations and retain existing operations.'
  Check ((Number "SELECT COUNT(*) FROM sys.objects WHERE object_id IN(OBJECT_ID(N'dbo.AuditLogs'),OBJECT_ID(N'dbo.AuditOperations'),OBJECT_ID(N'dbo.AuditValueLeaves'),OBJECT_ID(N'dbo.GetAuditLogs'))") -eq 4) 'Historical audit readers remain intact.'
- Check ((Refusal ([IO.File]::ReadAllText((Join-Path $root 'Migrations/59.sql')).Split([string[]]@("`nGO"),[StringSplitOptions]::None)[0])) -eq 51000) 'Migration refuses execution without an outer transaction.'
+ Check ((Refusal ([IO.File]::ReadAllText((Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/59.sql')).Split([string[]]@("`nGO"),[StringSplitOptions]::None)[0])) -eq 51000) 'Migration refuses execution without an outer transaction.'
  Write-Output "PASS: $script:checks remaining-audit-retirement checks."
 } finally {
  if($created){& SqlLocalDB stop $catalog; & SqlLocalDB delete $catalog}

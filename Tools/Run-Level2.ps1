@@ -164,9 +164,9 @@ LOG ON (NAME=N'${catalog}_log',FILENAME=N'$escaped\database\fixture_log.ldf');
         & dotnet tool run sqlpackage -- '/Action:Publish' "/SourceFile:$fixture" "/TargetConnectionString:$connection" '/p:DropObjectsNotInSource=False' '/p:DropExtendedPropertiesNotInSource=False' '/p:ScriptDatabaseOptions=False' '/Quiet:True'
         Native 'Publish approved schema'
         Sql $catalog "INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'6');" | Out-Null
-        foreach($migration in @(Get-ChildItem (Join-Path $repo 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql'; Get-ChildItem (Join-Path $repo 'Migrations') -Filter '*.sql') | Sort-Object {[int]$_.BaseName}) {
-            $requiredSchema=[int]([regex]::Match((Get-Content (Join-Path $repo 'DatabaseHelper.cs') -Raw),'RequiredDatabaseSchemaVersion\s*=\s*"(\d+)"').Groups[1].Value)
-            if([int]$migration.BaseName -le 6 -or [int]$migration.BaseName -gt $requiredSchema){continue}
+        $baselineScript=Get-Item (Join-Path $repo 'Tools/ReleaseBaseline/Reset-Version.sql')
+        $scripts=@(Get-ChildItem (Join-Path $repo 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName}) + @($baselineScript) + @(Get-ChildItem (Join-Path $repo 'Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName})
+        foreach($migration in $scripts) {
             VerifyTarget
             $migrationScript=Join-Path $run ('migration-'+$migration.BaseName+'.sql')
             "SET XACT_ABORT ON;`nBEGIN TRANSACTION;`n"+(Get-Content -LiteralPath $migration.FullName -Raw)+"`nCOMMIT TRANSACTION;" | Set-Content -LiteralPath $migrationScript -Encoding utf8

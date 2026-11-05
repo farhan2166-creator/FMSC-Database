@@ -37,8 +37,11 @@ def verify_baseline():
         raise ValueError("Application and installer schema targets differ; review the SQL test fixture.")
     target = int(requirement.group(1))
     migrations = {int(p.stem) for p in (ROOT / "Migrations").glob("*.sql") if p.stem.isdecimal()}
-    if migrations != set(range(20, target + 1)):
+    if migrations != set(range(2, target + 1)):
         raise ValueError("Numbered migration chain must be complete through the required schema.")
+    historical = {int(p.stem) for p in (PROJECT / "Migrations").glob("*.sql")}
+    if historical != set(range(7, 77)):
+        raise ValueError("Historical test-only fixture chain must remain complete through the approved baseline.")
     # Shared SQL test contexts must not silently lag the runtime contract.
     for context in ("QuickRegistrationSqlChecks", "MutationSqlChecks"):
         fixture = (ROOT / "Tests" / context / "DatabaseContext.cs").read_text()
@@ -263,8 +266,9 @@ def main():
         # each isolated catalog; never seed a fabricated "current" version.
         checked("baseline schema version", lambda: sql(catalog, "INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'6');"))
         for migration in sorted((PROJECT / "Migrations").glob("*.sql"), key=lambda p: int(p.stem)):
-            if 6 < int(migration.stem) <= 19:
+            if 6 < int(migration.stem) <= 76:
                 checked("fixture migration " + migration.stem, lambda: sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + migration.read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;"))
+        checked("first release baseline", lambda: sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + (ROOT / "Tools/ReleaseBaseline/Reset-Version.sql").read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;"))
         for migration in sorted((ROOT / "Migrations").glob("*.sql"), key=lambda p: int(p.stem)):
             checked("migration " + migration.stem, lambda: sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + migration.read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;"))
         return catalog

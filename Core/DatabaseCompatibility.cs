@@ -5,7 +5,7 @@ namespace FMSC_SMS.Core;
 
 /// <summary>Shared startup/restore contract for the current application schema.</summary>
 // BD-29/30/31: keep version, structure and recovery guards; a DACPAC is not a replacement for school data.
-// Historical no-upgrade targets do not justify removing numbered migrations or retained operational/audit readers.
+// Baseline labels never bypass the complete structural compatibility contract.
 internal static class DatabaseCompatibility
 {
     private static readonly Lazy<string> Requirements = new(LoadRequirements);
@@ -18,10 +18,10 @@ internal static class DatabaseCompatibility
                 DatabaseHelper.RequiredDatabaseSchemaVersion, Details: "The application's database compatibility definition is missing."));
         using var reader = new StreamReader(stream);
         string baseline=reader.ReadToEnd();
-        // Historical migration-3 harnesses still validate the reviewed v2 shape.
-        if(int.TryParse(DatabaseHelper.RequiredDatabaseSchemaVersion,out int required)&&required<4)return baseline;
+        // Baseline 1 contains the complete approved schema. Numeric version 1
+        // must not select the old pre-release version-1 compatibility contract.
         var definition=JsonNode.Parse(baseline)!.AsObject();
-        if(required>=47 && definition["uniqueIndexes"] is JsonArray characterIndexes)
+        if(definition["uniqueIndexes"] is JsonArray characterIndexes)
             foreach(var index in characterIndexes.Where(item=>item?["name"]?.GetValue<string>()=="UX_CharacterCertificates_AdmissionId").ToArray())
                 characterIndexes.Remove(index);
         // Preserve the embedded compatibility requirements and combine them with

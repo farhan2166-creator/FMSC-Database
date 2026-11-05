@@ -29,7 +29,7 @@ try{
  if($version -eq 55){
   $tx=$cn.BeginTransaction()
   try{
-   foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $root 'Migrations/56.sql')),'(?im)^\s*GO\s*\r?$')){
+   foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/56.sql')),'(?im)^\s*GO\s*\r?$')){
     if([string]::IsNullOrWhiteSpace($batch)){continue};$q=$cn.CreateCommand();$q.Transaction=$tx;$q.CommandTimeout=180;$q.CommandText=$batch
     try{[void]$q.ExecuteNonQuery()}finally{$q.Dispose()}
    };$tx.Commit()

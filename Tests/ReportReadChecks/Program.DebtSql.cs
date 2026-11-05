@@ -31,7 +31,7 @@ internal static partial class Program
             """);
         var folder=new DirectoryInfo(AppContext.BaseDirectory);
         while(folder is not null && !File.Exists(Path.Combine(folder.FullName,"fmsc.dacpac")))folder=folder.Parent;
-        string sql=File.ReadAllText(Path.Combine(folder!.FullName,"Migrations","70.sql"));
+        string sql=File.ReadAllText(Path.Combine(folder!.FullName,"Tests","LifecycleSqlChecks","Migrations","70.sql"));
         Execute(connection,"BEGIN TRANSACTION;");
         try
         {

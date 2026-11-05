@@ -22,7 +22,7 @@ try{
  [void](Query "EXEC sys.sp_addextendedproperty @name=N'FMSC_CertificateChecksOwner',@value=N'$owner';")
  foreach($migration in @(49,50,51,52)|Where-Object {$_ -gt $sourceVersion}){
   $transaction=$connection.BeginTransaction()
-  try{foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $project "Migrations/$migration.sql")),'(?im)^\s*GO\s*\r?$')){if([string]::IsNullOrWhiteSpace($batch)){continue};$q=$connection.CreateCommand();$q.Transaction=$transaction;$q.CommandTimeout=120;$q.CommandText=$batch;try{[void]$q.ExecuteNonQuery()}finally{$q.Dispose()}};$transaction.Commit()}catch{try{$transaction.Rollback()}catch{};throw}finally{$transaction.Dispose()}
+  try{foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $project "Tests/LifecycleSqlChecks/Migrations/$migration.sql")),'(?im)^\s*GO\s*\r?$')){if([string]::IsNullOrWhiteSpace($batch)){continue};$q=$connection.CreateCommand();$q.Transaction=$transaction;$q.CommandTimeout=120;$q.CommandText=$batch;try{[void]$q.ExecuteNonQuery()}finally{$q.Dispose()}};$transaction.Commit()}catch{try{$transaction.Rollback()}catch{};throw}finally{$transaction.Dispose()}
  }
  $fixtureBuilder=[Data.SqlClient.SqlConnectionStringBuilder]::new($connection.ConnectionString);$fixtureBuilder['Initial Catalog']=$catalog
  $env:FMSC_CERTIFICATE_TEST_CONNECTION=$fixtureBuilder.ConnectionString;$env:FMSC_CERTIFICATE_TEST_OWNER=$owner

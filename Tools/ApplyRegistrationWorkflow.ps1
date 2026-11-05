@@ -69,7 +69,7 @@ SELECT COUNT(*) AS PreservedBusinessTables FROM #Preserved;
 PRINT 'PASS: schema 64 applied; existing business rows preserved.';
 '@
 $script=Join-Path $run 'apply.sql'
-[IO.File]::WriteAllText($script,$header+"`r`n"+[IO.File]::ReadAllText((Join-Path $root 'Migrations/64.sql'))+"`r`n"+$footer)
+[IO.File]::WriteAllText($script,$header+"`r`n"+[IO.File]::ReadAllText((Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/64.sql'))+"`r`n"+$footer)
 & sqlcmd -S $Instance -E -d FMSC_DB -b -l 10 -t 180 -i $script 2>&1 | Tee-Object -FilePath (Join-Path $run 'result.txt')
 if($LASTEXITCODE -ne 0){throw 'Registration workflow migration failed; review result.txt. The transaction is rolled back on connection close.'}
 Write-Output "Verified pre-migration backup: $backup"

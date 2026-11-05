@@ -64,7 +64,8 @@ try {
     $sourceSql = @(Get-ChildItem -LiteralPath (Join-Path $ProjectDirectory 'Migrations') -Filter '*.sql' -File)
     $copiedSql = @(Get-ChildItem -LiteralPath (Join-Path $release 'Migrations') -Filter '*.sql' -File)
     if ($sourceSql.Count -ne $copiedSql.Count) { throw 'Packaged migration inventory differs from source.' }
-    $updateSql = @(Get-ChildItem -LiteralPath (Join-Path $application 'UpdateSupport/Migrations') -Filter '*.sql' -File)
+    $updateMigrations = Join-Path $application 'UpdateSupport/Migrations'
+    $updateSql = if (Test-Path -LiteralPath $updateMigrations) { @(Get-ChildItem -LiteralPath $updateMigrations -Filter '*.sql' -File) } else { @() }
     if ($sourceSql.Count -ne $updateSql.Count) { throw 'Update support migration inventory differs from source.' }
     foreach ($file in $sourceSql) {
         if ((Get-FileHash -LiteralPath $file.FullName).Hash -ne

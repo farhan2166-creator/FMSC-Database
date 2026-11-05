@@ -50,7 +50,7 @@ try{
     foreach($migration in 54..56 | Where-Object {$_ -gt $currentVersion}){
         $tx=$cn.BeginTransaction()
         try{
-            foreach($batch in [regex]::Split((Get-Content (Join-Path $root "Migrations/$migration.sql") -Raw),'(?im)^GO\s*$')){
+            foreach($batch in [regex]::Split((Get-Content (Join-Path $root "Tests/LifecycleSqlChecks/Migrations/$migration.sql") -Raw),'(?im)^GO\s*$')){
                 if([string]::IsNullOrWhiteSpace($batch)){continue}
                 $command=$cn.CreateCommand();$command.Transaction=$tx;$command.CommandText=$batch;$command.CommandTimeout=120
                 try{[void]$command.ExecuteNonQuery()}finally{$command.Dispose()}

@@ -33,6 +33,16 @@ internal static class UpdateHandoffTests
             File.AppendAllText(Path.Combine(app, "FMSC_SMS.exe"), "damage"); Reject();
             File.WriteAllText(Path.Combine(app, "FMSC_SMS.exe"), "inert fixture");
             manifest.RequiredDatabaseSchema = 124; Save(); Reject();
+            // First production baseline contains the complete approved schema;
+            // an application-only update must not require retired SQL scripts.
+            Directory.Delete(Path.Combine(app, "UpdateSupport", "Migrations"), true);
+            File.WriteAllText(Path.Combine(app, "UpdateSupport", "core.ps1"), "$AppVersion = '2.0.0'\n$DatabaseVersion = '1'\n");
+            manifest.RequiredDatabaseSchema = 1;
+            manifest.Files = Directory.GetFiles(app, "*", SearchOption.AllDirectories).Select(path => new UpdateFile {
+                Path = Path.GetRelativePath(app, path).Replace('\\', '/'), Length = new FileInfo(path).Length,
+                Sha256 = UpdateChunks.Sha256(path) }).ToList();
+            Save(); UpdateInstallerHandoff.Validate(prepared);
+            Console.WriteLine("PASS: baseline-1 handoff without obsolete migration scripts.");
             Console.WriteLine("PASS: prepared handoff integrity, extra-file, damaged-file and installer-schema checks (no activation).");
         }
         finally { Directory.Delete(root, true); }
