@@ -42,6 +42,30 @@ internal static partial class Program
             using var rows = new DataTable(); rows.Columns.Add("Status"); var pending = rows.Rows.Add("Pending"); var cancelled = rows.Rows.Add("Cancelled");
             var picker = Field<StudentPicker>("quickStudent");
             Check(picker.RowFilter!(pending) && picker.RowFilter!(cancelled), "Admission quick search accepts pending and cancelled records");
+            // A successful switch from the loaded child to a sibling must also change
+            // the quick-search identity without emitting a new user-selection event.
+            using var studentDetails = new DataTable();
+            studentDetails.Columns.Add("AdmissionId", typeof(int));
+            studentDetails.Columns.Add("AdmissionNumber", typeof(string));
+            studentDetails.Columns.Add("StudentName", typeof(string));
+            studentDetails.Columns.Add("FatherName", typeof(string));
+            studentDetails.Columns.Add("Gender", typeof(string));
+            var mainChild = studentDetails.Rows.Add(123, "123", "Fictional Pending Child", "Fictional Parent", "Male");
+            var siblingChild = studentDetails.Rows.Add(456, "456", "Fictional Cancelled Child", "Fictional Parent", "Female");
+            int selectionEvents = 0;
+            picker.UserSelectionChanged += (_, _) => selectionEvents++;
+            var syncQuickSearch = type.GetMethod("UpdateQuickStudentToLoadedRecord", flags)!;
+            syncQuickSearch.Invoke(page, new object[] { mainChild });
+            Check(picker.SelectedId == 123 && picker.Text.Contains("Fictional Pending Child"),
+                "Admission quick search displays the loaded main student");
+            Set("currentAdmissionId", 456);
+            syncQuickSearch.Invoke(page, new object[] { siblingChild });
+            Check(picker.SelectedId == 456 && picker.Text.Contains("Fictional Cancelled Child") && selectionEvents == 0,
+                "Opening a sibling updates quick search without recursively loading a student");
+            Set("currentAdmissionId", 123);
+            syncQuickSearch.Invoke(page, new object[] { mainChild });
+            Check(picker.SelectedId == 123 && selectionEvents == 0,
+                "Returning to the main student restores its quick-search identity");
             ((Task)type.GetMethod("RunSiblingRegistrationActionAsync", flags)!.Invoke(page, new object[] { 0, siblingGrid.Columns["RegistrationConfirm"].Index })!).GetAwaiter().GetResult();
             Check(type.GetField("unconfirmedAdmission", flags)!.GetValue(page) is null, "Incomplete pending details refuse confirmation before a write");
             type.GetMethod("SwitchTab", flags)!.Invoke(page, new object[] { 1 });
