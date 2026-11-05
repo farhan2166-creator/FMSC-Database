@@ -119,7 +119,7 @@ internal static partial class Program
             var find = typeof(PageActionShortcutController).GetMethod("Find", flags)!;
             foreach (var (key, field) in new[] {
                 (Keys.Alt | Keys.A, "addChargeButton"),
-                (Keys.Alt | Keys.N, "nextStudentButton"),
+                // Fee Collection deliberately no longer has a Next Student control.
                 (Keys.Alt | Keys.U, "fullAmountButton"),
                 (Keys.Alt | Keys.H, "paymentHistoryButton"),
                 (Keys.Alt | Keys.P, "printReceiptButton"),
