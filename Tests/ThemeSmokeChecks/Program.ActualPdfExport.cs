@@ -35,9 +35,12 @@ internal static partial class Program
             foreach(var (field,amount) in new[]{("Refunds",20m),("Corrections",30m)})
             {
                 int column=columns.FindIndex(item=>item.Fields.Length==1&&projection.Columns[item.Fields[0]].ColumnName==field);
-                Check(printed.AsEnumerable().Any(row=>row.Field<string>("C"+column)==(-amount).ToString("#,##0.##")
-                    &&row.Field<decimal>("N"+column)==-amount),
-                    "The Export handler signs "+field+" consistently for detail rows and grouped subtotal inputs");
+                var observations=printed.AsEnumerable().Select(row =>
+                    (Display:row.Field<string>("C"+column),Numeric:row.Field<decimal>("N"+column))).ToArray();
+                Check(observations.Any(row=>row.Display==(-amount).ToString("#,##0.##")
+                    &&row.Numeric==-amount),
+                    "The Export handler signs "+field+" consistently for detail rows and grouped subtotal inputs. "
+                    +"Observed: "+string.Join("; ",observations.Select(v=>v.Display+" / "+v.Numeric)));
             }
             string path=Path.Combine(folder,"collections-receipts.pdf");
             typeof(V2Page).GetMethod("WritePdfExport",flags)!.Invoke(page,new object[]{path,document});
