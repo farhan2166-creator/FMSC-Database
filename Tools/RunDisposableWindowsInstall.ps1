@@ -299,13 +299,12 @@ EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@
     . (Join-Path $project 'Installer/UpdateRecovery.ps1')
     Assert-FmscRecoveryStorage $recoveryStorage
     $installedShortcut=(New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
-    if (-not $installedShortcut.TargetPath.EndsWith('powershell.exe',[StringComparison]::OrdinalIgnoreCase) -or
-        -not $installedShortcut.Arguments.Contains((Join-Path $recoveryStorage 'Launch-FMSC.ps1'))) {
+    if ($installedShortcut.TargetPath -ine (Join-Path $recoveryStorage 'FMSC.Launcher.exe') -or $installedShortcut.Arguments) {
         throw 'Installed shortcut does not use the stable external launcher.'
     }
-    foreach ($asset in @('UpdateRecovery.ps1','Launch-FMSC.ps1')) {
+    foreach ($asset in @('UpdateRecovery.ps1','Launch-FMSC.ps1','FMSC.Launcher.exe')) {
         if ((Get-FileHash (Join-Path $recoveryStorage $asset) -Algorithm SHA256).Hash -ne
-            (Get-FileHash (Join-Path $project "Installer/$asset") -Algorithm SHA256).Hash) { throw 'Installed recovery launcher asset differs from source.' }
+            (Get-FileHash (Join-Path $app "UpdateSupport/$asset") -Algorithm SHA256).Hash) { throw 'Installed recovery launcher asset differs from source package.' }
     }
     $checks.Add('Actual installer created protected stable launcher and desktop shortcut outside the application folder')
 

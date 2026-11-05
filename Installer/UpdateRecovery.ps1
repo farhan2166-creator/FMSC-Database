@@ -132,13 +132,13 @@ function Set-FmscRecoveryPhase {
 function Install-FmscStableLauncher {
     param([string]$Source, [string]$Root, [string]$ShortcutPath, [string]$Application)
     Initialize-FmscRecoveryStorage $Root
-    foreach ($name in @('UpdateRecovery.ps1','Launch-FMSC.ps1')) {
+    foreach ($name in @('UpdateRecovery.ps1','Launch-FMSC.ps1','FMSC.Launcher.exe')) {
         Write-FmscAtomicFile (Join-Path $Root $name) ([IO.File]::ReadAllBytes((Join-Path $Source "UpdateSupport/$name")))
     }
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($ShortcutPath)
-    $shortcut.TargetPath = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
-    $shortcut.Arguments = '-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + (Join-Path $Root 'Launch-FMSC.ps1') + '"'
+    $shortcut.TargetPath = Join-Path $Root 'FMSC.Launcher.exe'
+    $shortcut.Arguments = ''
     $shortcut.WorkingDirectory = $Root
     $shortcut.Description = 'FMSC School Management System'
     $shortcut.IconLocation = "$Application,0"

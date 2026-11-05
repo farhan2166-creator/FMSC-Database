@@ -32,7 +32,8 @@ internal static class UpdateStartupGuard
             string launcher = Path.Combine(root, "Launch-FMSC.ps1");
             if (!File.Exists(launcher)) throw new IOException("FMSC needs update recovery. Contact support; do not replace the school database.");
             var start = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
-                @"WindowsPowerShell\v1.0\powershell.exe")) { UseShellExecute = true };
+                @"WindowsPowerShell\v1.0\powershell.exe")) { UseShellExecute = false, CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden };
             start.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File \"" + launcher + "\"";
             Process.Start(start)?.Dispose();
             return false;

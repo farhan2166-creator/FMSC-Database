@@ -76,7 +76,7 @@ try {
     Require (-not (Test-Path $installed) -and (Test-Path "$installed.rollback")) 'The missing-app activation gap was not reproduced.'
     Require ((Read-FmscRecoveryJournal $recovery).Phase -eq 'Activating') 'Activation intent was not committed by the actual installer.'
     $shortcut=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'FMSC SMS.lnk'))
-    Require ($shortcut.Arguments.Contains((Join-Path $recovery 'Launch-FMSC.ps1'))) 'Shortcut is not outside the missing application directory.'
+    Require ($shortcut.TargetPath -ieq (Join-Path $recovery 'FMSC.Launcher.exe')) 'Shortcut is not outside the missing application directory.'
     # Execute the real stable launcher, including its real elevated resume handoff.
     $launcher=[Diagnostics.ProcessStartInfo]::new($shortcut.TargetPath)
     $launcher.UseShellExecute=$false;$launcher.CreateNoWindow=$true;$launcher.Arguments=$shortcut.Arguments

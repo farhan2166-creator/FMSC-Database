@@ -77,6 +77,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Updater gate failed: $($command[1])" }
           }
           & .\Tools\TestPreparedUpdate.ps1
+          & .\Tools\TestWindowlessLauncher.ps1
           & .\Tools\TestInstallerMigrations.ps1
           & .\Tools\TestUpdateCleanup.ps1
           & .\Tools\TestUpdateRecovery.ps1

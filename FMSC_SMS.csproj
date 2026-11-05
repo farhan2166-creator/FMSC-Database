@@ -1,4 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+    <!-- Schools receive this small GUI binary; no compiler is installed there. -->
+    <Target Name="BuildStableUpdateLauncher" BeforeTargets="PrepareForBuild"
+            Inputs="$(MSBuildProjectDirectory)/Installer/Launch-FMSC.cs"
+            Outputs="$(BaseIntermediateOutputPath)FmscLauncher/$(Configuration)/FMSC.Launcher.exe">
+        <MakeDir Directories="$(BaseIntermediateOutputPath)FmscLauncher/$(Configuration)" />
+        <Exec Command="&quot;$(windir)\Microsoft.NET\Framework64\v4.0.30319\csc.exe&quot; /nologo /target:winexe /optimize+ /out:&quot;$(BaseIntermediateOutputPath)FmscLauncher\$(Configuration)\FMSC.Launcher.exe&quot; &quot;$(MSBuildProjectDirectory)\Installer\Launch-FMSC.cs&quot;" />
+    </Target>
     <!-- Opt-in test binary; normal builds contain no disposable-target override. -->
     <PropertyGroup Condition="'$(FmscLevel2)' == 'true'">
         <DefineConstants>$(DefineConstants);FMSC_LEVEL2</DefineConstants>
@@ -13,6 +20,7 @@
         <Compile Remove="Apps/**/*.cs" />
         <!-- Standalone update packaging CLI is not part of the WinForms executable. -->
         <Compile Remove="Tools/**/*.cs" />
+        <Compile Remove="Installer/Launch-FMSC.cs" />
     </ItemGroup>
 	<PropertyGroup>
 		<!-- Local verification repositories and generated files are not application inputs. -->
@@ -34,6 +42,7 @@
 		<Content Include="Installer/core.ps1" Link="UpdateSupport/core.ps1" CopyToPublishDirectory="PreserveNewest" />
 		<Content Include="Installer/UpdateRecovery.ps1" Link="UpdateSupport/UpdateRecovery.ps1" CopyToPublishDirectory="PreserveNewest" />
 		<Content Include="Installer/Launch-FMSC.ps1" Link="UpdateSupport/Launch-FMSC.ps1" CopyToPublishDirectory="PreserveNewest" />
+		<Content Include="$(BaseIntermediateOutputPath)FmscLauncher/$(Configuration)/FMSC.Launcher.exe" Link="UpdateSupport/FMSC.Launcher.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
 		<Content Include="Migrations/*.sql" Link="UpdateSupport/Migrations/%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
 		<Content Include="Assets\academics.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

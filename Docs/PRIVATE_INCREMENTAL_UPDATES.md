@@ -348,6 +348,12 @@ user to open the normal shortcut instead of launching an elevated application.
 Prepared installation now makes a verified protected snapshot under
 `%ProgramData%/FMSC_Updater/transactions/<guid>` and installs a stable desktop
 launcher outside the replaceable application directory before migrations run.
+The shortcut targets a small GUI-subsystem `FMSC.Launcher.exe`, which starts the
+existing PowerShell recovery script with `UseShellExecute=false` and
+`CreateNoWindow=true`. Unlike hiding an already created PowerShell console, this
+prevents the startup console flash. The bootstrap is compiled during the Windows
+build and included in the hashed package; schools need no compiler or extra
+runtime beyond the Windows Framework already used by Windows PowerShell.
 Only Administrators/SYSTEM may modify recovery storage; users have read/execute
 access. Links and weakened ownership/permissions are refused. The owner-published
 installer/helper SHA-256 values are recorded locally; no publisher signing key is

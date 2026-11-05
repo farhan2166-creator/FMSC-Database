@@ -129,6 +129,10 @@ jobs:
         shell: powershell
         run: .\Tools\TestInstallerMigrations.ps1
 
+      - name: Verify normal launcher creates no PowerShell console
+        shell: powershell
+        run: .\Tools\TestWindowlessLauncher.ps1
+
       - name: Test prepared update installer integrity without touching SQL
         shell: powershell
         run: .\Tools\TestPreparedUpdate.ps1
