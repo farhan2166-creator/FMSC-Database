@@ -4,7 +4,7 @@ $source = Get-Content (Join-Path $PSScriptRoot '../Installer/core.ps1') -Raw
 $tokens = $null; $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$errors)
 if ($errors.Count) { throw 'Installer does not parse.' }
-foreach ($name in @('Pause-Step','Pause-Long','Start-UpdatedFmsc','Start-FmscAfterInstallation','Open-UpdateWindow','Set-UpdateWindowStage','Set-UpdateWindowStatus')) {
+foreach ($name in @('Pause-Step','Pause-Long','Start-UpdatedFmsc','Start-FmscAfterInstallation','Open-UpdateWindow','Set-UpdateWindowStage','Set-UpdateWindowStatus','Wait-FmscSetupChoice')) {
     $definition = $ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true)
     Invoke-Expression $definition.Extent.Text
 }
@@ -21,21 +21,43 @@ $desktop | Add-Member ScriptMethod ShellExecute {
     $script:launches++
 }
 function Get-FmscDesktopShell { return $desktop }
-$PreparedRoot = 'fixture'
+$AppVersion = '1.0.0'; $DatabaseVersion = '1'
+$script:TestDecision = $null
+$script:launches = 0
+# The production selector waits for a real button click. These isolated tests
+# supply a choice without hanging; the actual button click events are verified.
+function Wait-FmscSetupChoice {
+    if (-not $script:UpdateYes.Enabled -or -not $script:UpdateNo.Enabled) {
+        throw 'Finish choices activated before verified completion.'
+    }
+    return $script:TestDecision -eq 'Yes'
+}
+$PreparedRoot = 'fixture'; $ShowInstallerWindow = $false
 Pause-Step; Pause-Long
-Start-FmscAfterInstallation 'C:\fixture\FMSC_SMS.exe'
-if ($script:launches -ne 1) { throw 'Successful prepared installation must restart exactly once.' }
-# Exercise the real SQL-free installer progress window and its cleanup.
 try {
     Open-UpdateWindow
-    Set-UpdateWindowStatus 'Verifying the installed application...'
     if (-not $script:UpdateWindow.Visible -or $script:UpdateWindow.ControlBox -or
-        -not $script:UpdateStatus.Text.StartsWith('Installing')) { throw 'Installer progress window state is invalid.' }
+        $script:UpdateWindow.ClientSize.Height -lt 400 -or
+        $script:UpdateWindow.BackColor.ToArgb() -ne [Drawing.Color]::FromArgb(246,248,251).ToArgb() -or
+        $script:UpdateYes.Enabled -or $script:UpdateNo.Enabled) {
+        throw 'OceanBlue updater window must be tall and disable launch decisions during installation.'
+    }
+    $script:UpdateYes.PerformClick()
+    if ($script:UpdateDecision) { throw 'A disabled finish button must not start FMSC.' }
+    Set-UpdateWindowStatus 'Verifying the installed application...'
+    $script:TestDecision = 'Yes'
+    Start-FmscAfterInstallation 'C:\fixture\FMSC_SMS.exe'
+    if ($script:launches -ne 1 -or -not $script:UpdateYes.Enabled -or -not $script:UpdateNo.Enabled -or
+        $script:UpdateBar.Style -ne 'Continuous' -or $script:UpdateBar.Value -ne 100) {
+        throw 'A verified update must offer active finish actions and launch once only after Yes.'
+    }
+    $script:UpdateYes.PerformClick()
+    if ($script:UpdateDecision -ne 'Yes') { throw 'Yes button did not record the launch choice.' }
+    $script:UpdateNo.PerformClick()
+    if ($script:UpdateDecision -ne 'No') { throw 'No button did not record the close choice.' }
 } finally { if ($script:UpdateWindow) { $script:UpdateWindow.Dispose(); $script:UpdateWindow = $null } }
-# The first-install entry point must use the same native dialog with real eight-stage state.
-$PreparedRoot = ''
-$ShowInstallerWindow = $true
-$AppVersion = '1.0.0'; $DatabaseVersion = '1'
+
+$PreparedRoot = ''; $ShowInstallerWindow = $true
 Pause-Step; Pause-Long
 try {
     Open-UpdateWindow
@@ -43,14 +65,25 @@ try {
     Set-UpdateWindowStatus 'Checking SQL Server LocalDB...'
     if (-not $script:UpdateWindow.Visible -or $script:UpdateWindow.ControlBox -or
         $script:UpdateWindow.Text -notlike '*First-time setup*' -or
-        -not $script:UpdateStatus.Text.StartsWith('Installing FMSC') -or
         $script:UpdateStepBars.Count -ne 8 -or
         $script:UpdatePhase.Text -notmatch 'STEP 4 OF 8' -or
-        $script:UpdateBar.Style -ne 'Marquee') {
-        throw 'First-install visual progress dialog did not initialize correctly.'
+        $script:UpdateYes.Enabled -or $script:UpdateNo.Enabled) {
+        throw 'Fresh installation must use the same gated eight-stage OceanBlue GUI.'
+    }
+    $script:TestDecision = 'No'
+    Start-FmscAfterInstallation 'C:\fixture\FMSC_SMS.exe'
+    if ($script:launches -ne 1 -or -not $script:UpdateYes.Enabled -or -not $script:UpdateNo.Enabled) {
+        throw 'No must close the verified installer without launching FMSC.'
     }
 } finally {
     if ($script:UpdateWindow) { $script:UpdateWindow.Dispose(); $script:UpdateWindow = $null }
+}
+$ShowInstallerWindow = $false
+# The real selector must pump UI events; never auto-launch a prepared update.
+$selector = $ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Wait-FmscSetupChoice'}, $true)
+if (-not $selector.Extent.Text.Contains('[Windows.Forms.Application]::DoEvents()') -or
+    -not $selector.Extent.Text.Contains('$script:UpdateDecision')) {
+    throw 'The real finish choice must wait for the user click.'
 }
 $installerEntry = Get-Content (Join-Path $PSScriptRoot '../Installer/Install FMSC_SMS.bat') -Raw
 if ($installerEntry -notmatch 'FMSC[.]Setup[.]exe' -or
@@ -75,4 +108,4 @@ if (-not $handoff.Contains('FMSC.Setup.exe') -or -not $handoff.Contains('--updat
     -not $handoff.Contains('UseShellExecute = true, Verb = "runas"')) {
     throw 'Prepared updates must request UAC through the verified shared GUI executable.'
 }
-Write-Output 'PASS: shared GUI setup launcher used by fresh installs and prepared updates; no console, UAC retained, eight-stage progress and safe restart preserved.'
+Write-Output 'PASS: taller OceanBlue setup UI for install/update; finish buttons disabled until verified, Yes launches, No leaves FMSC closed; shared native launcher and UAC retained.'
