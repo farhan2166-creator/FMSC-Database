@@ -289,7 +289,7 @@ COMMIT;
  Check ((Number "SELECT COUNT(*) FROM dbo.Enrollments WHERE AdmissionId=$returnId AND Status=N'Active' AND BillingReady=1 AND PlacementConfirmedAt IS NOT NULL;") -eq 1) 'Readmission confirms a new billing placement on the same student.'
  Check ((Number "SELECT COUNT(*) FROM dbo.Enrollments WHERE AdmissionId=$returnId;") -eq 2) 'Readmission preserves the historical placement.'
  Check ((Number "SELECT COUNT(*) FROM dbo.StudentFeeAssignments A JOIN dbo.Enrollments E ON E.EnrollmentId=A.EnrollmentId WHERE E.AdmissionId=$returnId AND E.Status=N'Active' AND (A.DiscountAmount<>0 OR A.ConcessionLabel IS NOT NULL);") -eq 0) 'Readmission loads reviewed class rates without carrying the prior concession into its new assignments.'
- Check ((Number "SELECT COALESCE((SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=$returnId),0)+COALESCE((SELECT SUM(A.Amount) FROM dbo.FeePaymentAllocations A JOIN dbo.FeePayments P ON P.FeePaymentId=A.FeePaymentId WHERE P.AdmissionId=$returnId AND P.IsCreditApplication=1),0);") -eq 1000) 'Readmission preserves and uses existing credit without losing or recreating it.'
+ Check ((Number "SELECT COALESCE((SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=$returnId),0)+COALESCE((SELECT SUM(A.Amount) FROM dbo.FeePaymentAllocations A JOIN dbo.FeePayments P ON P.FeePaymentId=A.FeePaymentId WHERE P.AdmissionId=$returnId AND P.IsCreditApplication=1),0);") -eq 1000) 'Readmission preserves existing credit without losing or recreating it.'
  $freeAdmission=Admit 16 $false 'Free'
  $freeId=[int]$freeAdmission.Tables[0].Rows[0].AdmissionId
  Check ((Number "SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE AdmissionId=$freeId AND EffectiveTo IS NULL AND FeeTypeId=1 AND ConcessionLabel=N'Free' AND Amount=DiscountAmount;") -eq 1) 'Admission can explicitly designate free monthly tuition from next month.'
@@ -322,13 +322,16 @@ COMMIT;
   Check ((Number "SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE AdmissionId=$pendingId AND FeeTypeId=1 AND DiscountAmount=2000 AND EffectiveTo=DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1);") -eq 1) 'The previous month retains its original agreed concession.'
  }
  Check ((Number "SELECT SUM(DiscountAmount) FROM dbo.BillingCharges WHERE AdmissionId=$pendingId;") -eq $pendingDiscounts) 'Prospective or refused concession edits never rewrite an existing opening bill.'
- # Credit must also reach an already-issued bill when no new charge is needed.
+ # Schema 76 retains the preview's informational credit count, but opening and
+ # posting bills must not spend advance; explicit collection above owns that.
  [void](Post (Preview))
  [void](Query "DECLARE @R uniqueidentifier=NEWID(); EXEC dbo.ProcessStudentCredit @UserId=1,@AdmissionId=5,@Action=N'Deposit',@Amount=500,@RequestId=@R,@Reason=N'Fictional credit for issued bill';")
  $review=Preview
  Check ($review.Tables[0].Rows[0].PendingCreditApplications -ge 1) 'Opening check notices credit against already-issued current bills.'
+ $creditPaymentsBeforeOpening=Number 'SELECT COUNT(*) FROM dbo.FeePayments WHERE IsCreditApplication=1;'
  [void](Post $review)
- Check ((Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=5;') -eq 0) 'Opening check applies available credit even without generating a new charge.'
+ Check ((Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=5;') -eq 500) 'Opening check preserves advance against already-issued bills for explicit collection.'
+ Check ((Number 'SELECT COUNT(*) FROM dbo.FeePayments WHERE IsCreditApplication=1;') -eq $creditPaymentsBeforeOpening) 'Opening check creates no credit-payment side effect.'
  [void](Query "DECLARE @Id int=(SELECT StudentFeeAssignmentId FROM dbo.StudentFeeAssignments WHERE AdmissionId=5 AND FeeTypeId=1),@Next date=DATEADD(month,1,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1)); EXEC dbo.ChangeStudentFeeAssignmentAmount @UserId=1,@StudentFeeAssignmentId=@Id,@NewAmount=15000,@EffectiveFrom=@Next,@Reason=N'Fictional full-concession rate increase';")
  Check ((Number 'SELECT Amount-DiscountAmount FROM dbo.StudentFeeAssignments WHERE AdmissionId=5 AND FeeTypeId=1 AND EffectiveTo IS NULL;') -eq 0) 'A full labelled concession stays fully free after a rate increase.'
  # Inject failure in this owned fixture only, then retry two competing clients.
