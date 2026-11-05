@@ -32,6 +32,22 @@ try {
     if (-not $script:UpdateWindow.Visible -or $script:UpdateWindow.ControlBox -or
         -not $script:UpdateStatus.Text.StartsWith('Installing')) { throw 'Installer progress window state is invalid.' }
 } finally { if ($script:UpdateWindow) { $script:UpdateWindow.Dispose(); $script:UpdateWindow = $null } }
+# A first installation has the same progress UI without running SQL, requesting
+# elevation or touching a school database in this isolated fixture.
+$PreparedRoot = ''
+$GraphicalInstall = $true
+try {
+    Open-UpdateWindow
+    if (-not $script:UpdateWindow.Visible -or -not $script:UpdateWindow.Text.Contains('Setup') -or
+        $script:UpdateWindow.ControlBox) { throw 'Graphical first-install window is missing or closable.' }
+    Set-UpdateWindowStatus 'STEP 4 OF 8  -  DATABASE ENGINE AND TOOLS'
+    if (-not $script:UpdateStage.Text.Contains('Step 4 of 8')) { throw 'First-install progress stage does not advance.' }
+    Set-UpdateWindowStatus 'Checking the database engine...'
+    if (-not $script:UpdateStatus.Text.Contains('Checking the database engine')) {
+        throw 'First-install status does not update.'
+    }
+} finally { if ($script:UpdateWindow) { $script:UpdateWindow.Dispose(); $script:UpdateWindow = $null } }
+$GraphicalInstall = $false
 $finish = $source.IndexOf('    Start-FmscAfterInstallation -Application $InstalledExe')
 $verified = $source.IndexOf('    Complete-VerifiedApplicationUpdate -ApplicationDirectory $AppDir -Source $AppSource')
 $catch = $source.IndexOf("'                    INSTALLATION FAILED'")
@@ -40,4 +56,4 @@ $handoff = Get-Content (Join-Path $PSScriptRoot '../Core/Updates/UpdateInstaller
 if (-not $handoff.Contains('-STA -WindowStyle Hidden') -or -not $handoff.Contains('Verb = "runas"')) {
     throw 'Prepared updates must elevate while hiding the PowerShell console.'
 }
-Write-Output 'PASS: prompt-free prepared update, no cosmetic waits, normal-user shell restart exactly once after verification, installer progress window and hidden elevated handoff.'
+Write-Output 'PASS: updated progress window and graphical first-install stage labels; unattended prepared update remains prompt-free, wait-free and restarts once after verification.'
