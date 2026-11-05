@@ -27,7 +27,7 @@ internal static partial class Program
                     Check(Regex.IsMatch(Convert.ToString(row["Receipt / Reference"])??"",@"^(?:R|FR)-[0-9]{4}-[0-9]{5,}$|^(?:Credit|Payment) #[0-9]+$"),
                         "Review receipt references use the production R/FR format or a labelled unissued entry");
             }
-            var built=GridReportPreview.Build("Fictional Meadow School & College",title,subtitle,source,"Example Operator");
+            var built=GridReportPreview.Build("Fictional Meadow School & College",title,subtitle,source,"Amina Javed");
             var layout=CollectionReceiptGrouping.Layout(source);
             Check(source.GetXmlForTest()==before,"Printing must not modify source rows, values or types");
             var columns=GridReportColumns.Create(source,"#,##0.##");
@@ -111,7 +111,7 @@ internal static partial class Program
             decimal refund=index==5?1200m:0m,correction=index==4?1300m:index==6?150m:0m,credit=index==8?2250m:index==9?8700m:0m;
             receipts.Rows.Add(index==8?"Credit #19":$"{(index%3==0?"FR":"R")}-2026-{index+9:D5}",new DateTime(2026,10,index==9?19:18),index%3==0?"Family":"Individual",
                 index%3==0?"Hamid, Kausar":"Hamid","Campus Boys","Play Group – F",
-                credit>0?"Account Credit":refund>0?"Refund":correction>0?"Correction":"Cash",money,refund,correction,credit,money-refund-correction,"operator");
+                credit>0?"Account Credit":refund>0?"Refund":correction>0?"Correction":"Cash",money,refund,correction,credit,money-refund-correction,"Amina Javed");
         }
         string totals="   Receipts: 9     Money Received: Rs. 14,800     Refunds: Rs. 1,200     Corrections: Rs. 1,450     Credit Applied: Rs. 10,950     Adjusted Collection: Rs. 12,150";
         receipts.Columns.Add("__ReceiptStudents");receipts.Columns.Add("__ReceiptSnapshot");
@@ -156,14 +156,14 @@ internal static partial class Program
         using var outstanding=new DataTable();
         foreach(string name in new[]{"Adm. / QR No.","Student","Campus","Class / Section","Open Charges (Net)","Settled on Open Charges","Outstanding","Oldest Due Date","Aging"})
             outstanding.Columns.Add(name,name=="Oldest Due Date"?typeof(DateTime):new[]{"Open Charges (Net)","Settled on Open Charges","Outstanding"}.Contains(name)?typeof(decimal):typeof(string));
-        outstanding.Rows.Add("101","Example Student","Campus Boys","Play Group – F",6900m,0m,6900m,new DateTime(2026,10,19),"Due Today");
-        outstanding.Rows.Add("QR-102","Example Sibling","Campus Girls","Play Group – F",6900m,0m,6900m,new DateTime(2026,10,19),"Due Today");
-        outstanding.Rows.Add("103","Another Student","Campus Girls","Class 10 – A",2500m,1700m,800m,new DateTime(2027,1,1),"Not Yet Due");
-        Check(Render("outstanding-aging","Outstanding & Aging — Students","View: Students   Campus: All   Aging date: 19-10-2026   Students Owing: 3     Total Outstanding: Rs. 14,600     Overdue: Rs. 0     90+ Days: Rs. 0",outstanding)==1,"Outstanding report fits one clear page");
+        outstanding.Rows.Add("101","Hamza Ali","Campus Boys","Play Group – M",4650m,1200m,3450m,new DateTime(2026,11,5),"Due Today");
+        outstanding.Rows.Add("QR-102","Ayesha Khan","Campus Girls","Play Group – F",5600m,0m,5600m,new DateTime(2026,11,5),"Due Today");
+        outstanding.Rows.Add("103","Maryam Iqbal","Campus Girls","Class 10 – A",3500m,2150m,1350m,new DateTime(2027,1,1),"Not Yet Due");
+        Check(Render("outstanding-aging","Outstanding & Aging — Students","View: Students   Campus: All   Aging date: 05-11-2026   Students Owing: 3     Total Outstanding: Rs. 10,400     Overdue: Rs. 0     90+ Days: Rs. 0",outstanding)==1,"Outstanding report fits one clear page");
         using(var summaryRows=new DataTable())
         {
             summaryRows.Columns.Add("Charge Date");summaryRows.Columns.Add("Gross Billed",typeof(decimal));
-            summaryRows.Rows.Add("01-11-2026",1234.50m);summaryRows.Rows.Add("TOTAL",1234.50m);
+            summaryRows.Rows.Add("01-11-2026",2875.50m);summaryRows.Rows.Add("TOTAL",2875.50m);
             var values=new[]{new ReportPrintMetric("Overdue Amount","Rs. 200"),new ReportPrintMetric("Due Today","Rs. 100"),
                 new ReportPrintMetric("Not Yet Due","Rs. 700"),new ReportPrintMetric("Due Date Missing","Rs. 0")};
             var report=GridReportPreview.Build("Fictional Meadow School","Debt summary","Campus: All",summaryRows,"Fixture",summaryMetrics:values);
@@ -180,13 +180,13 @@ internal static partial class Program
                     "Summary figures fit inside the reserved header");
             }
             Check(!xml.Descendants(ns+"Value").Any(v=>v.Value.Contains("Data rows:")),"Printed reports omit technical data-row counts");
-            Check(report.Data.Rows[1].Field<bool>("IsReportTotal") && report.Data.Rows[0].Field<string>("C1")==1234.5m.ToString("#,##0.##"),
+            Check(report.Data.Rows[1].Field<bool>("IsReportTotal") && report.Data.Rows[0].Field<string>("C1")==2875.5m.ToString("#,##0.##"),
                 "Totals are emphasized and decimal money retains its readable precision");
             report.Data.Dispose();
         }
         using var wide=new DataTable();wide.Columns.Add("Admission Number");wide.Columns.Add("Student");
         for(int column=0;column<16;column++)wide.Columns.Add("Detailed Amount "+column,typeof(decimal));
-        for(int row=0;row<36;row++)wide.Rows.Add(new object[]{(row+1).ToString(),"Example student "+(row+1)}.Concat(Enumerable.Range(0,16).Select(column=>(object)(1234567.89m+row+column))).ToArray());
+        for(int row=0;row<36;row++)wide.Rows.Add(new object[]{(row+1).ToString(),SampleStudentName(row)}.Concat(Enumerable.Range(0,16).Select(column=>(object)(1750m+row*15m+column*125m))).ToArray());
         var plan=GridReportColumns.Create(wide,"#,##0.##");
         Check(GridReportColumns.Bands(plan,10.67).Count>1,"Extra-wide reports split into identified sections instead of shrinking to tiny text");
         Check(Render("wide-multipage","Wide layout check","Synthetic layout stress case   Records: 36",wide)>1,"Wide reports paginate without overflowing the sheet");
