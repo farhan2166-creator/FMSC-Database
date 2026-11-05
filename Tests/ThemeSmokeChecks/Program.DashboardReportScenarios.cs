@@ -15,14 +15,17 @@ internal static partial class Program
 
         void Render(string file, string title, string scope, DataTable rows, int minimumPages = 1)
         {
-            using var report = GridReportPreview.Build("Fictional Meadow School & College",
+            var report = GridReportPreview.Build("Fictional Meadow School & College",
                 title, scope + " | Fictional layout stress test", rows, "Example Operator");
-            string path = Path.Combine(folder, file + ".pdf");
-            GridReportPreview.ExportPdf(path, report);
+            using (report.Data)
+            {
+                string path = Path.Combine(folder, file + ".pdf");
+                GridReportPreview.ExportPdf(path, report);
             using var pdf = PdfReader.Open(path, PdfDocumentOpenMode.Import);
             Check(pdf.PageCount >= minimumPages, file + " renders the expected page count");
             Check(pdf.Pages.Cast<PdfSharp.Pdf.PdfPage>().All(page =>
-                page.Width.Point > 0 && page.Height.Point > 0), file + " has printable pages");
+                    page.Width.Point > 0 && page.Height.Point > 0), file + " has printable pages");
+            }
         }
 
         DataTable ReceiptSource()
