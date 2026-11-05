@@ -99,7 +99,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private ModernButton? executeButton;
     private ModernButton? fullAmountButton;
     private ModernButton? printReceiptButton;
-    private ModernButton? nextStudentButton;
     private readonly Label collectionResult = new() {
         Dock = DockStyle.Top, AutoSize = true, Visible = false,
         Font = AppTheme.NormalFont, ForeColor = AppTheme.Text,
@@ -416,12 +415,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         };
         studentFeesMenuButton.Click += (_, _) =>
             studentFeesMenu.Show(studentFeesMenuButton, new Point(0, studentFeesMenuButton.Height));
-        var clear =
-            AddAction(
-                UiText.Certificates.NextStudent,
-                (_, _) => { if (transactionBusy) return; ClearPayment(); student.Focus(); },
-                "Secondary");
-        nextStudentButton = clear;
         RelocateFromActions(
             executeButton,
             printReceiptButton,
@@ -430,8 +423,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             addChargeButton,
             futureFeesButton,
             historyButton,
-            paymentHistoryButton,
-            clear);
+            paymentHistoryButton);
         /* Start reading the student list now so the first keystroke filters at once. */
         if(initialize)StudentSearchCache.Warm();
         /* Clear the previous student's data without changing the search text. */
@@ -773,14 +765,14 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             "Payment", "Enter the amount received.");
         var summary = new TableLayoutPanel {
             Dock = DockStyle.Top, AutoSize = true,
-            ColumnCount = 1, RowCount = 13,
+            ColumnCount = 1, RowCount = 12,
             Padding = new Padding(0), Margin = new Padding(0)
         };
         summary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         int valueHeight = AppScale.Scale(40, AppScale.ControlSizeScale);
         foreach (int height in new[] { valueHeight, AppMetrics.FieldRowHeight + 2, 0, valueHeight,
             AppMetrics.FieldRowHeight + 2, 0, valueHeight, 0, AppMetrics.FieldRowHeight + 2,
-            AppMetrics.FieldRowHeight + 2, AppMetrics.ButtonHeight + 6, AppMetrics.ButtonHeight + 6, AppMetrics.ButtonHeight + 6 })
+            AppMetrics.FieldRowHeight + 2, AppMetrics.ButtonHeight + 6, AppMetrics.ButtonHeight + 6 })
             summary.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
         summary.SizeChanged += (_, _) => collectionResult.MaximumSize = new Size(Math.Max(1, summary.ClientSize.Width - 8), 0);
         totalDue.Text = balance.Text = "0.00";
@@ -828,7 +820,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
 
         summary.Controls.Add(executeButton!, 0, 10);
         summary.Controls.Add(receiptActions, 0, 11);
-        summary.Controls.Add(clear, 0, 12);
         creditSummary = SummaryField("Available credit (Rs.)", availableCredit, Color.ForestGreen);
         remainingCreditSummary = SummaryField("Advance left (Rs.)", remainingCredit, Color.ForestGreen);
         FinanceHelp.Attach(this,paymentAmount,FinanceHelp.Topic.ReceiveMoney);
@@ -864,9 +855,9 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         useAvailableCredit.CheckedChanged += (_, _) => {
             if (!suppressPaymentEvents) RefreshEnteredPaymentAllocation();
         };
-        // Keep transaction feedback in the page status, not below Next Student.
+        // Keep transaction feedback in the page status.
         Disposed += (_, _) => {collectionResult.Dispose();familyPaymentBreakdowns.Dispose();};
-        foreach (ModernButton button in new[] { fullAmountButton!, printReceiptButton!, executeButton!, clear })
+        foreach (ModernButton button in new[] { fullAmountButton!, printReceiptButton!, executeButton! })
         {
             button.AutoSize = false;
             button.MinimumSize = Size.Empty;
@@ -3179,7 +3170,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         enrollment.Enabled = false;
         siblings.Enabled = false;
         if (printReceiptButton is not null) printReceiptButton.Enabled = false;
-        if (nextStudentButton is not null) nextStudentButton.Enabled = false;
         try
         {
             if (admissionId <= 0)
@@ -3748,7 +3738,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 ? "Payment recorded. Check Recent Payments for receipt details."
                 : $"Payment recorded. Receipt: {singleReceipt}. " +
                   (lastCollectionReceipt is not null || lastGroupReceiptNumber is not null
-                    ? "Print Receipt, or choose Next Student." : "Check Recent Payments to print, or choose Next Student.");
+                    ? "Print Receipt, or select another student." : "Check Recent Payments to print, or select another student.");
             collectionResult.Visible = true;
             RememberCounterReceipt(result,singleReceipt);
             int refreshVersion = ++loadVersion;
@@ -3823,7 +3813,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 student.Enabled = studentWasEnabled;
                 enrollment.Enabled = enrollmentWasEnabled;
                 siblings.Enabled = siblingsWasEnabled;
-                if (nextStudentButton is not null) nextStudentButton.Enabled = true;
                 if (printReceiptButton is not null)
                     printReceiptButton.Enabled = lastCollectionReceipt is not null || lastGroupReceiptNumber is not null;
             }
@@ -4518,7 +4507,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         /* A family collection carries ONE receipt number shared by every child, so it is reprinted as a single document listing each child, rather than as one receipt per student. */
         if (groupReceiptNumber is not null)
         {
-            await PrintGroupReceiptAsync(institution, groupReceiptNumber);
+            // Print the saved original directly; child copies are available in Recent Payments.
+            await PrintGroupReceiptAsync(institution, groupReceiptNumber, selectedChild: 0);
             return;
         }
         /* assigned from the value captured before the await, and checked, because the field may have been cleared while the institution name was being read. */
