@@ -15,11 +15,19 @@ internal static partial class Program
         CheckGridPdfReports();
         CheckReportStudentIdentity();
         CheckCollectionReceiptPresentation();
+        CheckDashboardReportScenarios();
         CheckReportCaptions(new[]{"ClassSectionSummary","ClassOutstandingCharges","ClassMarksSheet","ClassAttendanceSheet","ClassMonthlyAttendanceSheet"});
         var samples=new (string Title,string Path)[] {
             ("Collections & Receipts — Whole School","grid-pdf/collections-receipts-export.pdf"),
             ("Collections & Receipts — By Campus","grid-pdf/collections-by-campus-export.pdf"),
             ("Family Receipts — Names, Classes and Payment Methods","collection-receipt-presentation/family-receipts.pdf"),
+            ("Receipts — Family with 3 Children","dashboard-report-scenarios/receipts-family-three.pdf"),
+            ("Receipts — Family with 10 Children","dashboard-report-scenarios/receipts-family-ten.pdf"),
+            ("Receipts — Mixed 60-Entry Multipage","dashboard-report-scenarios/receipts-mixed-multipage.pdf"),
+            ("Advance Balance — 22 Families Multipage","dashboard-report-scenarios/advance-families-multipage.pdf"),
+            ("Outstanding & Aging — 75 Students Multipage","dashboard-report-scenarios/outstanding-students-multipage.pdf"),
+            ("Billing & Discounts — 75 Rows Multipage","dashboard-report-scenarios/billing-detail-multipage.pdf"),
+            ("Monthly Reconciliation — 48 Months Multipage","dashboard-report-scenarios/monthly-reconciliation-multipage.pdf"),
             ("Outstanding & Aging — Compact","grid-pdf/outstanding-aging-export.pdf"),
             ("Student List","report-student-identity/student-list.pdf"),
             ("Outstanding & Aging — Student Identity","report-student-identity/outstanding-aging.pdf"),
