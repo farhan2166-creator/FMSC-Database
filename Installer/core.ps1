@@ -221,13 +221,13 @@ function Open-UpdateWindow {
     $actions.SetBounds(0,364,650,66)
     $actions.BackColor = [Drawing.Color]::White
     $script:UpdateFinishPrompt = New-Object Windows.Forms.Label
-    $script:UpdateFinishPrompt.SetBounds(27,378,290,34)
+    $script:UpdateFinishPrompt.SetBounds(27,12,290,34)
     $script:UpdateFinishPrompt.Text = 'Open FMSC when setup finishes?'
     $script:UpdateFinishPrompt.TextAlign = 'MiddleLeft'
     $script:UpdateFinishPrompt.ForeColor = [Drawing.Color]::FromArgb(107,114,128)
     $script:UpdateFinishPrompt.Font = New-Object Drawing.Font('Segoe UI',9)
     $script:UpdateYes = New-Object Windows.Forms.Button
-    $script:UpdateYes.SetBounds(324,378,170,36)
+    $script:UpdateYes.SetBounds(324,14,170,36)
     $script:UpdateYes.Text = 'Yes, open FMSC'
     $script:UpdateYes.FlatStyle = 'Flat'
     $script:UpdateYes.FlatAppearance.BorderSize = 0
@@ -237,7 +237,7 @@ function Open-UpdateWindow {
     $script:UpdateYes.Cursor = [Windows.Forms.Cursors]::Hand
     $script:UpdateYes.Enabled = $false
     $script:UpdateNo = New-Object Windows.Forms.Button
-    $script:UpdateNo.SetBounds(503,378,118,36)
+    $script:UpdateNo.SetBounds(503,14,118,36)
     $script:UpdateNo.Text = 'No, close'
     $script:UpdateNo.FlatStyle = 'Flat'
     $script:UpdateNo.FlatAppearance.BorderSize = 1
