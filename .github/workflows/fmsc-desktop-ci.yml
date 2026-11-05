@@ -82,13 +82,13 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "$suite failed with exit code $LASTEXITCODE" }
           }
 
-      - name: Retain the single direct-export review PDF
+      - name: Retain the dashboard report review PDF
         # Fictional fixture data only. These files use the production export
         # builder and Windows PDF renderer, rather than a recreated layout.
-        if: ${{ always() && hashFiles('artifacts/direct-pdf-review/REVIEW-ALL.pdf') != '' }}
+        if: ${{ always() && hashFiles('artifacts/direct-pdf-review/FMSC-Dashboard-Reports-Review.pdf') != '' }}
         uses: actions/upload-artifact@v7
         with:
-          path: artifacts/direct-pdf-review/REVIEW-ALL.pdf
+          path: artifacts/direct-pdf-review/FMSC-Dashboard-Reports-Review.pdf
           archive: false
           retention-days: 7
           if-no-files-found: error
