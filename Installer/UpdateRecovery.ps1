@@ -87,9 +87,9 @@ function Read-FmscRecoveryJournal {
         $record.Phase -notin @('Prepared','Migrating','Activating','Verified','Completed') -or
         $record.UserSid -notmatch '^S-1-5-21-[0-9-]+$' -or
         $record.Version -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z.-]+)?$' -or
-        $record.Schema -isnot [int] -or $record.Schema -le 0 -or
-        $record.BeforeSchema -isnot [int] -or $record.BeforeSchema -lt 0 -or $record.BeforeSchema -gt $record.Schema -or
-        $record.LastSchema -isnot [int] -or $record.LastSchema -lt 0 -or $record.LastSchema -gt $record.Schema -or
+        ($record.Schema -isnot [int] -and $record.Schema -isnot [long]) -or $record.Schema -le 0 -or $record.Schema -gt [int]::MaxValue -or
+        ($record.BeforeSchema -isnot [int] -and $record.BeforeSchema -isnot [long]) -or $record.BeforeSchema -lt 0 -or $record.BeforeSchema -gt $record.Schema -or
+        ($record.LastSchema -isnot [int] -and $record.LastSchema -isnot [long]) -or $record.LastSchema -lt 0 -or $record.LastSchema -gt $record.Schema -or
         $record.ScriptSha256 -notmatch '^[a-fA-F0-9]{64}$' -or $record.HelperSha256 -notmatch '^[a-fA-F0-9]{64}$') {
         throw 'Recovery record is invalid. FMSC was not opened; contact support.'
     }

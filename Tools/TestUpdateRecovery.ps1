@@ -115,6 +115,9 @@ try {
     $record.Phase = 'Unknown'; Save-FmscRecoveryJournal $script:RecoveryRoot $record
     Refuse { Read-FmscRecoveryJournal $script:RecoveryRoot }
     $record.Phase = 'Prepared'; Save-FmscRecoveryJournal $script:RecoveryRoot $record
+    $record.Schema = 3.5; Save-FmscRecoveryJournal $script:RecoveryRoot $record
+    Refuse { Read-FmscRecoveryJournal $script:RecoveryRoot }
+    $record.Schema = $schema; Save-FmscRecoveryJournal $script:RecoveryRoot $record
     $snapshot = Join-Path $script:RecoveryRoot ('transactions/' + $record.Transaction)
     foreach ($checkpointName in @('BeforeOldMove','AfterOldMove','AfterNewMove')) {
         foreach ($directory in @($app,$stage,$rollback)) { Remove-VerifiedUpdateDirectory $directory $directory }

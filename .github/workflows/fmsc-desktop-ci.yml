@@ -138,8 +138,11 @@ jobs:
         run: .\Tools\TestUpdateCleanup.ps1
 
       - name: Force interruption and recover activation using disposable folders
-        shell: powershell
-        run: .\Tools\TestUpdateRecovery.ps1
+        shell: pwsh
+        run: |
+          & .\Tools\TestUpdateRecovery.ps1
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Tools\TestUpdateRecovery.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Windows PowerShell recovery checks failed.' }
 
       - name: Build optional communication worker and webhook host
         run: |

@@ -6,7 +6,7 @@ param(
     [switch]$ResumeUpdate
 )
 $ErrorActionPreference = 'Stop'
-. (Join-Path $PSScriptRoot 'UpdateRecovery.ps1')
+. ([IO.Path]::Combine($PSScriptRoot,'UpdateRecovery.ps1'))
 $script:RecoveryRoot = Get-FmscRecoveryRoot
 $script:RecoveryJournal = $null
 if ($ResumeUpdate) { $PreparedRoot = 'pending-recovery' }

@@ -2,7 +2,7 @@
 # Administrators/SYSTEM-writable storage outside the replaceable app directory.
 $ErrorActionPreference = 'Stop'
 try {
-    . (Join-Path $PSScriptRoot 'UpdateRecovery.ps1')
+    . ([IO.Path]::Combine($PSScriptRoot,'UpdateRecovery.ps1'))
     $root = Get-FmscRecoveryRoot
     if ([IO.Path]::GetFullPath($PSScriptRoot) -ine [IO.Path]::GetFullPath($root)) { throw 'Invalid FMSC launcher location.' }
     $record = Read-FmscRecoveryJournal $root
