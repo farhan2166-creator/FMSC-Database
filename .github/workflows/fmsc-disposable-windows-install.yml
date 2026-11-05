@@ -44,6 +44,11 @@ jobs:
         timeout-minutes: 10
         run: .\Tools\TestAutomaticBilling.ps1
 
+      - name: Recover interrupted migrations and restore verified backup on disposable databases
+        shell: pwsh
+        timeout-minutes: 10
+        run: .\Tools\TestUpdateRecoverySql.ps1
+
       - name: Publish sanitized acceptance summary
         if: always()
         uses: actions/upload-artifact@v7

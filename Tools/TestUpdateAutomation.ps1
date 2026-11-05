@@ -33,7 +33,7 @@ try {
         -not $script:UpdateStatus.Text.StartsWith('Installing')) { throw 'Installer progress window state is invalid.' }
 } finally { if ($script:UpdateWindow) { $script:UpdateWindow.Dispose(); $script:UpdateWindow = $null } }
 $finish = $source.IndexOf('    Start-FmscAfterInstallation -Application $InstalledExe')
-$verified = $source.IndexOf('    Complete-VerifiedApplicationUpdate -ApplicationDirectory')
+$verified = $source.IndexOf('    Complete-VerifiedApplicationUpdate -ApplicationDirectory $AppDir -Source $AppSource')
 $catch = $source.IndexOf("'                    INSTALLATION FAILED'")
 if ($finish -le $verified -or $finish -ge $catch) { throw 'Restart must occur only on the verified success path.' }
 $handoff = Get-Content (Join-Path $PSScriptRoot '../Core/Updates/UpdateInstallerHandoff.cs') -Raw

@@ -343,19 +343,49 @@ Failure shows an attention dialog with the log and recovery paths, without
 restarting FMSC. A missing desktop shell after successful installation asks the
 user to open the normal shortcut instead of launching an elevated application.
 
-### Forced interruption limitations
+### Interrupted installation recovery
 
-An ordinary caught activation failure attempts to restore the previous application
-directory; completed migrations remain applied and their verified backup is kept.
-A forced process termination or power failure bypasses those handlers. There is
-currently no durable startup repair journal or stable recovery launcher: interruption
-between the two activation directory renames can leave the application shortcut
-without a target until the installation is repaired. Interruption between numbered
-migrations can leave a schema incompatible with the previous application, which
-normal database compatibility checks must refuse. SQL transaction rollback for an
-interrupted individual migration is separate from restoring earlier committed
-migrations. Database backup restoration is not automatic. These cases require
-disposable power-interruption/recovery acceptance before claiming crash-safe updates.
+Prepared installation now makes a verified protected snapshot under
+`%ProgramData%/FMSC_Updater/transactions/<guid>` and installs a stable desktop
+launcher outside the replaceable application directory before migrations run.
+Only Administrators/SYSTEM may modify recovery storage; users have read/execute
+access. Links and weakened ownership/permissions are refused. The owner-published
+installer/helper SHA-256 values are recorded locally; no publisher signing key is
+introduced. Recovery uses no network or additional database.
+
+The atomically replaced, flushed `recovery.json` records Prepared, Migrating,
+Activating, Verified and Completed. Activation intent is committed before either
+directory rename. Recovery preserves the transaction's original rollback copy,
+rebuilds staging from the protected snapshot, verifies it and rechecks database
+compatibility before activation. A separate durable verified manifest survives
+partial cleanup. Verified is committed before deleting rollback or recovery
+payloads; interrupted cleanup can therefore be retried without requiring those
+payloads. Completed permits normal startup. The next update removes leftover
+completed/orphaned protected snapshots, keeping recovery storage bounded.
+
+The desktop launcher requests elevation to resume an unfinished update. Direct
+application startup also checks local pending state before accessing the school
+database and redirects to recovery. An active installer blocks concurrent startup;
+the original Windows user is required for the same LocalDB identity. Invalid state,
+modified recovery scripts, missing payloads or failed compatibility checks stop
+with recovery instructions instead of opening an uncertain application.
+
+Migrations read the actual database schema rather than trusting the journal's last
+recorded migration. Earlier committed migrations are skipped; the remaining numbered
+scripts still run sequentially under the existing transactional/version guards.
+The original pre-migration backup path/hash and database GUID are retained and
+checked on recovery. Recovery never overwrites that backup or automatically
+restores/downgrades the database. A damaged backup, changed database identity or
+failing migration requires support; existing data and recovery files are preserved.
+
+`TestUpdateRecovery.ps1` actually kills child processes around directory renames
+and during cleanup using disposable folders. Restricted local runs substitute a
+fixture owner; elevated Windows CI checks production Administrators ownership.
+`TestUpdateRecoverySql.ps1` is guarded to approved hosted disposable runners and
+tests interrupted committed migrations, transactional failure, forward resume and
+backup restoration into a second newly named fixture database. Physical power-loss,
+disk/controller failure and complete-machine-loss recovery are separate limits;
+local journaling cannot replace an independent school-data backup.
 
 The dialog displays download percentage, received/total bytes, remaining bytes,
 network speed, elapsed time and estimated time remaining. Git's network pack

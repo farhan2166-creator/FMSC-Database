@@ -27,6 +27,7 @@ $instance='(localdb)\MSSQLLocalDB'
 $installed='C:\FMSC School Management'
 $live='C:\ProgramData\FMSC_Database'
 $shortcut=Join-Path ([Environment]::GetFolderPath('Desktop')) 'FMSC SMS.lnk'
+$recoveryStorage=Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'FMSC_Updater'
 $ownedDatabase=$false
 $ownedInstallation=$false
 $ownedRoot=$false
@@ -131,6 +132,7 @@ try {
         if (Test-Path -LiteralPath $path) { throw 'Pre-existing FMSC installation assets: refusing to touch them.' }
     }
     if (Test-Path -LiteralPath $root) { throw 'Disposable test workspace already exists.' }
+    if (Test-Path -LiteralPath $recoveryStorage) { throw 'Recovery storage already exists; refusing to alter an existing installation.' }
     New-Item -ItemType Directory -Path $root,$release,$app,$tools,$database,(Join-Path $root 'empty-source') -Force | Out-Null
     $ownedRoot=$true
     $checks.Add('No existing FMSC application or target database found')
@@ -414,7 +416,7 @@ finally {
             if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
         }
         if ($ownedInstallation) {
-            foreach ($path in @($installed,"$installed.staging","$installed.rollback",$live,$shortcut)) {
+            foreach ($path in @($installed,"$installed.staging","$installed.rollback",$live,$shortcut,$recoveryStorage)) {
                 if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
             }
         }

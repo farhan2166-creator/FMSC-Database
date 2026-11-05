@@ -137,6 +137,10 @@ jobs:
         shell: powershell
         run: .\Tools\TestUpdateCleanup.ps1
 
+      - name: Force interruption and recover activation using disposable folders
+        shell: powershell
+        run: .\Tools\TestUpdateRecovery.ps1
+
       - name: Build optional communication worker and webhook host
         run: |
           dotnet build Apps/Worker/Worker.csproj -c Release

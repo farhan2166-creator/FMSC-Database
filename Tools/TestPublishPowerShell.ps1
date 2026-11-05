@@ -40,7 +40,8 @@ try {
     }
     foreach ($relative in @('FMSC_SMS/FMSC_SMS.exe', 'FMSC_SMS/FMSC_SMS.dll',
         'FMSC_SMS/FMSC_SMS.deps.json', 'FMSC_SMS/FMSC_SMS.runtimeconfig.json',
-        'FMSC_SMS/UpdateSupport/core.ps1', 'core.ps1', 'Install FMSC_SMS.bat', 'Tools/SqlLocalDB.msi')) {
+        'FMSC_SMS/UpdateSupport/core.ps1', 'FMSC_SMS/UpdateSupport/UpdateRecovery.ps1',
+        'FMSC_SMS/UpdateSupport/Launch-FMSC.ps1', 'UpdateRecovery.ps1', 'core.ps1', 'Install FMSC_SMS.bat', 'Tools/SqlLocalDB.msi')) {
         $file = Join-Path $release $relative
         if (-not (Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -eq 0) {
             throw "Full publish did not copy its required output: $relative"
@@ -49,6 +50,9 @@ try {
     foreach ($pair in @(
         ,@('Installer/core.ps1', 'core.ps1')
         ,@('Installer/core.ps1', 'FMSC_SMS/UpdateSupport/core.ps1')
+        ,@('Installer/UpdateRecovery.ps1', 'UpdateRecovery.ps1')
+        ,@('Installer/UpdateRecovery.ps1', 'FMSC_SMS/UpdateSupport/UpdateRecovery.ps1')
+        ,@('Installer/Launch-FMSC.ps1', 'FMSC_SMS/UpdateSupport/Launch-FMSC.ps1')
     )) {
         $expected = (Get-FileHash -LiteralPath (Join-Path $ProjectDirectory $pair[0]) -Algorithm SHA256).Hash
         $actual = (Get-FileHash -LiteralPath (Join-Path $release $pair[1]) -Algorithm SHA256).Hash

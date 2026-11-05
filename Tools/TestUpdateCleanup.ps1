@@ -58,7 +58,7 @@ try {
         if (-not $refused -or -not (Test-Path $app)) { throw 'Linked cleanup was accepted.' }
     } finally { [IO.Directory]::Delete($link) }
     $activation = $source.IndexOf('    Enable-StagedApplication -Staging')
-    $cleanup = $source.IndexOf('    Complete-VerifiedApplicationUpdate -ApplicationDirectory')
+    $cleanup = $source.IndexOf('    Complete-VerifiedApplicationUpdate -ApplicationDirectory $AppDir -Source $AppSource')
     if ($activation -lt 0 -or $cleanup -le $activation) { throw 'Cleanup must follow activation.' }
     $completed = $source.IndexOf("'STEP 8 OF 8  -  COMPLETED'")
     if ($completed -le $cleanup) { throw 'Completed must follow activated-application verification.' }

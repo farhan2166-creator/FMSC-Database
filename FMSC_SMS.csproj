@@ -32,6 +32,8 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<Content Include="Installer/core.ps1" Link="UpdateSupport/core.ps1" CopyToPublishDirectory="PreserveNewest" />
+		<Content Include="Installer/UpdateRecovery.ps1" Link="UpdateSupport/UpdateRecovery.ps1" CopyToPublishDirectory="PreserveNewest" />
+		<Content Include="Installer/Launch-FMSC.ps1" Link="UpdateSupport/Launch-FMSC.ps1" CopyToPublishDirectory="PreserveNewest" />
 		<Content Include="Migrations/*.sql" Link="UpdateSupport/Migrations/%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
 		<Content Include="Assets\academics.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -161,6 +163,7 @@
 		<Copy SourceFiles="@(MigrationFiles)" DestinationFiles="@(MigrationFiles->'$(ReleaseRoot)Migrations\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="@(MigrationApplierFiles)" DestinationFolder="$(ReleaseRoot)Migrations" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\core.ps1" DestinationFiles="$(ReleaseRoot)core.ps1" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\UpdateRecovery.ps1" DestinationFiles="$(ReleaseRoot)UpdateRecovery.ps1" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\Install FMSC_SMS.bat" DestinationFiles="$(ReleaseRoot)Install FMSC_SMS.bat" SkipUnchangedFiles="true" />
 	</Target>
 	<ItemGroup>

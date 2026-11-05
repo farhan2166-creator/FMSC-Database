@@ -30,6 +30,9 @@ internal static class Program
             return;
         }
         ApplicationConfiguration.Initialize();
+#if !FMSC_LEVEL2
+        if (!FMSC_SMS.Core.Updates.UpdateStartupGuard.AllowStartup()) return;
+#endif
         AppExceptionHandler.Register();
         MainDashboardForm.PrimeInitialScale();
         using (var connection = new DatabaseConnectionForm(startup: true))

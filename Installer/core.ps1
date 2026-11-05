@@ -2,9 +2,14 @@ param(
     [string]$PreparedRoot = '',
     [int]$OriginalProcessId = 0,
     [long]$OriginalStartTicks = 0,
-    [string]$OriginalUserSid = ''
+    [string]$OriginalUserSid = '',
+    [switch]$ResumeUpdate
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'UpdateRecovery.ps1')
+$script:RecoveryRoot = Get-FmscRecoveryRoot
+$script:RecoveryJournal = $null
+if ($ResumeUpdate) { $PreparedRoot = 'pending-recovery' }
 function Wait-OriginalFmscExit {
     param([int]$ProcessId, [long]$StartTicks, [string]$UserSid, [int]$TimeoutMilliseconds = 120000)
     if ($ProcessId -le 0 -or $StartTicks -le 0 -or
@@ -846,14 +851,25 @@ function Enable-StagedApplication {
     }
     $HadPreviousInstall =
         Test-Path -LiteralPath $AppDir
+    $HadRecoveryRollback = $script:RecoveryJournal -and (Test-Path -LiteralPath $RollbackDir)
+    if ($script:RecoveryJournal) {
+        # Activating is written BEFORE the first rename. On recovery, any
+        # existing rollback is this transaction's baseline and must be preserved.
+        if ($script:RecoveryJournal.Phase -ne 'Activating') {
+            if (Test-Path -LiteralPath $RollbackDir) {
+                Remove-VerifiedUpdateDirectory $RollbackDir "$AppDir.rollback"
+            }
+            Set-FmscRecoveryPhase 'Activating'
+        } elseif ((Test-Path -LiteralPath $RollbackDir) -and $HadPreviousInstall) {
+            Remove-VerifiedUpdateDirectory $AppDir $AppDir
+            $HadPreviousInstall = $false
+        }
+    }
     if ($HadPreviousInstall) {
         if (Test-Path -LiteralPath $RollbackDir) {
             Write-Log `
                 "Removing the previous rollback copy: $RollbackDir"
-            Remove-Item `
-                -LiteralPath $RollbackDir `
-                -Recurse `
-                -Force
+            Remove-VerifiedUpdateDirectory $RollbackDir "$AppDir.rollback"
         }
         Write-Log `
             "Setting the installed application aside: $AppDir -> $RollbackDir"
@@ -888,7 +904,7 @@ function Enable-StagedApplication {
             }
         }
         if (
-            $HadPreviousInstall -and
+            ($HadPreviousInstall -or $HadRecoveryRollback) -and
             (Test-Path -LiteralPath $RollbackDir) -and
             (-not (Test-Path -LiteralPath $AppDir))
         ) {
@@ -961,12 +977,14 @@ function Complete-VerifiedApplicationUpdate {
     }
     $result = Invoke-InstallationDatabaseCheck -Application (Join-Path $ApplicationDirectory 'FMSC_SMS.exe')
     if ($result -notin @(0,10)) { throw "Activated application verification failed (code $result). Recovery files have been kept." }
+    if ($script:RecoveryJournal) { Complete-FmscRecoveryTransaction }
     $rollback = "$ApplicationDirectory.rollback"
     try {
         Remove-VerifiedUpdateDirectory -Path $rollback -ExpectedPath $rollback
         Write-Log 'Activated application verified; previous application copy removed.'
     } catch { Write-WarningMessage "Update succeeded; previous application cleanup is pending: $($_.Exception.Message)" }
     if (-not $Prepared) { return }
+    if ($script:RecoveryJournal) { $Prepared = $script:RecoveryJournal.DownloadRoot }
     try {
         $preparedPath = [IO.Path]::GetFullPath($Prepared).TrimEnd('\')
         $state = Split-Path -Parent $preparedPath
@@ -1066,6 +1084,7 @@ function Invoke-PendingMigrations {
         [pscustomobject]@{ FilePath = $file.FullName; Version = $version }
     })
     $current = Convert-ToDbVersion (Get-DatabaseVersion)
+    if ($script:RecoveryJournal) { Confirm-FmscRecoveryBackup -CurrentSchema $current }
     $pending = @($migrations | Where-Object Version -gt $current | Sort-Object Version)
     if ($pending.Count -eq 0) {
         Write-Log "No migrations newer than database version $current; skipping database migrations."
@@ -1087,13 +1106,28 @@ function Invoke-PendingMigrations {
         }
         $expected++
     }
-    $script:RecoveryBackupPath = New-PreMigrationBackup -FromVersion "$current" -ToVersion "$target"
+    if ($script:RecoveryJournal -and $script:RecoveryJournal.Backup) {
+        $script:RecoveryBackupPath = $script:RecoveryJournal.Backup
+    } else {
+        $script:RecoveryBackupPath = New-PreMigrationBackup -FromVersion "$current" -ToVersion "$target"
+        if ($script:RecoveryJournal) {
+            $script:RecoveryJournal.Backup = $script:RecoveryBackupPath
+            $script:RecoveryJournal.BackupSha256 = (Get-FileHash -LiteralPath $script:RecoveryBackupPath -Algorithm SHA256).Hash
+            $script:RecoveryJournal.BeforeSchema = $current
+            if ($script:RecoveryJournal.Phase -eq 'Prepared') { $script:RecoveryJournal.Phase = 'Migrating' }
+            Save-FmscRecoveryJournal $script:RecoveryRoot $script:RecoveryJournal
+        }
+    }
     foreach ($migration in $pending) {
         Write-Step "Applying database migration $($migration.Version)..."
         Invoke-SqlMigration -FilePath $migration.FilePath -VersionBefore $current -ExpectedVersion $migration.Version
         $actual = Convert-ToDbVersion (Get-DatabaseVersion)
         if ($actual -ne $migration.Version) { throw "Migration $($migration.Version) did not leave the expected database version. Application activation stopped." }
         $current = $actual
+        if ($script:RecoveryJournal) {
+            $script:RecoveryJournal.LastSchema = $actual
+            Save-FmscRecoveryJournal $script:RecoveryRoot $script:RecoveryJournal
+        }
     }
 }
 
@@ -1177,8 +1211,25 @@ function Test-PreparedUpdate {
 
 try {
     Open-UpdateWindow
+    $existingRecovery = Read-FmscRecoveryJournal $script:RecoveryRoot
+    if ($ResumeUpdate) {
+        if (-not $existingRecovery -or $existingRecovery.Phase -eq 'Completed') {
+            throw 'No unfinished update was found. Open FMSC from its shortcut.'
+        }
+        Assert-FmscResumeIdentity $existingRecovery $script:RecoveryRoot $AppVersion ([int]$DatabaseVersion) $PSCommandPath
+        $script:RecoveryJournal = $existingRecovery
+        $PreparedRoot = Join-Path $script:RecoveryRoot ('transactions/' + $existingRecovery.Transaction)
+        $AppSource = Join-Path $PreparedRoot 'application'
+        $MigrationsDir = Join-Path $AppSource 'UpdateSupport/Migrations'
+        $ReleaseRoot = $script:RecoveryRoot
+        $script:RecoveryBackupPath = $existingRecovery.Backup
+    } elseif ($existingRecovery -and $existingRecovery.Phase -ne 'Completed') {
+        throw 'An unfinished update exists. Use the FMSC desktop shortcut to recover it first.'
+    }
     if ($PreparedRoot) {
-        Wait-OriginalFmscExit -ProcessId $OriginalProcessId -StartTicks $OriginalStartTicks -UserSid $OriginalUserSid
+        if (-not $ResumeUpdate) {
+            Wait-OriginalFmscExit -ProcessId $OriginalProcessId -StartTicks $OriginalStartTicks -UserSid $OriginalUserSid
+        }
         if (-not (Test-Path -LiteralPath $LiveMdf -PathType Leaf) -or
             -not (Test-Path -LiteralPath $LiveLdf -PathType Leaf)) {
             throw 'An existing complete school database is required. Update will never copy template database files.'
@@ -1189,6 +1240,15 @@ try {
     try { $script:InstallerLockHeld = $script:InstallerMutex.WaitOne(0) }
     catch [Threading.AbandonedMutexException] { $script:InstallerLockHeld = $true }
     if (-not $script:InstallerLockHeld) { throw 'Another FMSC installer is active. No update was installed.' }
+    if ($ResumeUpdate -and (Get-Process -Name 'FMSC_SMS' -ErrorAction SilentlyContinue)) {
+        throw 'Close all FMSC windows before recovering the update.'
+    }
+    if ($ResumeUpdate -and $script:RecoveryJournal.Phase -eq 'Verified') {
+        Complete-VerifiedApplicationUpdate -ApplicationDirectory $AppDir -Source $AppDir -Prepared (Join-Path $script:RecoveryRoot 'verification')
+        Remove-FmscCompletedSnapshot
+        Start-FmscAfterInstallation -Application (Join-Path $AppDir 'FMSC_SMS.exe')
+        return
+    }
     if ($PreparedRoot) { Test-PreparedUpdate -Root $PreparedRoot -Version $AppVersion -Schema ([int]$DatabaseVersion) }
     Show-Banner
     Write-Section 'Installing - preparing and activating the application update'
@@ -1299,6 +1359,13 @@ try {
     }
     Write-Success `
         'Application is not running.'
+    if ($PreparedRoot -and -not $ResumeUpdate) {
+        $script:RecoveryJournal = Initialize-FmscRecoveryTransaction -Prepared $PreparedRoot -Root $script:RecoveryRoot -Version $AppVersion -Schema ([int]$DatabaseVersion) -UserSid $OriginalUserSid
+        $PreparedRoot = Join-Path $script:RecoveryRoot ('transactions/' + $script:RecoveryJournal.Transaction)
+        $AppSource = Join-Path $PreparedRoot 'application'
+        $MigrationsDir = Join-Path $AppSource 'UpdateSupport/Migrations'
+        $ReleaseRoot = $script:RecoveryRoot
+    }
     Pause-Step
     Write-Section `
         'STEP 4 OF 8  -  DATABASE ENGINE AND TOOLS'
@@ -1641,6 +1708,7 @@ try {
     if ($PreparedRoot) {
         Test-PreparedUpdate -Root $PreparedRoot -Version $AppVersion -Schema ([int]$DatabaseVersion) -Application $AppStagingDir
     }
+    if ($script:RecoveryJournal) { Assert-FmscRecoveryDatabaseIdentity }
     Invoke-PendingMigrations -Directory $MigrationsDir -RequiredVersion (Convert-ToDbVersion $DatabaseVersion)
     $verification = Invoke-InstallationDatabaseCheck -Application (Join-Path $AppStagingDir 'FMSC_SMS.exe')
     if ($verification -notin @(0,10)) {
@@ -1698,21 +1766,7 @@ try {
             $DesktopPath `
             'FMSC SMS.lnk'
     try {
-        $WshShell =
-            New-Object -ComObject WScript.Shell
-        $Shortcut =
-            $WshShell.CreateShortcut(
-                $ShortcutPath
-            )
-        $Shortcut.TargetPath =
-            $InstalledExe
-        $Shortcut.WorkingDirectory =
-            $AppDir
-        $Shortcut.Description =
-            $AppName
-        $Shortcut.IconLocation =
-            "$InstalledExe,0"
-        $Shortcut.Save()
+        Install-FmscStableLauncher -Source $AppSource -Root $script:RecoveryRoot -ShortcutPath $ShortcutPath -Application $InstalledExe
         Write-Success `
             "Desktop shortcut created: $ShortcutPath"
     }
@@ -1722,6 +1776,7 @@ try {
     }
     Pause-Long
     Complete-VerifiedApplicationUpdate -ApplicationDirectory $AppDir -Source $AppSource -Prepared $PreparedRoot
+    if ($script:RecoveryJournal) { Remove-FmscCompletedSnapshot }
     Write-Section `
         'STEP 8 OF 8  -  COMPLETED'
     Write-Host ''
