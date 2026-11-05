@@ -10,7 +10,7 @@ The [Complete Windows Installer ZIP](../.github/workflows/fmsc-complete-installe
 FMSC_SMS/                 Published self-contained app and resources
 Database/                 You provide FMSC_DB.mdf and FMSC_DB_log.ldf for a fresh install
 Tools/                    Signed Microsoft SqlLocalDB.msi and verified sqlcmd.exe
-Migrations/               Pending numbered SQL migrations; 20.sql upgrades schema 19; 21.sql upgrades schema 20
+Migrations/               Empty at first-production schema 1; future numbered upgrades begin at 2.sql
 Install FMSC_SMS.bat
 core.ps1
 READ_ME_FIRST.txt         Packaging instructions
@@ -21,6 +21,8 @@ SHA256SUMS.txt            Package content hashes
 **Important:** The GitHub build deliberately excludes school MDF/LDF files. The source repository alone is **not** a ready-to-install fresh database. A complete-installer workflow must first run successfully and upload its artifact; do not assume an installer exists from a passing ordinary CI build.
 
 After fixes are merged, start a **new** Complete Windows Installer ZIP run with **Run workflow → main**. Rerunning an older run rebuilds its original source commit. Check the source commit in the run summary and extracted `READ_ME_FIRST.txt`; do not mix an older `core.ps1` with newer application files. Packaging verifies the copied installer against that checked-out revision and checks the migration folder inventory.
+
+Historical installer guides and dated tests may describe development schemas 19–21 and migrations 20/21. Those are **pre-baseline history**, not install instructions for schema 1. Do not ship or replay those numbered scripts against the current production baseline.
 
 The installer no longer offers the already-applied Communication Center setup. Its runtime definition remains embedded for verification; fresh installs that need the module must use a snapshot containing it.
 
@@ -43,7 +45,7 @@ The installer checks `Migrations` for top-level `*.sql` files. An empty or missi
 4. **Never ignore a blocked or failed validation.** Record the exact message and installer logs and stop before retrying or adjusting data files.
 5. After successful installation, launch the application under the intended operator account; verify connection, login, schema compatibility, a read-only student search, a report preview, and permitted user actions.
 
-The app expects `FMSC_DB` under `C:\ProgramData\FMSC_Database` and uses `(localdb)\MSSQLLocalDB` by default. Current required **database schema version: 20**; application assembly version is tracked separately in `FMSC_SMS.csproj`.
+The app expects `FMSC_DB` under `C:\ProgramData\FMSC_Database` and uses `(localdb)\MSSQLLocalDB` by default. Current required **database schema version: 1** (first-production baseline, 5 November 2026); application version is **1.0.0**. See [first-release baseline](FIRST_RELEASE_BASELINE.md). Future app-only releases can change the application version without changing the database schema.
 
 If silent LocalDB installation fails (for example, MSI code 1603), the current installer reports a verbose log under `C:\ProgramData\FMSC_Database` and asks whether to open the official Microsoft installer wizard. A failed/cancelled wizard or restart-required result stops installation safely. Code 1603 alone does not identify the underlying MSI problem; retain the verbose log for diagnosis. An immediate `SQL Server LocalDB installation failed. MSI exit code: 1603` message without this fallback belongs to the older installer: verify the artifact's source commit before retrying.
 
@@ -51,13 +53,13 @@ If silent LocalDB installation fails (for example, MSI code 1603), the current i
 
 - Take and **verify** a recoverable backup first and note its storage path.
 - Do **not** copy a replacement MDF/LDF over an installed school's existing pair.
-- Run the same verified installer with the app closed. This release requires schema 21. Migrations 20 and 21 support schema 19/20 respectively, with a verified recovery backup first. Older databases require a separately reviewed upgrade path. A newer schema must not be downgraded.
+- Run the same verified installer with the app closed. The first-production release requires **schema 1**, supplied in the approved fully updated detached database. There are **no production numbered migration files** at this baseline; future schema changes start with `2.sql` and require a continuous, verified and backed-up upgrade path. Legacy pre-release schemas carrying higher version labels are **not** silently downgraded to 1; use the separately approved fresh-baseline installation procedure in [first-release baseline](FIRST_RELEASE_BASELINE.md).
 - Record the automatic pre-migration safety backup, installer status, original/current version, and post-upgrade application compatibility. Recovery requires a tested restore path.
 - If anything fails, **do not manually rerun SQL migrations on the live school database**. Follow [recovery](BACKUP_RECOVERY.md), and use a verified disposable clone for diagnosis.
 
 ## Disposable Windows installation acceptance in GitHub Actions
 
-Run **FMSC Disposable Windows Installation Acceptance** from **Actions → Run workflow** on the reviewed branch/commit. This manual workflow uses a fresh GitHub-hosted `windows-2022` runner, checks the approved data-free schema fixture, verifies Microsoft's signed LocalDB MSI and pinned sqlcmd, publishes the real full installer, creates a disposable LocalDB schema-19 database containing **no real school records**, detaches it, then runs the actual `Installer/core.ps1` against that synthetic database. The workflow verifies installation completion, on-disk application and database files, and the installed application's `--verify-installation` exit code.
+Run **FMSC Disposable Windows Installation Acceptance** from **Actions → Run workflow** on the reviewed branch/commit. This manual workflow uses a fresh GitHub-hosted `windows-2022` runner, checks the approved data-free schema fixture, verifies Microsoft's signed LocalDB MSI and pinned sqlcmd, publishes the real full installer, creates a disposable LocalDB schema-only test database containing **no real school records**, detaches it, then runs the actual `Installer/core.ps1` against that synthetic database. The workflow verifies installation completion, on-disk application and database files, and the installed application's `--verify-installation` exit code.
 
 The Release Readiness workflow also calls this test after security, desktop and SQL checks pass on a release branch. It requires a GitHub-hosted Windows runner, refuses existing FMSC assets or catalogs, and removes only its owned synthetic database, installed files and temporary package after success or failure. It uses no repository secrets or write credentials. Its result artifact contains only a sanitized JSON report and Markdown summary, including cleanup status. The workflow does **not** export the synthetic database, the raw installer logs, or secrets. It must fail or report blocked when prerequisites, elevation, validation, or the real installer cannot run. If the GitHub Windows runner already has LocalDB, the report explicitly says the initial clean MSI installation was **not tested**. This is not a guaranteed pristine Windows VM or an interactive MSI wizard/printer/UI test, and it does not replace manual clean-PC acceptance using an owner-approved detached database pair. Self-hosted execution is refused.
 

@@ -1,5 +1,7 @@
 # Current-release verification and acceptance — 1 November 2026
 
+> **Historical release-candidate record.** The owner's [first-production baseline reset on 5 November 2026](FIRST_RELEASE_BASELINE.md) established application 1.0.0 / schema 1. Schema 69/75 and pre-release version claims below describe the original reviewed November 1–2 baseline only; they are retained for evidence traceability and must not be used as today's installer instructions.
+
 Source baseline: `12b37c39a6915c5a9f5730f4191e9c92a445d992` on `main` before this repair.
 Application: FMSC School Management System 1.1.0-rc.2. Database schema: **69**.
 
