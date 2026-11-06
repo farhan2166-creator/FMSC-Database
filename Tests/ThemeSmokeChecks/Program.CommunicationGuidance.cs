@@ -86,6 +86,34 @@ internal static partial class Program
             Check(!templateButtons.Single(b=>b.Text=="Next").Enabled&&templateButtons.Single(b=>b.Text=="Previous").Enabled,"A short or empty result page stops Next while allowing a return");
             templateReply=templateTable.Clone();templateReply.Rows.Add(chosen,false,"revoked_fixture","en",1);Await("RefreshTemplates");
             Check(Field<ModernComboBox>("templateChoice").SelectedIndex==-1,"A known revoked template is removed rather than silently replaced by a different template");
+
+            // The task-oriented recipient choice must not offer a school notice as
+            // an outstanding reminder or a student template to staff/manual contacts.
+            var scoped=Rows("Templates",[]);
+            scoped.Columns.Add("Scope",typeof(string));
+            scoped.Columns.Add("Category",typeof(string));
+            scoped.Rows.Add(Guid.NewGuid(),true,"year_commencement","en",1,"Student","Announcement");
+            scoped.Rows.Add(Guid.NewGuid(),true,"outstanding","en",1,"Student","Financial");
+            scoped.Rows.Add(Guid.NewGuid(),true,"staff_announcement","en",1,"Staff","Announcement");
+            scoped.Rows.Add(Guid.NewGuid(),true,"general_announcement","en",1,"Manual","Announcement");
+            templateReply=scoped;
+            typeof(CommunicationCenterPage).GetField("templatePage",flags)!.SetValue(page,0);
+            Await("RefreshTemplates");
+            var audience=Field<ModernComboBox>("audience");
+            var choice=Field<ModernComboBox>("templateChoice");
+            audience.SelectedIndex=2;
+            Check(choice.Items.Count==1 && (choice.Items[0] as DataRowView)?.Row.Field<string>("Code")=="outstanding",
+                "Outstanding-fee recipients can only choose the reviewed reminder template");
+            audience.SelectedIndex=4;
+            Check(choice.Items.Count==1 && (choice.Items[0] as DataRowView)?.Row.Field<string>("Scope")=="Staff",
+                "Staff recipients do not see student or manual templates");
+            audience.SelectedIndex=5;
+            Check(choice.Items.Count==1 && (choice.Items[0] as DataRowView)?.Row.Field<string>("Scope")=="Manual",
+                "Manual contacts use appropriately scoped templates");
+            audience.SelectedIndex=0;
+            Check(choice.Items.Count==2 && choice.Items.Cast<DataRowView>().All(item=>item.Row.Field<string>("Scope")=="Student"),
+                "Campus messages offer student-scoped templates instead of cross-purpose contact types");
+
             Check(connections==0&&reads>0,"Communication workflow fixtures exercise injected reads only, without SQL, writes or external delivery");
             CurrentUser.SignIn(920,"View-only fixture","Operator",false,["Communication.View"]);
             using var restricted=new CommunicationCenterPage(store,false);
