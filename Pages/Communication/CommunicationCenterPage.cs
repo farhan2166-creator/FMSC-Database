@@ -450,7 +450,8 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         if(old is not null && !rows.AsEnumerable().Any(r=>(Guid)r["TemplateId"]==selected))
         {
             var kept=approved.NewRow();
-            foreach(DataColumn column in rows.Columns)kept[column]=old[column.ColumnName];
+            foreach(DataColumn column in approved.Columns)
+                kept[column.ColumnName]=old.Table.Columns.Contains(column.ColumnName)?old[column.ColumnName]:DBNull.Value;
             approved.Rows.Add(kept);
         }
         reviewedTemplateOptions=approved;
