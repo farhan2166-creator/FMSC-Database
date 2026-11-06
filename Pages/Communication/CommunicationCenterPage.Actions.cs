@@ -106,7 +106,6 @@ public sealed partial class CommunicationCenterPage
         }
         historySearch.PlaceholderText="Student or recipient name";historySearch.Width=220;
         historyState.Items.Add("All states");historyState.Items.AddRange(Enum.GetNames<DeliveryState>());historyState.SelectedIndex=0;
-        advancedControls.Add(historyState);
         var toolbar=Bar([historySearch,historyState,Button("Search",async()=>{historyPage=0;await RefreshHistory();}),
             Button("Refresh",RefreshHistory),..Paging(history,()=>historyPage,value=>historyPage=value,RefreshHistory),
             Button("Submit",()=>Transition("Submit"),"Communication.Send","Primary",history),Button("Approve",()=>Transition("Approve"),"Communication.Approve",selectedGrid:history),
@@ -133,9 +132,17 @@ public sealed partial class CommunicationCenterPage
                 await store.CallAsync("StatusUpdate",lifetime.Token,SqlCommunicationStore.P("@Id",row["MessageId"]),SqlCommunicationStore.P("@Provider","Twilio"),SqlCommunicationStore.P("@Reference",status.Reference),SqlCommunicationStore.P("@State",status.State.ToString()));await AfterSavedAsync(RefreshHistory,"Provider status checked: "+status.State+". Accepted is not proof of delivery.");
             },"Communication.Configure",selectedGrid:history),
             Button("Start Dispatcher",StartDispatcher,"Communication.Send"),Button("Stop Dispatcher",()=>{if(dispatchTask is not {IsCompleted:false}){SetStatus("Dispatcher is already stopped. Queued messages remain stored.");return Task.CompletedTask;}dispatchStop?.Cancel();operational.Text="Stopping dispatcher. In-flight submissions are recorded before stopping.";SetStatus(operational.Text);return Task.CompletedTask;},"Communication.Send")]);
-        advancedControls.AddRange(toolbar.Controls.Cast<Control>().Where(control=>control.Text is
+        var extendedActions=toolbar.Controls.Cast<Control>().Where(control=>control.Text is
             "Submit" or "Approve" or "Pause" or "Resume" or "Cancel Campaign" or "Safe Retry"
-            or "Check Provider Status" or "Start Dispatcher" or "Stop Dispatcher"));
+            or "Check Provider Status" or "Start Dispatcher" or "Stop Dispatcher").ToArray();
+        foreach(var action in extendedActions)action.Visible=false;
+        bool showActions=false;
+        var more=Button("More Actions",()=>{
+            showActions=!showActions;
+            foreach(var action in extendedActions)action.Visible=showActions;
+            return Task.CompletedTask;
+        });
+        toolbar.Controls.Add(more);
         return ListHost(history,toolbar);
     }
     private Task StartDispatcher()
