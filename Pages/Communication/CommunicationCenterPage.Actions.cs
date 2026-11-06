@@ -50,11 +50,12 @@ public sealed partial class CommunicationCenterPage
         bool simulation=Convert.ToInt32(row["Simulation"])==1;
         if(!simulation && Convert.ToInt32(row["UnknownCosts"])>0)
         {
-            SetStatus("Draft saved. Ask your administrator to configure WhatsApp pricing before sending.",PageStatusKind.Warning);
+            SetStatus("Draft saved. Ask your administrator to configure message pricing before sending.",PageStatusKind.Warning);
             return;
         }
-        string cost=simulation?"Simulation. No messages go to WhatsApp.":$"Estimated provider cost: {row["EstimatedCost"]} {row["Currency"]}.";
-        if(!ModernMessageDialog.Confirm(FindForm(),$"Send {count} reviewed WhatsApp message(s)? {included.Count-count} selected contacts will be skipped. {cost}","Confirm WhatsApp Send"))
+        string channelName=SelectedChannel()==MessageChannel.Sms?"SMS":"WhatsApp";
+        string cost=simulation?"Simulation only. No external messages will be sent.":$"Estimated provider cost: {row["EstimatedCost"]} {row["Currency"]}.";
+        if(!ModernMessageDialog.Confirm(FindForm(),$"Submit {count} reviewed {channelName} message(s)? {included.Count-count} selected contacts will be skipped. {cost}","Confirm Message Send"))
         {
             SetStatus("Draft saved in History. No send was requested.");
             return;
@@ -91,11 +92,11 @@ public sealed partial class CommunicationCenterPage
                 +(s.IsNull("EstimatedCost")?"Estimated cost unavailable. ":$"Estimated {s["EstimatedCost"]} {s["Currency"]}. ");
             if(action=="Send Now")
             {
-                if(Convert.ToString(s["Status"])!="Queued" || Convert.ToString(s["Channel"])!="WhatsApp")
-                    throw new ArgumentException("Choose a queued WhatsApp campaign. Submit a draft or obtain approval first.");
+                if(Convert.ToString(s["Status"])!="Queued")
+                    throw new ArgumentException("Choose a queued campaign. Submit a draft or obtain approval first.");
                 bool simulation=Convert.ToInt32(s["Simulation"])==1;
-                string prompt=simulation?"Run this queued WhatsApp simulation now? No phone will be contacted."
-                    :"Send the remaining eligible WhatsApp messages from this batch? Provider charges may apply.";
+                string prompt=simulation?"Run this queued simulation now? No phone will be contacted."
+                    :"Send the remaining eligible messages from this batch? Provider charges may apply.";
                 if(ModernMessageDialog.Confirm(FindForm(),prompt,simulation?"Run Simulation":"Send Pending Messages"))
                     await DispatchCampaignAsync(id,Convert.ToInt32(s["Recipients"]));
                 return;
