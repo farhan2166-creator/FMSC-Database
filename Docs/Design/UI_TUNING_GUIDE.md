@@ -56,6 +56,22 @@ This is the main table you will use most of the time.
 | Certificate card icon size | 📄 | [StudentCertificatesPage.cs](../../Pages/Students/Certificates/StudentCertificatesPage.cs) | `CertificateCardIconFont` |
 | Reports-home cards | 📄 | [ReportsHomePage.cs](../../Pages/Reports/ReportsHomePage.cs) | `BuildReportGrid` |
 
+## Dialog sizing: align similar dialogs, not every dialog
+
+Startup installation, connection, update checking and login use the login-size baseline in `AppMetrics.StartupDialogClientSize` (the PowerShell installer has the equivalent 760 × 500 logical baseline).
+
+Other dialogs can opt into these content-based tiers in [AppMetrics.cs](../../Core/AppMetrics.cs):
+
+| Tier | Logical client size | Example uses |
+|---|---:|---|
+| `CompactChoiceDialogClientSize` | 540 × 230 | Report period and annual receipt-year selection |
+| `CompactEditorDialogClientSize` | 520 × 300 | Fee matrix cell and add-fee editor |
+| `CredentialDialogClientSize` | 560 × 430 | Password reset and change |
+| `MediumDialogClientSize` | 660 × 430 | About, quick navigation, program manager |
+| `RateWorkspaceDialogClientSize` | 900 × 640 | Copy and bulk-adjust fee rates |
+
+**Sizing rule:** Adopt a tier only when it closely matches the original window and does **not reduce** either dimension. The tier is a minimum starting size, not a content cap: keep dynamic height calculations for longer labels or higher DPI. Leave grids, search results, multiline forms, connection-details expansion and other content-heavy workflows at their task-appropriate sizes. Test every changed dialog at regular and larger Windows display scaling, checking that buttons and text remain visible. Do not force all dialogs to login dimensions.
+
 ## Before changing anything: what do these words mean?
 
 | Word | Plain meaning | Example |

@@ -43,7 +43,7 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(AppScale.Scale(660), AppScale.Scale(420));
+        ClientSize = AppMetrics.MediumDialogClientSize;
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
         var title = new Label {
@@ -191,8 +191,8 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
             buttonRowHeight;
         ClientSize =
             new Size(
-                AppScale.Scale(660),
-                Math.Max(AppScale.Scale(420), requiredClientHeight));
+                AppMetrics.MediumDialogClientSize.Width,
+                Math.Max(AppMetrics.MediumDialogClientSize.Height, requiredClientHeight));
         AcceptButton = save;
         CancelButton = cancel;
         FormFlow.EnterMovesToNext(this);

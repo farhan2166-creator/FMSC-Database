@@ -10,7 +10,7 @@ internal sealed class ReportAcademicPeriodDialog : ApplicationWindowForm
     {
         Text="Choose Report Period";StartPosition=FormStartPosition.CenterParent;
         FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;ShowInTaskbar=false;
-        ClientSize=new Size(AppScale.S(540),AppScale.S(230));
+        ClientSize=AppMetrics.CompactChoiceDialogClientSize;
         var root=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(AppScale.S(16))};
         root.RowStyles.Add(new RowStyle(SizeType.Percent,50));root.RowStyles.Add(new RowStyle(SizeType.Percent,50));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));

@@ -17,7 +17,7 @@ internal sealed class PasswordResetDialog : ApplicationWindowForm
     {
         this.reset=reset;Text=$"Reset password · {username}";StartPosition=FormStartPosition.CenterParent;
         FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;ShowInTaskbar=false;
-        ClientSize=new Size(AppScale.Scale(520),AppScale.Scale(410));MinimumSize=SizeFromClientSize(ClientSize);
+        ClientSize=AppMetrics.CredentialDialogClientSize;MinimumSize=SizeFromClientSize(ClientSize);
         BackColor=AppTheme.PageBackground;Font=AppTheme.NormalFont;
         password.UseSystemPasswordChar=confirmation.UseSystemPasswordChar=true;password.PlaceholderText=PasswordPolicy.Requirement;
         var root=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=5,Padding=new Padding(24)};

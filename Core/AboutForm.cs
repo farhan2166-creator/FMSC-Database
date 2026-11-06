@@ -14,7 +14,7 @@ internal sealed class AboutForm : ApplicationWindowForm
         MinimizeBox = false;
         ShowInTaskbar = false;
         AutoScaleMode = AutoScaleMode.None;
-        ClientSize = new Size(AppScale.S(660), AppScale.S(430));
+        ClientSize = AppMetrics.MediumDialogClientSize;
         Font = AppTheme.NormalFont;
         BackColor = AppTheme.PageBackground;
 

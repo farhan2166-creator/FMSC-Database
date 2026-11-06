@@ -20,7 +20,7 @@ internal sealed class FeeRateDetailsDialog : ApplicationWindowForm
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = MinimizeBox = false;
         BackColor = AppTheme.PageBackground;
-        ClientSize = new Size(AppScale.Scale(510), AppScale.Scale(285));
+        ClientSize = AppMetrics.CompactEditorDialogClientSize;
         frequency.Items.AddRange(new object[] { "Monthly", "Yearly", "As Needed" });
         frequency.SelectedItem = frequencyValue;
         if (frequency.SelectedIndex < 0) frequency.SelectedIndex = 0;
@@ -43,8 +43,16 @@ internal sealed class FeeRateDetailsDialog : ApplicationWindowForm
         layout.Controls.Add(HumanUi.Field("Amount", amount, true), 0, 0);
         layout.Controls.Add(HumanUi.Field("Frequency", frequency, true), 0, 1);
         layout.Controls.Add(HumanUi.Field("Remarks", remarks), 0, 2);
-        layout.Controls.Add(HumanUi.DialogButtons(apply, cancel), 0, 3);
+        var actions = HumanUi.DialogButtons(apply, cancel);
+        layout.Controls.Add(actions, 0, 3);
         Controls.Add(layout);
+        // Three fixed-height fields must not squeeze the action row at larger
+        // text sizes. The shared compact tier is a floor, not a clipping cap.
+        int requiredHeight = layout.Padding.Vertical + 3 * AppMetrics.FieldRowHeight +
+            actions.GetPreferredSize(new Size(ClientSize.Width - layout.Padding.Horizontal, int.MaxValue)).Height +
+            AppMetrics.SpacingSm;
+        ClientSize = new Size(AppMetrics.CompactEditorDialogClientSize.Width,
+            Math.Max(AppMetrics.CompactEditorDialogClientSize.Height, requiredHeight));
         FinanceHelp.Attach(this,amount,FinanceHelp.Topic.FeeRate);
         FinanceHelp.Attach(this,frequency,"Choose how often this fee can be charged: monthly, yearly, or as a one-time charge when needed.","Tuition is normally Monthly; an occasional book purchase is As Needed. This setting does not receive payment.");
         FinanceHelp.Attach(this,apply,"Put this fee setting into the grid. The grid's Save action saves the settings; student bills are reviewed separately.","Enter Rs. 500 here, use it in the grid, then save the grid when the settings are correct.");

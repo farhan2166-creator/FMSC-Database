@@ -90,7 +90,7 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(AppScale.Scale(460, AppScale.ControlSizeScale), AppScale.Scale(265, AppScale.ControlSizeScale));
+        ClientSize = AppMetrics.CompactEditorDialogClientSize;
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
         BuildLayout();

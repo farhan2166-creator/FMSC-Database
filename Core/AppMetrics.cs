@@ -68,6 +68,14 @@ namespace FMSC_SMS.Core
         public const int StartupDialogHeight = 500;
         public static Size StartupDialogClientSize => new(
             AppScale.Scale(StartupDialogWidth), AppScale.Scale(StartupDialogHeight));
+        // Related dialogs share a small set of content-appropriate size tiers.
+        // These are *client* sizes at the current app/DPI scale. Opt-in only:
+        // content-heavy grids, long forms and expandable dialogs keep their own sizes.
+        public static Size CompactChoiceDialogClientSize => new(AppScale.S(540), AppScale.S(230));
+        public static Size CompactEditorDialogClientSize => new(AppScale.S(520), AppScale.S(300));
+        public static Size CredentialDialogClientSize => new(AppScale.S(560), AppScale.S(430));
+        public static Size MediumDialogClientSize => new(AppScale.S(660), AppScale.S(430));
+        public static Size RateWorkspaceDialogClientSize => new(AppScale.S(900), AppScale.S(640));
         // Authentication
         public const int AuthenticationTitleRowHeight = 70;
         public const int PasswordFieldRowHeight = 70;
