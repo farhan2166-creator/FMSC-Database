@@ -1,5 +1,7 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using FMSC_SMS.Core.Updates;
 
 try
@@ -150,9 +152,13 @@ internal static class PackageBuilder
             if (!UpdateManifestPolicy.IsSafeRelativePath(name))
                 throw new InvalidDataException("Unsafe application file path: " + name);
             string ext = Path.GetExtension(name);
-            if (new[] { ".mdf", ".ldf", ".bak", ".pfx", ".p12", ".pem", ".key" }
+            bool forbidden = new[] { ".mdf", ".ldf", ".bak", ".pfx", ".p12", ".pem", ".key" }
                 .Contains(ext, StringComparer.OrdinalIgnoreCase) ||
-                Path.GetFileName(name).StartsWith(".env", StringComparison.OrdinalIgnoreCase))
+                Path.GetFileName(name).StartsWith(".env", StringComparison.OrdinalIgnoreCase);
+            // The pinned MinGit transport contains a public CA bundle, not a key.
+            // Never relax the denylist for any other PEM file or non-certificate data.
+            if (forbidden && !(ext.Equals(".pem", StringComparison.OrdinalIgnoreCase) &&
+                IsAllowedBundledGitCaBundle(name, path)))
                 throw new InvalidDataException("A database or secret-like file was found in the application package: " + name);
             var file = new FileInfo(path);
             list.Add(new UpdateFile { Path = name, Length = file.Length, Sha256 = Hash(path) });
@@ -161,6 +167,52 @@ internal static class PackageBuilder
         if (list.Select(f => f.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count() != list.Count)
             throw new InvalidDataException("Application contains paths that collide on Windows.");
         return list;
+    }
+
+    // Only MinGit's known CA trust-store path can contain public certificates.
+    // Parse every certificate rather than trusting the extension or filename.
+    private static bool IsAllowedBundledGitCaBundle(string name, string file)
+    {
+        if (!string.Equals(name, "UpdateTransport/ucrt64/etc/ssl/cert.pem", StringComparison.Ordinal))
+            return false;
+        long size = new FileInfo(file).Length;
+        if (size <= 0 || size > 2 * 1024 * 1024)
+            return false;
+        bool insideCertificate = false;
+        bool foundCertificate = false;
+        var base64 = new StringBuilder();
+        try
+        {
+            foreach (string raw in File.ReadLines(file))
+            {
+                string line = raw.Trim();
+                if (!insideCertificate)
+                {
+                    if (line.Length == 0 || line.StartsWith('#')) continue;
+                    if (line != "-----BEGIN CERTIFICATE-----") return false;
+                    insideCertificate = true;
+                    base64.Clear();
+                }
+                else if (line == "-----END CERTIFICATE-----")
+                {
+                    using var certificate = new X509Certificate2(Convert.FromBase64String(base64.ToString()));
+                    if (certificate.HasPrivateKey) return false;
+                    foundCertificate = true;
+                    insideCertificate = false;
+                }
+                else
+                {
+                    if (line.Length == 0 || line.Any(c =>
+                        !(char.IsAsciiLetterOrDigit(c) || c == '+' || c == '/' || c == '=')))
+                        return false;
+                    base64.Append(line);
+                }
+            }
+            return foundCertificate && !insideCertificate;
+        }
+        catch (CryptographicException) { return false; }
+        catch (FormatException) { return false; }
+        catch (IOException) { return false; }
     }
 
     private static void CreateZip(string root, IEnumerable<string> paths, string destination)
@@ -300,6 +352,38 @@ internal static class SelfTest
                 "folder\\evil.exe", "CON.txt", "dir//evil" })
                 Require(!UpdateManifestPolicy.IsSafeRelativePath(unsafePath),
                     "Unsafe archive path passed validation: " + unsafePath);
+
+            // The transport's public CA bundle is not a private key. Only this
+            // exact path with parseable certificates can bypass the PEM denylist.
+            string gitCaFolder = Path.Combine(newDir, "UpdateTransport", "ucrt64", "etc", "ssl");
+            Directory.CreateDirectory(gitCaFolder);
+            string caFile = Path.Combine(gitCaFolder, "cert.pem");
+            using var key = RSA.Create(2048);
+            var certificateRequest = new CertificateRequest("CN=FMSC package test",
+                key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            using var certificate = certificateRequest.CreateSelfSigned(
+                DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+            string caBundle = "# Synthetic public trust store\n" + certificate.ExportCertificatePem();
+            File.WriteAllText(caFile, caBundle);
+            _ = PackageBuilder.Build(newDir, Path.Combine(root, "valid-git-ca"),
+                "1.1.0", 75, null, null);
+            void RejectUnsafePackage(string suffix, string reason)
+            {
+                bool rejected = false;
+                try { _ = PackageBuilder.Build(newDir, Path.Combine(root, suffix),
+                    "1.1.0", 75, null, null); }
+                catch (InvalidDataException) { rejected = true; }
+                Require(rejected, reason);
+            }
+            File.WriteAllText(caFile, caBundle + "-----BEGIN PRIVATE KEY-----\nYWJj\n-----END PRIVATE KEY-----\n");
+            RejectUnsafePackage("reject-key-in-trust-store",
+                "Private-key material must be refused even at the Git CA path.");
+            File.WriteAllText(caFile, caBundle);
+            File.WriteAllText(Path.Combine(newDir, "other.pem"), caBundle);
+            RejectUnsafePackage("reject-other-pem", "Unapproved PEM files must be refused.");
+            File.Delete(Path.Combine(newDir, "other.pem"));
+            File.WriteAllText(Path.Combine(newDir, "operator.key"), "secret");
+            RejectUnsafePackage("reject-key-file", "Private-key files must remain forbidden.");
 
         }
         finally
