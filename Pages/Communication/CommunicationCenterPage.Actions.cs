@@ -112,6 +112,9 @@ public sealed partial class CommunicationCenterPage
     private static DataRow? Selected(DataGridView grid)=>(grid.CurrentRow?.DataBoundItem as DataRowView)?.Row;
     private Control BuildHistory()
     {
+        bool InCampaignState(DataRow row,params string[] states)=>
+            row.Table.Columns.Contains("CampaignStatus") &&
+            states.Contains(Convert.ToString(row["CampaignStatus"]));
         async Task Transition(string action)
         {
             var row=Selected(history)??throw new ArgumentException("Select a campaign in the outbox first.");
@@ -140,11 +143,19 @@ public sealed partial class CommunicationCenterPage
         historyState.Items.Add("All states");historyState.Items.AddRange(Enum.GetNames<DeliveryState>());historyState.SelectedIndex=0;
         var toolbar=Bar([historySearch,historyState,Button("Search",async()=>{historyPage=0;await RefreshHistory();}),
             Button("Refresh",RefreshHistory),..Paging(history,()=>historyPage,value=>historyPage=value,RefreshHistory),
-            Button("Submit",()=>Transition("Submit"),"Communication.Send","Primary",history),Button("Approve",()=>Transition("Approve"),"Communication.Approve",selectedGrid:history),
+            Button("Submit",()=>Transition("Submit"),"Communication.Send","Primary",history,
+                available:row=>InCampaignState(row,"Draft")),
+            Button("Approve",()=>Transition("Approve"),"Communication.Approve",selectedGrid:history,
+                available:row=>InCampaignState(row,"AwaitingApproval")),
             Button("Send Pending Now",()=>Transition("Send Now"),"Communication.Send",selectedGrid:history,
                 available:row=>row.Table.Columns.Contains("State") && row.Table.Columns.Contains("CampaignStatus")
                     && Convert.ToString(row["State"])=="Queued" && Convert.ToString(row["CampaignStatus"])=="Queued"),
-            Button("Pause",()=>Transition("Pause"),"Communication.Compose",selectedGrid:history),Button("Resume",()=>Transition("Resume"),"Communication.Send",selectedGrid:history),Button("Cancel Campaign",()=>Transition("Cancel"),"Communication.Compose",selectedGrid:history),
+            Button("Pause",()=>Transition("Pause"),"Communication.Compose",selectedGrid:history,
+                available:row=>InCampaignState(row,"Queued","Scheduled")),
+            Button("Resume",()=>Transition("Resume"),"Communication.Send",selectedGrid:history,
+                available:row=>InCampaignState(row,"Paused")),
+            Button("Cancel Campaign",()=>Transition("Cancel"),"Communication.Compose",selectedGrid:history,
+                available:row=>InCampaignState(row,"Draft","AwaitingApproval","Queued","Scheduled","Paused")),
             Button("Details",async()=>{
                 var row=Selected(history)??throw new ArgumentException("Select a message first.");
                 var detail=await store.CallAsync("Details",lifetime.Token,SqlCommunicationStore.P("@Id",row["MessageId"]));
@@ -155,14 +166,21 @@ public sealed partial class CommunicationCenterPage
             Button("Safe Retry",async()=>{
                 var row=Selected(history)??throw new ArgumentException("Select a rejected message first.");
                 await store.CallAsync("Retry",lifetime.Token,SqlCommunicationStore.P("@Id",row["MessageId"]));await AfterSavedAsync(RefreshHistory,"Safe retry requested. The message must still pass current eligibility and dispatcher safeguards; no delivery is implied.");
-            },"Communication.Send",selectedGrid:history),
+            },"Communication.Send",selectedGrid:history,
+                available:row=>row.Table.Columns.Contains("State")
+                    && Convert.ToString(row["State"])=="Rejected"
+                    && row.Table.Columns.Contains("ProviderReference") && row.IsNull("ProviderReference")),
             Button("Check Provider Status",async()=>{
                 var row=Selected(history)??throw new ArgumentException("Select an accepted provider message first.");
                 if(row.IsNull("ProviderReference"))throw new ArgumentException("No provider reference is available. Do not resend an uncertain submission; reconcile with the provider.");
                 if(Convert.ToString(row["Provider"])!="Twilio")throw new ArgumentException("This provider needs a signed webhook or provider-console review. Simulation is never proof of delivery.");
                 var status=await gateways.Provider(MessageChannel.Sms,Http).QueryAsync(Convert.ToString(row["ProviderReference"])!,lifetime.Token);
                 await store.CallAsync("StatusUpdate",lifetime.Token,SqlCommunicationStore.P("@Id",row["MessageId"]),SqlCommunicationStore.P("@Provider","Twilio"),SqlCommunicationStore.P("@Reference",status.Reference),SqlCommunicationStore.P("@State",status.State.ToString()));await AfterSavedAsync(RefreshHistory,"Provider status checked: "+status.State+". Accepted is not proof of delivery.");
-            },"Communication.Configure",selectedGrid:history),
+            },"Communication.Configure",selectedGrid:history,
+                available:row=>row.Table.Columns.Contains("Provider")
+                    && Convert.ToString(row["Provider"])=="Twilio"
+                    && row.Table.Columns.Contains("ProviderReference")
+                    && !row.IsNull("ProviderReference")),
             Button("Start Dispatcher",StartDispatcher,"Communication.Send"),Button("Stop Dispatcher",()=>{if(dispatchTask is not {IsCompleted:false}){SetStatus("Dispatcher is already stopped. Queued messages remain stored.");return Task.CompletedTask;}dispatchStop?.Cancel();operational.Text="Stopping dispatcher. In-flight submissions are recorded before stopping.";SetStatus(operational.Text);return Task.CompletedTask;},"Communication.Send")]);
         var extendedActions=toolbar.Controls.Cast<Control>().Where(control=>control.Text is
             "Submit" or "Approve" or "Pause" or "Resume" or "Cancel Campaign" or "Safe Retry"
