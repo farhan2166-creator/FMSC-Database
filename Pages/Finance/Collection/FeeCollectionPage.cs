@@ -3167,6 +3167,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         }
         catch (Exception ex) { Fail(ex); return; }
         bool collectionCommitted = false;
+        bool receiptPrepared = false;
         string confirmedReceipt = string.Empty;
         transactionBusy = true;
         if (fullAmountButton is not null) fullAmountButton.Enabled = false;
@@ -3750,10 +3751,11 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 lastCollectionReceipt=null;lastGroupReceiptNumber=singleReceipt;
                 if(printReceiptButton is not null) printReceiptButton.Enabled=true;
             }
+            receiptPrepared = lastCollectionReceipt is not null || lastGroupReceiptNumber is not null;
             collectionResult.Text = string.IsNullOrWhiteSpace(singleReceipt)
                 ? "Payment recorded. Check Recent Payments for receipt details."
                 : $"Payment recorded. Receipt: {singleReceipt}. " +
-                  (lastCollectionReceipt is not null || lastGroupReceiptNumber is not null
+                  (receiptPrepared
                     ? "Print Receipt, or select another student." : "Check Recent Payments to print, or select another student.");
             collectionResult.Visible = true;
             RememberCounterReceipt(result,singleReceipt);
@@ -3834,6 +3836,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             }
             /* After a collection that settled the student there is nothing left to collect, so the button goes quiet instead of inviting a second empty click. */
             UpdateProcessCollectionAvailability();
+            if (receiptPrepared && !IsDisposed && printReceiptButton is { CanFocus: true })
+                printReceiptButton.Focus();
         }
     }
     private void OpenAdditionalFee()
