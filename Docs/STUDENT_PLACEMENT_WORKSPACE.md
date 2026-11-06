@@ -14,10 +14,16 @@ destinations, related student tools, then Review. Spacing separates these groups
 ## Annual promotion
 
 Choose the source year. Leave campus, class or section blank to include all active
-placements in that scope. Choose the destination year and optionally another campus.
-Load Students suggests the immediate next class within the same academic program
+placements in that scope. Click **Load Students**, then confirm the destination
+year and optionally choose another campus. The app suggests the immediate next class within the same academic program
 and the matching section. Missing assignments and final classes remain explicit
 exceptions. They must be mapped, repeated or skipped before processing.
+
+To promote one student, click **Clear Selection** and tick **Process** beside
+that student. Leave their decision on **Promote** and check the destination
+placement. Enter a reason, click **Review**, and then click **Process Reviewed
+Plan** if the details are correct. **Confirm Return Admission** is a separate
+step after promotion, before the new placement can be billed.
 
 Each student can Promote, Repeat Class or Skip for Now. Repeat keeps the original
 campus/class/section in the destination year. Skipping leaves the record unchanged.

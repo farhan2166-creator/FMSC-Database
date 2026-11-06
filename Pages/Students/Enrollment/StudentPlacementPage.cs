@@ -53,7 +53,7 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         suggest=AddAction("Suggest",(_,_)=>Suggest(),"Secondary");SetToolTip(suggest,"Suggest destination placements for the loaded students.");
         assign=AddAction("Assign",(_,_)=>AssignHighlighted(),"Secondary");SetToolTip(assign,"Assign a decision and destination to highlighted students.");
         select=AddAction("Select All",(_,_)=>SelectRows(true),"Secondary");
-        clear=AddAction("Clear",(_,_)=>SelectRows(false),"Secondary");SetToolTip(clear,"Clear the ticked student selection.");
+        clear=AddAction("Clear Selection",(_,_)=>SelectRows(false),"Secondary");SetToolTip(clear,"Uncheck all students. Tick Process beside only the students you want to include.");
         review=AddAction("Review Promotion",async(_,_)=>await Guard(Process),"Success");
         retry=AddAction("Check / Retry Plan",async(_,_)=>await Guard(Retry),"Warning");
         records=AddAction("Refresh History",async(_,_)=>await Guard(LoadHistory),"Secondary");
@@ -351,7 +351,7 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         Suggest();
         SetStatus(Annual && targetYear.SelectedId<=0
             ? $"Loaded {data.Rows.Count:N0} active placements. Configure a later academic year before processing promotion."
-            : $"Loaded {data.Rows.Count:N0} active placements. Completed promotions leave this source list; skipped students remain available for a later batch.");
+            : $"Loaded {data.Rows.Count:N0} active placements. To process one student, use Clear Selection, then tick Process beside that student.");
     }
     private void Suggest()
     {
@@ -378,7 +378,8 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         if(pending is not null || students.SelectedRows.Count==0)return;
         var selectedRows=students.SelectedRows.Cast<DataGridViewRow>().Where(row=>row.DataBoundItem is DataRowView).Select(row=>((DataRowView)row.DataBoundItem!).Row).ToArray();
         var lookup=new LookupBox();
-        var decision=HumanUi.Combo();decision.ValueMember="Value";decision.DisplayMember="Label";decision.DataSource=((DataView)((DataGridViewComboBoxColumn)students.Columns["Decision"]).DataSource!).ToTable();decision.SelectedIndex=0;
+        var decision=HumanUi.Combo();decision.BindingContext=new BindingContext();
+        decision.ValueMember="Value";decision.DisplayMember="Label";decision.DataSource=((DataView)((DataGridViewComboBoxColumn)students.Columns["Decision"]).DataSource!).ToTable();decision.SelectedIndex=0;
         void BindDestinations(){string action=Convert.ToString(decision.SelectedValue)??"";lookup.Bind(CommonDestinations(selectedRows,action),"ClassSectionId","Display");lookup.SelectedIndex=-1;lookup.Enabled=action is not ("HOLD" or "SKIP");}
         decision.SelectedIndexChanged+=(_,_)=>BindDestinations();BindDestinations();
         var panel=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(12)};
@@ -444,19 +445,33 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         SetStatus("Validating the complete plan, including lifecycle and fee rules…");
         var preview=await PlacementPlan.RunAsync(id,json,targetYear.SelectedId,effective.Value.Date,reason.Text.Trim(),Annual && carry.Checked,true);
         using var reviewed=JsonDocument.Parse(Convert.ToString(preview.Rows[0]["ResultJson"])!);
-        if(!ReviewDetails(selected,reviewed.RootElement))return;
+        if(!ReviewDetails(selected,reviewed.RootElement))
+        {
+            SetStatus("Review closed. Your plan is ready to edit.");
+            return;
+        }
         pending=(id,json,targetYear.SelectedId,effective.Value.Date,reason.Text.Trim(),Annual && carry.Checked,reviewed.RootElement.GetProperty("ReviewHash").GetString()!);
         await Retry();
     }
     private bool ReviewDetails(DataRow[] selected,JsonElement reviewed)
     {
         var summary=new DataTable();foreach(var name in new[]{"Student","From","Decision","To","Fees Before","Fees After","Bill Difference"})summary.Columns.Add(name);
-        string FeeText(string json){using var feesDoc=JsonDocument.Parse(json);return string.Join("; ",feesDoc.RootElement.EnumerateArray().Select(f=>{
+        string FeeText(JsonElement effect, string property)
+        {
+            // SQL FOR JSON omits null properties when there are no assignments.
+            if (!effect.TryGetProperty(property, out var value) || value.ValueKind == JsonValueKind.Null)
+                return "None";
+            string? json = value.GetString();
+            if (string.IsNullOrWhiteSpace(json)) return "None";
+            using var feesDoc = JsonDocument.Parse(json);
+            if (feesDoc.RootElement.GetArrayLength() == 0) return "None";
+            return string.Join("; ",feesDoc.RootElement.EnumerateArray().Select(f=>{
             string period=f.TryGetProperty("EffectiveFrom",out var from)?$" from {from.GetDateTime():dd-MMM-yyyy}":"";
             if(f.TryGetProperty("EffectiveTo",out var until))period+=$" through {until.GetDateTime():dd-MMM-yyyy}";
             return $"{f.GetProperty("FeeTypeName").GetString()}: {f.GetProperty("Amount").GetDecimal()-f.GetProperty("DiscountAmount").GetDecimal():N0} / {f.GetProperty("Frequency").GetString()}{period}";
-        }));}
-        foreach(var row in selected){var dest=placements.AsEnumerable().Single(p=>Convert.ToInt32(p["ClassSectionId"])==Convert.ToInt32(row["Destination"]));var effect=reviewed.GetProperty("Effects").EnumerateArray().Single(e=>e.GetProperty("AdmissionId").GetInt32()==Convert.ToInt32(row["AdmissionId"]));summary.Rows.Add(row["StudentName"],row["Current"],row["Decision"],dest["Display"],FeeText(effect.GetProperty("FeesBefore").GetString()!),FeeText(effect.GetProperty("FeesAfter").GetString()!),effect.GetProperty("BillDifference").GetDecimal().ToString("N0"));}
+        }));
+        }
+        foreach(var row in selected){var dest=placements.AsEnumerable().Single(p=>Convert.ToInt32(p["ClassSectionId"])==Convert.ToInt32(row["Destination"]));var effect=reviewed.GetProperty("Effects").EnumerateArray().Single(e=>e.GetProperty("AdmissionId").GetInt32()==Convert.ToInt32(row["AdmissionId"]));summary.Rows.Add(row["StudentName"],row["Current"],row["Decision"],dest["Display"],FeeText(effect,"FeesBefore"),FeeText(effect,"FeesAfter"),effect.GetProperty("BillDifference").GetDecimal().ToString("N0"));}
         var grid=HumanUi.Grid(false);grid.Dock=DockStyle.Fill;grid.DataSource=summary;
         var root=new TableLayoutPanel{Dock=DockStyle.Fill,RowCount=3,ColumnCount=1,Padding=new Padding(12)};
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,85));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.ButtonRowHeight));
@@ -541,14 +556,16 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         if(ModernMessageDialog.Show(this,$"Restore the previous placement for {row["StudentName"]}?\n\nThe mistaken destination and original promotion history remain recorded.\nReason: {historyReason.Text.Trim()}","Review Promotion Correction",MessageBoxButtons.OKCancel,MessageBoxIcon.Warning)!=DialogResult.OK)return;
         pending=(id,json,year,historyDate.Value.Date,historyReason.Text.Trim(),false,reviewed.RootElement.GetProperty("ReviewHash").GetString()!);await Retry();
     }
-    private void OpenStudentHistory()
+    private async void OpenStudentHistory()
     {
         if(busy || pending is not null)return;
         if(!CurrentUser.HasPermission("Students.Administer")){Warn("Student administration access is required.");return;}
         DataRowView? row=SelectedStudent();
         if(row is null){Warn("Select a student first.");return;}
         using var dialog=new StudentPlacementCorrectionDialog(Convert.ToInt32(row["AdmissionId"]),Convert.ToString(row["StudentName"])!);dialog.ShowDialog(FindForm());
-        InvalidatePlan();
+        if (!dialog.Changed) return;
+        if (ViewingHistory) await Guard(LoadHistory);
+        else InvalidatePlan();
     }
     private DataRowView? SelectedStudent()=>ViewingHistory?history.CurrentRow?.DataBoundItem as DataRowView:students.CurrentRow?.DataBoundItem as DataRowView;
     private void OpenStudentActions()
@@ -559,13 +576,25 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         // WinForms still uses the menu after Closed while dispatching an item click.
         studentActionsMenu?.Dispose();
         var menu = studentActionsMenu = new StyledContextMenu();
-        void Add(string caption,Action action,string permission){var item=menu.Items.Add(caption);item.Enabled=CurrentUser.HasPermission(permission);item.Click+=(_,_)=>{try{action();InvalidatePlan();}catch(Exception ex){Fail(ex);}};}
-        Add("Record Departure / Final-Class Completion…",()=>{using var dialog=new CloseAdmissionDialog(admission,name,false);dialog.ShowDialog(FindForm());},"Students.Administer");
-        Add("Confirm Return Admission…",()=>{using var dialog=new ConfirmReturnAdmissionDialog(admission);dialog.ShowDialog(FindForm());},"Students.Administer");
+        void Add(string caption,Func<Form> createDialog,string permission)
+        {
+            var item=menu.Items.Add(caption);
+            item.Enabled=CurrentUser.HasPermission(permission);
+            item.Click+=(_,_)=>{
+                try
+                {
+                    using var dialog = createDialog();
+                    if (dialog.ShowDialog(FindForm()) == DialogResult.OK) InvalidatePlan();
+                }
+                catch (Exception ex) { Fail(ex); }
+            };
+        }
+        Add("Record Departure / Final-Class Completion…",()=>new CloseAdmissionDialog(admission,name,false),"Students.Administer");
+        Add("Confirm Return Admission…",()=>new ConfirmReturnAdmissionDialog(admission),"Students.Administer");
         if(!Annual){
-            Add("Re-Admit…",()=>{using var dialog=new StudentReadmissionDialog(admission,name);dialog.ShowDialog(FindForm());},"Enrollment.Manage");
-            Add("Put on Hold…",()=>{using var dialog=new StudentPostingHoldDialog(admission,name,false);dialog.ShowDialog(FindForm());},"Students.Administer");
-            Add("Lift Hold / Resume…",()=>{using var dialog=new StudentPostingHoldDialog(admission,name,true);dialog.ShowDialog(FindForm());},"Students.Administer");
+            Add("Re-Admit…",()=>new StudentReadmissionDialog(admission,name),"Enrollment.Manage");
+            Add("Put on Hold…",()=>new StudentPostingHoldDialog(admission,name,false),"Students.Administer");
+            Add("Lift Hold / Resume…",()=>new StudentPostingHoldDialog(admission,name,true),"Students.Administer");
         }
         menu.Show(studentActions, new Point(0, studentActions.Height));
     }
