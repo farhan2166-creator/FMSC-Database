@@ -120,9 +120,36 @@ internal static partial class Program
                 Check(picker.SelectedBillId==901L&&picker.DialogResult==DialogResult.OK,"The operator can select exactly the fully paid purchase instead of changing another purchase under the same fee");
             }
             using var promotion=new FMSC_SMS.Pages.Students.Enrollment.StudentPlacementPage(null,false);
-            var carry=(CheckBox)typeof(FMSC_SMS.Pages.Students.Enrollment.StudentPlacementPage).GetField("carry",flags)!.GetValue(promotion)!;
-            Check(carry.Enabled&&!carry.Checked,"Promotion exposes a deliberate carry-concession choice with the legacy reset default");
-            ((Control)typeof(FMSC_SMS.Pages.Students.Enrollment.StudentPlacementPage).GetField("pageContent",flags)!.GetValue(promotion)!).Enabled=false;
+            var placementType=typeof(FMSC_SMS.Pages.Students.Enrollment.StudentPlacementPage);
+            T PromotionField<T>(string name)=>(T)placementType.GetField(name,flags)!.GetValue(promotion)!;
+            void RefreshPromotion()=>placementType.GetMethod("RefreshActionAvailability",flags)!.Invoke(promotion,null);
+            var carry=PromotionField<CheckBox>("carry");
+            Check(carry.Parent is not null&&!carry.Checked&&!carry.Enabled,
+                "Promotion defaults to resetting concessions and locks the choice before destination selection");
+            // Provide an offline, selected source/destination fixture: enabling the
+            // concession choice requires both a plan context and fee-adjust access.
+            var years=new DataTable();
+            years.Columns.Add("AcademicYearId",typeof(int));years.Columns.Add("YearName");
+            years.Rows.Add(10,"Source year");years.Rows.Add(11,"Destination year");
+            var sourceYear=PromotionField<LookupBox>("sourceYear");
+            var targetYear=PromotionField<LookupBox>("targetYear");
+            sourceYear.Bind(years,"AcademicYearId","YearName");sourceYear.SelectedValue=10;
+            targetYear.Bind(years,"AcademicYearId","YearName");targetYear.SelectedValue=11;
+            var selected=new DataTable();
+            selected.Columns.Add("Selected",typeof(bool));selected.Columns.Add("Decision");
+            selected.Rows.Add(false,"SKIP");
+            placementType.GetField("data",flags)!.SetValue(promotion,selected);
+            placementType.GetField("choicesReady",flags)!.SetValue(promotion,true);
+            RefreshPromotion();
+            Check(carry.Enabled&&!carry.Checked,
+                "A ready promotion exposes carry-concession with the legacy reset default");
+            CurrentUser.SignIn(7782,"Read-only fixture","Accountant",false,new[]{"Fees.View"});
+            RefreshPromotion();
+            Check(!carry.Enabled,"Carrying concessions requires fee-adjustment permission");
+            CurrentUser.SignIn(7781,"Concession fixture","Administrator",false,Array.Empty<string>());
+            RefreshPromotion();
+            Check(carry.Enabled,"The authorized operator regains the choice when the plan is ready");
+            PromotionField<Control>("pageContent").Enabled=false;
             Check(!carry.Enabled,"Promotion holds the concession policy while processing");
         }
         finally{CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Permissions);}
