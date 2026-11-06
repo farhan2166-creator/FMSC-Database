@@ -8,7 +8,32 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         ex is DatabaseRecoveryException or DatabaseCompatibilityException || ex is Microsoft.Data.SqlClient.SqlException sql &&
         (DatabaseHelper.IsConnectionFailure(sql) || sql.Number is 4060 or 911) ||
         ex.InnerException is not null && IsConnectionProblem(ex.InnerException);
-    private readonly bool _startup;
+    internal DatabaseConnectionForm(bool startup)
+    {
+        Text = DatabaseConnectionView.WindowTitle;
+        StartPosition = startup ? FormStartPosition.CenterScreen : FormStartPosition.CenterParent;
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        MinimizeBox = false;
+        ShowInTaskbar = false;
+        ClientSize = AppMetrics.StartupDialogClientSize;
+        Font = AppTheme.NormalFont;
+        BackColor = AppTheme.PageBackground;
+        AutoScaleMode = AutoScaleMode.None;
+        var view = new DatabaseConnectionView(this, startup ? _ => DialogResult = DialogResult.OK : null);
+        Controls.Add(view);
+        AcceptButton = view.AcceptAction;
+        CancelButton = view.CancelAction;
+        FormClosing += (_, e) => { if (view.Busy) e.Cancel = true; };
+        Shown += async (_, _) => await view.ConnectAsync(false);
+    }
+}
+
+internal sealed class DatabaseConnectionView : UserControl
+{
+    internal const string WindowTitle = "FMSC — Management System Connection";
+    private readonly Form _host;
+    private readonly Action<DatabaseConnectionView>? _connected;
     private readonly Label _message = new() { Dock = DockStyle.Top, AutoSize = true };
     private readonly Label _status = new() { Dock = DockStyle.Fill, AutoSize = false };
     private readonly ProgressBar _progress = new() { Dock = DockStyle.Fill, Style = ProgressBarStyle.Marquee };
@@ -24,18 +49,15 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
     private bool _canRestart = true;
     private bool _canRepair;
 
-    internal DatabaseConnectionForm(bool startup)
+    internal bool Busy => _busy;
+    internal IButtonControl AcceptAction => _reconnect;
+    internal IButtonControl CancelAction => _close;
+
+    internal DatabaseConnectionView(Form host, Action<DatabaseConnectionView>? connected)
     {
-        _startup = startup;
-        Text = "FMSC — Management System Connection";
-        StartPosition = startup ? FormStartPosition.CenterScreen : FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
-        MinimizeBox = false;
-        ShowInTaskbar = false;
-        ClientSize = AppMetrics.StartupDialogClientSize;
-        Font = AppTheme.NormalFont;
-        BackColor = AppTheme.PageBackground;
+        _host = host;
+        _connected = connected;
+        Dock = DockStyle.Fill;
         AutoScaleMode = AutoScaleMode.None;
         int gap = UiDesignSystem.Spacing.Md;
         var root = new TableLayoutPanel {
@@ -122,8 +144,6 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         root.Controls.Add(footer, 0, 3);
         root.Controls.Add(detailsCard, 0, 4);
         Controls.Add(root);
-        AcceptButton = _reconnect;
-        CancelButton = _close;
         _reconnect.Click += async (_, _) => await ConnectAsync(false);
         _restart.Click += async (_, _) => await ConnectAsync(true);
 #if FMSC_LEVEL2
@@ -132,23 +152,21 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
 #endif
         _repair.Click += async (_, _) => await RepairDependenciesAsync();
         _repair.Visible = false;
-        _close.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
+        _close.Click += (_, _) => { _host.DialogResult = DialogResult.Cancel; _host.Close(); };
         bool detailsExpanded = false;
         detailsLink.LinkClicked += (_, _) => {
             detailsExpanded = !detailsExpanded;
             root.SuspendLayout();
             detailsCard.Visible = detailsExpanded;
             root.RowStyles[4].Height = detailsExpanded ? AppScale.S(200) : 0;
-            ClientSize = new Size(AppMetrics.StartupDialogClientSize.Width,
+            _host.ClientSize = new Size(AppMetrics.StartupDialogClientSize.Width,
                 AppMetrics.StartupDialogClientSize.Height + (detailsExpanded ? AppScale.S(200) : 0));
             detailsLink.Text = detailsExpanded ? "Hide connection details" : "Show connection details";
             root.ResumeLayout(true);
-            var fitted = WorkingAreaLayout.Fit(Bounds, MinimumSize, Screen.FromControl(this).WorkingArea);
-            MinimumSize = fitted.MinimumSize;
-            Bounds = fitted.Bounds;
+            var fitted = WorkingAreaLayout.Fit(_host.Bounds, _host.MinimumSize, Screen.FromControl(_host).WorkingArea);
+            _host.MinimumSize = fitted.MinimumSize;
+            _host.Bounds = fitted.Bounds;
         };
-        FormClosing += (_, e) => { if (_busy) e.Cancel = true; };
-        Shown += async (_, _) => await ConnectAsync(false);
     }
 
     private void SetBusy(bool busy)
@@ -161,7 +179,7 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         UseWaitCursor = busy;
     }
 
-    private async Task ConnectAsync(bool restart)
+    internal async Task ConnectAsync(bool restart)
     {
         if (_busy) return;
         SetBusy(true);
@@ -184,7 +202,8 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
                 _message.Text = "Your database is connected and ready.";
                 _status.Text = "Connection Successful";
                 _details.Text = ConnectionDetails(string.Empty);
-                if (_startup) { SetBusy(false); DialogResult = DialogResult.OK; Close(); }
+                SetBusy(false);
+                _connected?.Invoke(this);
             }
             else ShowFailure(result.message, result.failure);
         }

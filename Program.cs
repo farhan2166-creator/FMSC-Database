@@ -35,24 +35,7 @@ internal static class Program
 #endif
         AppExceptionHandler.Register();
         MainDashboardForm.PrimeInitialScale();
-        using (var connection = new DatabaseConnectionForm(startup: true))
-            if (connection.ShowDialog() != DialogResult.OK) return;
-        try
-        {
-            var state = DatabaseHelper.Query("GetFirstRunStatus");
-            if (state.Rows.Count > 0 && Convert.ToBoolean(state.Rows[0]["IsFirstRun"]))
-            {
-                using var setup = new FirstRunSetupForm();
-                if (setup.ShowDialog() != DialogResult.OK)
-                    return;
-            }
-        }
-        catch (Exception ex)
-        {
-            ModernMessageDialog.ShowError(null, Core.DbMessage.UserMessage(ex), "FMSC Startup");
-            return;
-        }
-        using var login = new LoginForm();
+        using var login = new LoginForm(checkConnectionOnStartup: true);
         if (login.ShowDialog() != DialogResult.OK)
             return;
         if (CurrentUser.MustChangePassword)

@@ -9,8 +9,10 @@ public sealed class LoginForm : ApplicationWindowForm
     readonly ModernButton login = new() { Text = "Sign In", Dock = DockStyle.Fill };
     /* Validate missing credentials inline; rejected credentials still use the refusal dialog. */
     readonly FormValidator validator = new();
+    internal LoginForm(bool checkConnectionOnStartup) : this(AttemptSignIn, checkConnectionOnStartup) { }
     public LoginForm() : this(AttemptSignIn) { }
-    internal LoginForm(Func<string, string, (bool Success, string Message, Exception? ConnectionFailure)> signIn)
+    internal LoginForm(Func<string, string, (bool Success, string Message, Exception? ConnectionFailure)> signIn,
+        bool checkConnectionOnStartup = false)
     {
         this.signIn = signIn;
         FormClosing += (_, e) => { if (signingIn) e.Cancel = true; };
@@ -182,9 +184,57 @@ public sealed class LoginForm : ApplicationWindowForm
         // Do not opt this form into generic Enter-to-next-field navigation:
         // it consumes Password's Enter before the form's AcceptButton can submit.
         FormFlow.OrderTableFields(root);
-        Shown += (_, _) => user.Focus();
+        if (checkConnectionOnStartup)
+        {
+            var connection = new DatabaseConnectionView(this, view =>
+            {
+                if (!CompleteFirstRun())
+                {
+                    DialogResult = DialogResult.Cancel;
+                    return;
+                }
+
+                AcceptButton = login;
+                CancelButton = null;
+                Controls.Remove(view);
+                view.Dispose();
+                Text = "FMSC - Sign In";
+                ClientSize = AppMetrics.StartupDialogClientSize;
+                shell.Visible = true;
+                user.Focus();
+            });
+            Controls.Add(connection);
+            shell.Visible = false;
+            Text = DatabaseConnectionView.WindowTitle;
+            AcceptButton = connection.AcceptAction;
+            CancelButton = connection.CancelAction;
+            FormClosing += (_, e) => { if (connection.Busy) e.Cancel = true; };
+            Shown += async (_, _) => await connection.ConnectAsync(false);
+        }
+        else
+        {
+            Shown += (_, _) => user.Focus();
+        }
         Disposed += (_, _) => validator.Dispose();
     }
+    private bool CompleteFirstRun()
+    {
+        try
+        {
+            var state = DatabaseHelper.Query("GetFirstRunStatus");
+            if (state.Rows.Count == 0 || !Convert.ToBoolean(state.Rows[0]["IsFirstRun"]))
+                return true;
+
+            using var setup = new FirstRunSetupForm();
+            return setup.ShowDialog(this) == DialogResult.OK;
+        }
+        catch (Exception ex)
+        {
+            ModernMessageDialog.ShowError(this, DbMessage.UserMessage(ex), "FMSC Startup");
+            return false;
+        }
+    }
+
     private sealed class JustifiedNote : Label
     {
         public JustifiedNote()
