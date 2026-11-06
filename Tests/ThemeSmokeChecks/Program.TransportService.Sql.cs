@@ -68,10 +68,8 @@ internal static partial class Program
                     """,P("@Enrollment",enrollment),P("@Amount",amount));
             }
             int current=NewPlacement();var key=Guid.NewGuid();string before=Token(current,true);
-            long audits=Convert.ToInt64(Scalar("SELECT COUNT_BIG(*) FROM dbo.AuditOperations"));
             using(var started=Manage(current,true,fee,month,before,key))
                 Check(Convert.ToInt32(started.Tables[0].Rows[0]["ChargesCreated"])==1,"Before transport cutoff a current-month start posts immediately");
-            Check(Convert.ToInt64(Scalar("SELECT COUNT_BIG(*) FROM dbo.AuditOperations"))==audits,"Transport changes do not write to the retiring audit system");
             Check(Convert.ToDecimal(Scalar("SELECT SUM(dbo.GetFeeChargeBalance(BillingChargeId)) FROM dbo.BillingCharges WHERE EnrollmentId=@Id",P("@Id",current)))==2600m,"Immediate transport posting has the configured whole amount");
             using(var retried=Manage(current,true,fee,month,before,key))
                 Check(Convert.ToInt32(retried.Tables[0].Rows[0]["ChargesCreated"])==1&&Convert.ToInt32(Scalar("SELECT COUNT(*) FROM dbo.BillingCharges WHERE EnrollmentId=@Id",P("@Id",current)))==1,"Retrying a committed request returns its result without a duplicate charge");

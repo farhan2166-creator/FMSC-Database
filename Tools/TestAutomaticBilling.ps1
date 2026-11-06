@@ -128,7 +128,6 @@ try {
  Check $refused 'Stale preview is refused before posting.'
  Check ((Number 'SELECT COUNT(*) FROM dbo.BillingCharges WHERE EnrollmentId=2;') -eq 0) 'Stale preview failure leaves no partial charges.'
  Check ((Number "SELECT COUNT(*) FROM dbo.BillingCharges B JOIN dbo.Enrollments E ON E.EnrollmentId=B.EnrollmentId WHERE B.BillingMonth<DATEFROMPARTS(YEAR(E.BillingStartDate),MONTH(E.BillingStartDate),1);") -eq 0) 'No charge is created before explicit billing commencement.'
- Check ((Number "SELECT COUNT(*) FROM dbo.AuditOperations WHERE OperationType=N'FEE_POSTING';") -eq 0) 'Changed monthly posting no longer writes audit entries.'
  [void](Query 'EXEC dbo.SaveStudentFeeDiscount @UserId=1,@StudentFeeAssignmentId=1,@DiscountAmount=8000;')
  Check ((Number 'SELECT DiscountAmount FROM dbo.StudentFeeAssignments WHERE StudentFeeAssignmentId=1;') -eq 0) 'Assignment discount leaves the old fee version unchanged.'
  Check ((Number "SELECT DiscountAmount FROM dbo.StudentFeeAssignments WHERE EnrollmentId=1 AND FeeTypeId=1 AND EffectiveFrom=DATEADD(month,1,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1));") -eq 8000) 'Assignment discount starts next month.'

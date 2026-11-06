@@ -288,7 +288,7 @@ var concurrent=await Task.WhenAll(QuickRegistrationWriter.SaveNewAsync(concurren
 Assert(concurrent[0]==concurrent[1]&&Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0])==beforeConcurrent+1,"concurrent copies of one request create exactly one student");
 var failedArgs=AdmissionArgs(recoveryRates);var failedRequest=Intent(placement,recoveryQuote,failedArgs);
 int beforeFailed=Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0]);
-string WriteCounts()=>Convert.ToString(Query("SELECT (SELECT COUNT(*) FROM dbo.Enrollments) E,(SELECT COUNT(*) FROM dbo.StudentFeeAssignments) A,(SELECT COUNT(*) FROM dbo.BillingCharges) B,(SELECT COUNT(*) FROM dbo.Families) F,(SELECT COUNT(*) FROM dbo.FamilyMembers) M,(SELECT COUNT(*) FROM dbo.AuditLogs) L FOR JSON PATH;").Rows[0][0])!;
+string WriteCounts()=>Convert.ToString(Query("SELECT (SELECT COUNT(*) FROM dbo.Enrollments) E,(SELECT COUNT(*) FROM dbo.StudentFeeAssignments) A,(SELECT COUNT(*) FROM dbo.BillingCharges) B,(SELECT COUNT(*) FROM dbo.Families) F,(SELECT COUNT(*) FROM dbo.FamilyMembers) M FOR JSON PATH;").Rows[0][0])!;
 string beforeFailedCounts=WriteCounts();
 Query("CREATE TRIGGER dbo.FMSC_QR_FailMarker ON dbo.QuickRegistrationRequests AFTER INSERT AS BEGIN SET NOCOUNT ON; THROW 57599,'Injected marker failure',1; END;");
 try{
@@ -297,7 +297,7 @@ try{
 }finally{Query("DROP TRIGGER dbo.FMSC_QR_FailMarker;");}
 Assert(await QuickRegistrationWriter.CheckSaveAsync(failedRequest) is null&&Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0])==beforeFailed,
     "student and marker roll back together; exact negative recovery permits a deliberate retry");
-Assert(WriteCounts()==beforeFailedCounts,"marker failure also rolls back enrollments, fee assignments, charges, families and audit rows");
+Assert(WriteCounts()==beforeFailedCounts,"marker failure also rolls back enrollments, fee assignments, charges and families");
 var failedRetried=await QuickRegistrationWriter.SaveNewAsync(failedRequest,placement,recoveryQuote,failedArgs);
 Assert(failedRetried.Id>0&&Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0])==beforeFailed+1,"a confirmed rolled-back request can be deliberately retried once");
 using(var c=DatabaseHelper.GetConnection()){

@@ -68,8 +68,6 @@ try {
   try{[void](Query $sql)}catch{$errorItem=$_.Exception;while($errorItem.InnerException){$errorItem=$errorItem.InnerException};if($errorItem -is [Data.SqlClient.SqlException]){$number=$errorItem.Number}else{throw}}
   Check ($number -eq $expected) $message
  }
- $baselineLogs=Number 'SELECT COUNT(*) FROM dbo.AuditLogs;'
- $baselineOperations=Number 'SELECT COUNT(*) FROM dbo.AuditOperations;'
  Check ((Number 'SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;') -eq 48) 'Sequential migration chain reaches schema 48.'
  $feeTypes=(Query 'EXEC dbo.GetFeeTypes @UserId=1;').Tables[0]
  Check ($feeTypes.Columns.Contains('IsTransportLinked')) 'The real fee lookup returns the transport flag used by transfer review.'
@@ -258,8 +256,7 @@ try {
  Check ((Number 'SELECT COUNT(*) FROM dbo.ProvisionalCertificates WHERE Grade IS NULL AND OtherSubjects IS NULL;') -eq 2) 'Provisional creation accepts an empty subject list and normalizes blank optional text.'
  . (Join-Path $projectRoot 'Validation/LargeSmallAuditRetirementChecks.ps1')
  . (Join-Path $projectRoot 'Validation/ClosingFeeAuditRetirementChecks.ps1')
- Check ((Number 'SELECT COUNT(*) FROM dbo.AuditLogs;') -eq $baselineLogs) 'All seven batches create no audit-log entries.'
- Check ((Number 'SELECT COUNT(*) FROM dbo.AuditOperations;') -eq $baselineOperations) 'All seven batches leave no audit-operation entries.'
+ Check ((Number "SELECT COUNT(*) FROM sys.objects WHERE schema_id=SCHEMA_ID(N'dbo') AND name IN (N'AuditLogs',N'AuditOperations',N'AuditValueLeaves',N'GetAuditLogs',N'GetAuditTableNames',N'PruneAuditTrail',N'WriteAuditLog');") -eq 0) 'The retired generic audit objects are absent after the business operations.'
  Write-Output "PASS: $checks small audit-retirement SQL checks."
 } finally {
  if($created -and -not $KeepFixture){

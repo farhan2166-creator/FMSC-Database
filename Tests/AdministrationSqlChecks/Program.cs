@@ -92,12 +92,11 @@ Check((await users.SaveAsync(AccessDraft.From(driftUser.Record) with { ForcePass
 Query("CREATE TRIGGER dbo.FMSC_Admin_FailPermissionSave ON dbo.RolePermissions AFTER INSERT AS BEGIN SET NOCOUNT ON; IF EXISTS(SELECT 1 FROM inserted I JOIN dbo.Roles R ON R.RoleId=I.RoleId JOIN dbo.Permissions P ON P.PermissionId=I.PermissionId WHERE R.RoleName=N'Accountant' AND P.PermissionCode=N'Students.View') THROW 59961,'Injected second-step failure',1; END;");
 try
 {
-    var before=await roles.LoadAsync(accountant);int auditBefore=Id("SELECT COUNT(*) FROM dbo.AuditLogs;");
+    var before=await roles.LoadAsync(accountant);
     var failed=await roles.SaveAsync(AccessDraft.From(before.Record) with { Description="Must roll back",Choices=new[]{view} },before.Record.Snapshot,before.Catalog.Token);
     Check(failed.Outcome!=AccessSaveOutcome.Saved,"an injected permission-step failure never claims success");
     var after=await roles.LoadAsync(accountant);
     Check(after.Record.Snapshot==before.Record.Snapshot,"Accountant description, permissions and membership state all roll back after second-step failure");
-    Check(Id("SELECT COUNT(*) FROM dbo.AuditLogs;")==auditBefore,"audit entries from the earlier definition step also roll back");
     var checkedFailure=await roles.CheckAsync(failed.Intent!);
     Check(checkedFailure.Outcome==AccessCheckOutcome.NotApplied,"read-only reconciliation recognizes the rolled-back role save");
 }

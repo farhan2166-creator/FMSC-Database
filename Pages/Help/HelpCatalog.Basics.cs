@@ -127,7 +127,7 @@ internal static partial class HelpCatalog
             new[] { HelpRule.System, HelpRule.Recovery }, HelpOwner.CSharp,
             new[] { "MainDashboardForm.cs#MainDashboardForm" }, System.Array.Empty<string>(), ""),
         new("FAQ-075", "Administration", "Where can I review significant changes?",
-            "Review the relevant business history: Student Fee Account for payments, receipts and credit; Student Profile for lifecycle history; and the Certificate Issue Register for certificate issues and collection. Fee Change History shows available fee-change evidence and identifies incomplete history.",
+            "Review the relevant business history: Student Fee Account for payments, receipts and credit; Student Profile for lifecycle history; and the Certificate Issue Register for certificate issues and collection. Fee Change History shows stored fee-rate versions and posted charges.",
             "audit,history,change,logs", "Student Fee Account / Student Profile / Certificate Issue Register",
             new[] { HelpRule.System, HelpRule.Permission }, HelpOwner.SQL | HelpOwner.CSharp,
             new[] { "Pages/Reports/Finance/StudentFeeChangeHistory.cs#StudentFeeChangeHistory", "fmsc.dacpac#RequirePermission" }, System.Array.Empty<string>(), ""),

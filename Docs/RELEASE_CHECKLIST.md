@@ -2,7 +2,7 @@
 
 **Release candidate commit:** `________________`  
 **Application version:** `________________`  
-**Required DB schema version:** `1` under the owner-approved first-production reset of 5 November 2026. Verify both `DatabaseHelper.cs` and `Installer/core.ps1` match at the candidate commit; see [First Release Baseline](FIRST_RELEASE_BASELINE.md).
+**Required DB schema version:** `________________`. Verify both `DatabaseHelper.cs` and `Installer/core.ps1` match at the candidate commit. The original baseline is schema 1. See [production migrations](../Migrations/README.md).
 **Reviewer and test date:** `________________`  
 **Windows account / OS / target hardware:** `________________`
 

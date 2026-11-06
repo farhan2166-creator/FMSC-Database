@@ -23,7 +23,7 @@ INSERT @Cases VALUES
  ('20261020','20261020','20261101',16,'20261031',0),
  ('20260401','20261015','20261001',16,NULL,0);
 DECLARE @Id int=1,@Start date,@Billing date,@Expected date,@Cutoff int,@End date,@Discounted bit,
- @Effective date,@Enrollment int,@Hash varchar(64),@Total decimal(12,2),@Count int,@Audits bigint;
+ @Effective date,@Enrollment int,@Hash varchar(64),@Total decimal(12,2),@Count int;
 DECLARE @Preview table(Snapshot varchar(64),OpeningTotal decimal(12,2),ChargeCount int);
 WHILE @Id<=8
 BEGIN
@@ -33,7 +33,6 @@ BEGIN
  SET @Effective=dbo.GetMonthlyBillingStartDate(@Billing);
  IF @End IS NOT NULL UPDATE dbo.AcademicYears SET EndDate=@End WHERE AcademicYearId=@Year;
  DECLARE @CaseFees nvarchar(max)=CASE WHEN @Discounted=1 THEN REPLACE(@Fees,N'"DiscountAmount":0,"Frequency":"Monthly"',N'"DiscountAmount":400,"Frequency":"Monthly"') ELSE @Fees END;
- SELECT @Audits=COUNT_BIG(*) FROM dbo.AuditOperations;
  DELETE @Preview;
  INSERT @Preview EXEC dbo.ActivateStudentBilling @UserId=@User,@AdmissionId=@Student,@YearId=@Year,@PlacementId=@Placement,
   @StartDate=@Start,@BillingStart=@Billing,@StudentName=N'Cutoff test',@FatherName=N'Test parent',@Fees=@CaseFees,@Reason=N'Disposable cutoff validation';
@@ -58,7 +57,6 @@ BEGIN
   THROW 51006,'Opening preview differs from committed charges.',1;
  IF (@Discounted=1 OR @End IS NOT NULL) AND EXISTS(SELECT 1 FROM dbo.BillingCharges WHERE EnrollmentId=@Enrollment AND ChargeKind=N'Monthly')
   THROW 51007,'Waived or outside-year monthly charge was created.',1;
- IF @Audits<>(SELECT COUNT_BIG(*) FROM dbo.AuditOperations) THROW 51008,'Activation wrote to the retired audit system.',1;
  ROLLBACK;
  PRINT CONCAT('PASS: placement cutoff case ',@Id,'; preview, monthly/one-off dates, charges and rollback.');
  SET @Id+=1;

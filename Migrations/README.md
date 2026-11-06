@@ -1,8 +1,11 @@
-# Production database baseline: 1
+# Production database migrations
 
 The first production release uses application **1.0.0**, database **1**.
-The supplied database already contains the complete approved schema. No numbered
-SQL is required for this first release. Future changes start at **2.sql**.
+The schema-1 baseline contains the complete original production schema.
+Application **1.0.1** requires schema **2**. Migration `2.sql` removes the
+generic audit trail. Fee Change History continues to show stored fee-rate
+versions and posted charges. The pre-migration backup retains the legacy audit
+entries. Future migrations start at **3.sql**.
 
 Disposable tests publish the complete schema-only baseline directly at version 1. Old development migrations are retired and must never be replayed on baseline 1. See [the baseline decision](../Docs/FIRST_RELEASE_BASELINE.md).
 

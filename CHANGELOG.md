@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 — Generic audit retirement
+
+- Apply migration 2 to remove the legacy generic audit tables and routines.
+- Fee Change History shows stored fee-rate versions and posted charges. Legacy
+  audit events remain available in the pre-migration database backup.
+
 ## Baseline 1 consolidation — 2026-11-05
 
 - Retire pre-release reset and historical migration replay tools; retain source Git history.
