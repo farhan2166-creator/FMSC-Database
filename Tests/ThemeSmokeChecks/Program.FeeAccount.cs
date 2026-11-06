@@ -143,7 +143,10 @@ internal static partial class Program
                     annualTimer.Stop();var dialog=Application.OpenForms.OfType<AnnualReceiptYearDialog>().Single();
                     try
                     {
-                        Check(dialog.ClientSize.Height<=AppScale.Scale(240)&&!DescendantControls(dialog).OfType<StudentPicker>().Any(),"Annual receipt selector is compact and keeps the existing student");
+                        Check(dialog.ClientSize.Height <= AppMetrics.CompactChoiceDialogClientSize.Height +
+                            SystemInformation.CaptionHeight + AppScale.S(8) &&
+                            !DescendantControls(dialog).OfType<StudentPicker>().Any(),
+                            "Annual receipt selector follows the compact choice size tier and keeps the existing student");
                         var year=DescendantControls(dialog).OfType<LookupBox>().Single();year.SelectedValue=76;
                         var buttons=DescendantControls(dialog).OfType<ModernButton>().Where(button=>button.Text is "View / Print Receipts" or "Close").ToArray();
                         var bounds=buttons.Select(button=>dialog.RectangleToClient(button.RectangleToScreen(button.ClientRectangle))).ToArray();
