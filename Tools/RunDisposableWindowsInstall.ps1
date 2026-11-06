@@ -236,7 +236,8 @@ try {
     & dotnet @arguments
     NativeOk 'Full PortableRelease publish'
     foreach ($file in @('FMSC_SMS/FMSC_SMS.exe','FMSC_SMS/UpdateSupport/FMSC.Setup.exe',
-        'FMSC_SMS/UpdateTransport/cmd/git.exe','FMSC_SMS/UpdateTransport/usr/bin/ssh.exe','core.ps1','Install FMSC_SMS.bat','FMSC.Setup.exe',
+        'FMSC_SMS/UpdateTransport/cmd/git.exe','FMSC_SMS/UpdateTransport/usr/bin/ssh.exe',
+        'FMSC_SMS/UpdateTransport/COPYING-GIT.txt','core.ps1','Install FMSC_SMS.bat','FMSC.Setup.exe',
         'Tools/SqlLocalDB.msi','Tools/sqlcmd.exe')) {
         if (-not (Test-Path -LiteralPath (Join-Path $release $file) -PathType Leaf)) {
             throw "Real installer asset missing: $file"

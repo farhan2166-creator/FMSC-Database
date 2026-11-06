@@ -149,6 +149,7 @@ jobs:
             'FMSC_SMS/UpdateSupport/FMSC.Setup.exe',
             'FMSC_SMS/UpdateTransport/cmd/git.exe',
             'FMSC_SMS/UpdateTransport/usr/bin/ssh.exe',
+            'FMSC_SMS/UpdateTransport/COPYING-GIT.txt',
             'FMSC_SMS/UpdateTransport/THIRD_PARTY_NOTICES.txt',
             'FMSC.Setup.exe',
             'Install FMSC_SMS.bat',
@@ -220,6 +221,7 @@ jobs:
             ''
             'Includes the current self-contained .NET 8 app, SQL LocalDB 2022 MSI,'
             'pinned Microsoft sqlcmd tool and current installer core.ps1.'
+            'Includes pinned Git for Windows MinGit and OpenSSH; no Git PATH setup needed.'
             'The migrations folder may be empty. Numbered SQL files newer than the'
             'installed database version run in numeric order, with a verified backup'
             'first. Missing intermediate files refuse without touching SQL.'

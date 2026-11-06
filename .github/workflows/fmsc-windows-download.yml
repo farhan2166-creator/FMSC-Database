@@ -109,6 +109,7 @@ jobs:
           if (-not $schema) { throw 'Required database schema is missing from the bundled installer.' }
           foreach ($name in @('FMSC_SMS.exe', 'FMSC_SMS.dll', 'FMSC_SMS.deps.json', 'FMSC_SMS.runtimeconfig.json',
               'UpdateTransport/cmd/git.exe', 'UpdateTransport/usr/bin/ssh.exe',
+              'UpdateTransport/COPYING-GIT.txt',
               'UpdateTransport/THIRD_PARTY_NOTICES.txt')) {
             if (-not (Test-Path -LiteralPath (Join-Path $root $name) -PathType Leaf)) {
               throw "Missing Windows application output: $name"
@@ -127,6 +128,7 @@ jobs:
             'This is NOT a complete installer or a GitHub public Release.'
             'It contains no student records, MDF/LDF, backups or LocalDB MSI.'
             'UpdateSupport contains the existing installer and numbered database migrations.'
+            'UpdateTransport bundles pinned Git, OpenSSH, dependencies and license notices; system Git is not required.'
             'Existing school databases are preserved. Pending migrations run only through the post-exit installer safeguards.'
             'Fresh installations still require the separately validated complete installer and approved database snapshot.'
             'GitHub Actions CI does not run interactive Windows UI, physical printer, or school-database tests.'

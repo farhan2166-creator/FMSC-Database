@@ -17,7 +17,7 @@ try {
     # Publish test uses synthetic Git/SSH files only; the real release pipeline
     # downloads and checksum-verifies the entire upstream MinGit distribution.
     $transport = Join-Path $scratch 'synthetic MinGit'
-    foreach ($relative in @('cmd/git.exe','usr/bin/ssh.exe','THIRD_PARTY_NOTICES.txt')) {
+    foreach ($relative in @('cmd/git.exe','usr/bin/ssh.exe','COPYING-GIT.txt','THIRD_PARTY_NOTICES.txt')) {
         $target = Join-Path $transport $relative
         New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
         Set-Content -LiteralPath $target -Value 'Synthetic publish-only fixture; not executable.'
@@ -61,6 +61,7 @@ try {
         'FMSC_SMS/UpdateSupport/FMSC.Setup.exe',
         'FMSC_SMS/UpdateTransport/cmd/git.exe',
         'FMSC_SMS/UpdateTransport/usr/bin/ssh.exe',
+        'FMSC_SMS/UpdateTransport/COPYING-GIT.txt',
         'FMSC_SMS/UpdateTransport/THIRD_PARTY_NOTICES.txt',
         'UpdateRecovery.ps1', 'core.ps1', 'Install FMSC_SMS.bat', 'FMSC.Setup.exe', 'Tools/SqlLocalDB.msi')) {
         $file = Join-Path $release $relative
