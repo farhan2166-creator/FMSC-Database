@@ -181,7 +181,7 @@ internal static partial class Program
                 (string?)item.Attribute("Name")==identifier &&
                 ((string?)item.Attribute("Type") is "SqlProcedure" or "SqlDmlTrigger" or "SqlScalarFunction"));
             Check(entity is not null,"DACPAC defines "+name);
-            var body=entity!.Elements().FirstOrDefault(item=>
+            var body=entity!.Descendants().FirstOrDefault(item=>
                 item.Name.LocalName=="Property" && (string?)item.Attribute("Name")=="BodyScript");
             Check(body is not null,name+" has a SQL body");
             return body!.Descendants().First(item=>item.Name.LocalName=="Value").Value;
