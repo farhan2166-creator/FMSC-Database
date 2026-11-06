@@ -68,7 +68,6 @@ internal static class StudentCertificateRegisterReader
         table.Columns.Add("IssueId", typeof(int));
         table.Columns.Add("RecordedAt", typeof(DateTime));
         table.Columns.Add("SourceCopyId", typeof(int));
-        table.Columns.Add("Copy");
         return table;
     }
 
@@ -81,6 +80,12 @@ internal static class StudentCertificateRegisterReader
             throw new InvalidOperationException(kind.Reader + " did not return " + kind.IssueKey + ".");
         if (!source.Columns.Contains("AdmissionId"))
             throw new InvalidOperationException(kind.Reader + " did not identify the student.");
+
+        var recordsWithMultipleIssues = kind.IssueKey is { } issueKey
+            ? source.AsEnumerable().GroupBy(row => Number(row, kind.RecordKey))
+                .Where(group => group.Select(row => Number(row, issueKey)).Where(id => id > 0).Distinct().Skip(1).Any())
+                .Select(group => group.Key).ToHashSet()
+            : new HashSet<int>();
 
         foreach (DataRow row in source.Rows)
         {
@@ -100,13 +105,16 @@ internal static class StudentCertificateRegisterReader
             string collection = savedOnly ? "Not tracked" : Text(row, "CollectionStatus");
             if (string.IsNullOrWhiteSpace(collection))
                 collection = collected.HasValue ? "Collected" : "Not Collected";
+            string reference = Text(row, "CertificateNumber");
+            if (reference.Length == 0) reference = $"Record #{recordId}";
+            if (issueId > 0 && recordsWithMultipleIssues.Contains(recordId))
+                reference += $" · Issue #{issueId}";
 
             result.Rows.Add(
                 kind.Key,
                 kind.Caption,
                 certificateDate?.ToString("dd MMM yyyy") ?? "—",
-                Text(row, "CertificateNumber") is { Length: > 0 } certificateNumber
-                    ? certificateNumber : "Record #" + recordId,
+                reference,
                 savedOnly ? "Saved record only" : "Issue logged",
                 collection,
                 collected?.ToString("dd MMM yyyy") ?? "—",
@@ -114,8 +122,7 @@ internal static class StudentCertificateRegisterReader
                 recordId,
                 issueId,
                 activity ?? DateTime.MinValue,
-                Number(row, "PreviousCertificateId"),
-                savedOnly ? "Saved record" : "Copy #" + (issueId > 0 ? issueId : recordId));
+                Number(row, "PreviousCertificateId"));
         }
     }
 

@@ -67,6 +67,7 @@ internal static partial class Program
         var projected = StudentCertificateRegisterReader.CreateTable();
         StudentCertificateRegisterReader.AppendRecords(projected, kind, source, 41);
         Check(projected.Rows.Count == 2, "Projection retains both a logged issue and an older saved-only row.");
+        Check((string)projected.Rows[0]["Reference"] == "CHAR-117", "A single issue shows its certificate number once.");
         Check(Convert.ToInt32(projected.Rows[0]["RecordId"]) == 117
             && Convert.ToInt32(projected.Rows[0]["IssueId"]) == 901
             && Convert.ToString(projected.Rows[0]["Collection"]) == "Collected",
@@ -75,6 +76,22 @@ internal static partial class Program
             && Convert.ToInt32(projected.Rows[1]["IssueId"]) == 0
             && Convert.ToString(projected.Rows[1]["Entry"]) == "Saved record only",
             "Legacy saved record without issue is never presented as an issued copy.");
+
+        source.Rows.Add(41, 117, 902, "CHAR-117");
+        projected.Clear();
+        StudentCertificateRegisterReader.AppendRecords(projected, kind, source, 41);
+        Check((string)projected.Rows[0]["Reference"] == "CHAR-117 · Issue #901" &&
+            (string)projected.Rows[2]["Reference"] == "CHAR-117 · Issue #902",
+            "Separate issuances of one certificate have distinct references.");
+
+        var sports = kinds.Single(item => item.Key == "Sports");
+        using var sportSource = new DataTable();
+        sportSource.Columns.Add("AdmissionId", typeof(int));
+        sportSource.Columns.Add(sports.RecordKey, typeof(int));
+        sportSource.Rows.Add(41, 2);
+        projected.Clear();
+        StudentCertificateRegisterReader.AppendRecords(projected, sports, sportSource, 41);
+        Check((string)projected.Rows[0]["Reference"] == "Record #2", "A Sports record shows its fallback reference once.");
 
         source.Rows[1]["AdmissionId"] = 42;
         bool refusedMixedStudents = false;

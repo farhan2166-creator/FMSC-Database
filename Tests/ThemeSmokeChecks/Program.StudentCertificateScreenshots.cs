@@ -69,8 +69,6 @@ internal static partial class Program
                     58, 0, new DateTime(2026,5,1,12,40,0));
                 var grid = (DataGridView)typeof(V2Page)
                     .GetField("Grid", privateFields)!.GetValue(workspace)!;
-                foreach (DataRow copy in records.Rows)
-                    copy["Copy"] = "Copy #" + (Convert.ToInt32(copy["IssueId"]) > 0 ? copy["IssueId"] : copy["RecordId"]);
                 typeof(StudentCertificatesWorkspacePage).GetField("records", privateFields)!.SetValue(workspace, records);
                 grid.DataSource = records.DefaultView;
                 host.Show(); Application.DoEvents();
@@ -113,7 +111,7 @@ internal static partial class Program
                 foreach (DataRow copy in records.Rows) refreshed.ImportRow(copy);
                 refreshed.Rows.Add("Sports", "Sports", "08 Aug 2026", "SPORT-80",
                     "Issue logged", "Not Collected", "—", "08 Aug 2026 10:00",
-                    80, 0, new DateTime(2026, 8, 8, 10, 0, 0), 0, "Copy #80");
+                    80, 0, new DateTime(2026, 8, 8, 10, 0, 0), 0);
                 var sports = StudentCertificateRegisterReader.Kinds.Single(kind => kind.Key == "Sports");
                 workspace.OpenEditor(sports, 0, 0, loadSelection: false);
                 Application.DoEvents();

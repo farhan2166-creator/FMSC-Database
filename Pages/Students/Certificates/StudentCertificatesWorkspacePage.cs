@@ -106,12 +106,7 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
         Grid.Columns.Add(new DataGridViewTextBoxColumn
         {
             Name = "Reference", HeaderText = "Reference", DataPropertyName = "Reference",
-            FillWeight = 24, MinimumWidth = 92
-        });
-        Grid.Columns.Add(new DataGridViewTextBoxColumn
-        {
-            Name = "Copy", HeaderText = "Copy", DataPropertyName = "Copy",
-            FillWeight = 18, MinimumWidth = 80
+            FillWeight = 35, MinimumWidth = 140
         });
          Grid.Columns.Add(new DataGridViewTextBoxColumn
         {
@@ -142,7 +137,7 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
         copyFacts.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, AppScale.Scale(91)));
         copyFacts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         foreach (var (key, caption) in new[] { ("Certificate Type", "Type"), ("Reference", "Reference"),
-            ("Copy", "Copy"), ("Certificate Date", "Date"), ("Collection", "Collection"),
+            ("Certificate Date", "Date"), ("Collection", "Collection"),
             ("Collected On", "Collected"), ("Recorded On", "Recorded") })
         {
             int row = copyFacts.RowCount++;
