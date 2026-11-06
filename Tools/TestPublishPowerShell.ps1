@@ -86,6 +86,7 @@ try {
         $actual = (Get-FileHash -LiteralPath (Join-Path $release $pair[1]) -Algorithm SHA256).Hash
         if ($actual -ne $expected) { throw "Published installer asset differs from checked-out source: $($pair[1])" }
     }
+    & (Join-Path $ProjectDirectory 'Tools/TestOfflineSqlPrerequisites.ps1')
     & (Join-Path $ProjectDirectory 'Tools/TestWindowlessLauncher.ps1') -LauncherPath (Join-Path $application 'UpdateSupport/FMSC.Launcher.exe')
     # GUI setup is one native executable copied to both first install and
     # private update support. Inspect PE subsystem without running UAC or SQL.

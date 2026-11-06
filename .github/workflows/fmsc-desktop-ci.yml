@@ -163,6 +163,10 @@ jobs:
       - name: Run deterministic communication provider checks (no live delivery)
         run: dotnet run --project Tests/CommunicationChecks/CommunicationChecks.csproj -c Release
 
+      - name: Verify offline sqlcmd resolution for new installs and updates
+        shell: pwsh
+        run: .\Tools\TestOfflineSqlPrerequisites.ps1
+
       - name: Verify disposable publish and module isolation
         shell: pwsh
         run: .\Tools\TestPublishPowerShell.ps1 -ProjectDirectory .

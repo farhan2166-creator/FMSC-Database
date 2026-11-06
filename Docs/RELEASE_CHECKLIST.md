@@ -28,7 +28,7 @@
 
 - [ ] [Complete installer workflow](../.github/workflows/fmsc-complete-installer.yml) finished **successfully** at the same SHA.
 - [ ] Downloaded database-free Actions artifact and recorded URL, run ID and checksum.
-- [ ] Package contains `FMSC_SMS/`, `Install FMSC_SMS.bat`, `core.ps1`, `Tools/SqlLocalDB.msi`, `Tools/sqlcmd.exe`, a `Migrations/` folder (empty when there are no pending scripts), required app resources, readme and communication deployment guide. The first-production schema-1 baseline ships **no numbered production migration scripts**; historical development scripts belong to disposable tests only. Future production migrations start at `2.sql`, must be complete and version-matched, and require the verified backup/missing-intermediate safeguards. Never replay old development versions 20–70 onto the baseline-1 school database.
+- [ ] Package contains `FMSC_SMS/`, `Install FMSC_SMS.bat`, `core.ps1`, `Tools/SqlLocalDB.msi`, `Tools/sqlcmd.exe`, a `Migrations/` folder (empty when there are no pending scripts), required app resources, readme and communication deployment guide. The original schema-1 baseline shipped no migrations; current source 1.0.3/schema 3 includes `2.sql` and `3.sql`. Confirm the release's complete migration chain and matching database requirements. Never replay old development versions 20–70 onto the baseline-1 school database.
 - [ ] Copied installer and any pending numbered SQL files match the source commit; copied-helper migration discovery/version tests passed. Start a new workflow run for new source rather than rerunning an older run.
 - [ ] Microsoft LocalDB MSI signature and pinned sqlcmd digest were verified by the workflow; double-check source of prerequisites if changed.
 - [ ] DB snapshot is **not** included in Actions. The owner locally supplies matching **detached** `FMSC_DB.mdf` and `FMSC_DB_log.ldf` only for fresh-install validation.
@@ -65,3 +65,17 @@
 **Approver:** `________________`
 
 Artifact visibility follows this public repository. Include no school database, backup, credentials or private logs. Broad school deployment requires the owner’s recorded acceptance above.
+
+### Offline dependency verification for current releases
+
+- [ ] Verify `FMSC_SMS/UpdateSupport/Tools/sqlcmd.exe` and
+  `FMSC_SMS/UpdateSupport/Tools/SqlLocalDB.msi` alongside the full installer's
+  top-level `Tools/` folder.
+- [ ] An application-only private update carries both SQL tools, so future
+  update installation and recovery do not depend on tools on Windows PATH.
+- [ ] Confirm the Microsoft signature for LocalDB MSI and pinned go-sqlcmd
+  archive digest during packaging.
+- [ ] Exercise bundled SQL dependency repair on a disposable Windows machine,
+  never a live school database.
+- [ ] Check actual app/schema versions and migration inventory against the
+  approved commit; historical 1.0.0/schema 1 is not the current release version.

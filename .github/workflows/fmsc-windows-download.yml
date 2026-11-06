@@ -78,6 +78,7 @@ jobs:
           }
           dotnet run --project Tests/UpdateAuthorizationChecks/UpdateAuthorizationChecks.csproj -c Release
           if ($LASTEXITCODE -ne 0) { throw 'Windows Git key/transport checks failed.' }
+          & .\Tools\TestOfflineSqlPrerequisites.ps1
           & .\Tools\TestPreparedUpdate.ps1
           & .\Tools\TestWindowlessLauncher.ps1
           & .\Tools\TestInstallerMigrations.ps1
