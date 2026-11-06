@@ -1,0 +1,76 @@
+name: '08 - Review - Certificates (PDF and Print)'
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Pages/Reports/Templates/*Certificate.rdlc'
+      - 'Core/CertificateUi.cs'
+      - 'Core/CertificateLetterhead.cs'
+      - 'Core/RdlcReportPreview.cs'
+      - 'Tests/ThemeSmokeChecks/Program.CertificatePdfReview.cs'
+      - 'Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj'
+      - '.github/workflows/fmsc-certificate-pdf-review.yml'
+  pull_request:
+    paths:
+      - 'Pages/Reports/Templates/*Certificate.rdlc'
+      - 'Core/CertificateUi.cs'
+      - 'Core/CertificateLetterhead.cs'
+      - 'Core/RdlcReportPreview.cs'
+      - 'Tests/ThemeSmokeChecks/Program.CertificatePdfReview.cs'
+      - 'Tests/ThemeSmokeChecks/Program.cs'
+      - 'Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj'
+      - '.github/workflows/fmsc-certificate-pdf-review.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: certificate-pdf-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    name: Render and review certificate combinations
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Render certificate PDF combinations with production layouts
+        id: render
+        shell: pwsh
+        run: |
+          & dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --certificate-pdf-review 2>&1 | Tee-Object -Variable renderOutput
+          $renderExit = $LASTEXITCODE
+          if ($renderExit -ne 0) {
+            $detail = ($renderOutput | Select-Object -Last 40) -join "`n"
+            $detail = $detail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=Certificate PDF review failed::$detail"
+          }
+          exit $renderExit
+      - name: Upload the single certificate review PDF
+        id: samples
+        if: ${{ success() && hashFiles('artifacts/certificate-pdf-review/FMSC-Certificates-Review.pdf') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          path: artifacts/certificate-pdf-review/FMSC-Certificates-Review.pdf
+          archive: false
+          retention-days: 7
+          if-no-files-found: error
+      - name: Link PDF in the workflow summary
+        if: ${{ always() && steps.samples.outcome == 'success' }}
+        shell: pwsh
+        env:
+          REVIEW_URL: ${{ steps.samples.outputs.artifact-url }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          "[Download the certificate review PDF]($env:REVIEW_URL)" >> $env:GITHUB_STEP_SUMMARY
+          $review = Get-Content artifacts/certificate-pdf-review/provenance.json -Raw | ConvertFrom-Json
+          "Source commit: $env:SOURCE_COMMIT. Templates: $($review.TemplateCount). Certificate combinations: $($review.ScenarioCount). PDF pages: $($review.PageCount). SHA-256: $($review.Sha256)." >> $env:GITHUB_STEP_SUMMARY
+          'The direct PDF download is FMSC-Certificates-Review.pdf. Bookmarks navigate certificate types and realistic variations. All records are fictional; no school database or physical printer is used.' >> $env:GITHUB_STEP_SUMMARY
