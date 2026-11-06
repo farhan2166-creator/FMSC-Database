@@ -20,48 +20,79 @@ public sealed partial class CommunicationCenterPage
 
     private async Task SendReviewedAsync(DataTable reviewed)
     {
+        // No database campaign should be created just because the operator opened
+        // the confirmation dialog. A cancelled action remains a cancelled action.
         var operationalSettings=await ReadAsync("Operational");
+        if(operationalSettings.Rows.Count==0)throw new InvalidOperationException("Communication sending settings are unavailable.");
         var settings=operationalSettings.Rows[0];
-        if(Convert.ToString(settings["Mode"])=="Disabled" || Convert.ToBoolean(settings["Paused"]))
+        string mode=Convert.ToString(settings["Mode"])??"Disabled";
+        if(mode=="Disabled" || Convert.ToBoolean(settings["Paused"]))
         {
             SetStatus("Sending is disabled or paused. Ask your administrator to check sending settings.",PageStatusKind.Warning);
             return;
         }
-        var eligible=reviewed.AsEnumerable().Where(row=>Convert.ToString(row["Exclusion"])=="").Select(row=>new
+        var eligible=reviewed.AsEnumerable()
+            .Where(row=>Convert.ToString(row["Exclusion"])=="")
+            .Select(row=>new
+            {
+                ContactId=row.Field<Guid>("ContactId"),
+                Destination=row.Field<string>("Destination"),
+                Body=row.Field<string>("Body"),
+                Parameters=row.Field<string>("Parameters"),
+                EstimatedCost=row.Field<decimal?>("EstimatedCost"),
+                Currency=row.Field<string>("Currency")
+            }).ToArray();
+        if(eligible.Length==0)
+            throw new ArgumentException("No eligible recipients remain. Refresh the preview.");
+        if(mode=="Live" && eligible.Any(row=>!row.EstimatedCost.HasValue))
         {
-            ContactId=row.Field<Guid>("ContactId"),
-            Destination=row.Field<string>("Destination"),
-            Body=row.Field<string>("Body"),
-            Parameters=row.Field<string>("Parameters"),
-            EstimatedCost=row.Field<decimal?>("EstimatedCost"),
-            Currency=row.Field<string>("Currency")
-        }).ToArray();
+            SetStatus("Live send is unavailable because some provider costs are unknown. Ask your administrator to configure pricing.",PageStatusKind.Warning);
+            return;
+        }
+        if(eligible.Length>1 && !CurrentUser.HasPermission("Communication.Bulk"))
+            throw new ArgumentException("Bulk sending permission is required for more than one recipient.");
+
+        string channelName=SelectedChannel()==MessageChannel.Sms?"SMS":"WhatsApp";
+        string cost=mode=="Simulation"
+            ?"Simulation only. No external messages will be sent."
+            :$"Estimated provider cost: {eligible.Sum(row=>row.EstimatedCost??0m):0.0000} {eligible[0].Currency}.";
+        string exclusions=reviewed.Rows.Count-eligible.Length>0
+            ?$" {reviewed.Rows.Count-eligible.Length} ineligible contacts will be excluded."
+            :"";
+        if(!ModernMessageDialog.Confirm(FindForm(),
+            $"Send {eligible.Length} reviewed {channelName} message(s)?{exclusions} {cost}",
+            mode=="Simulation"?"Confirm Simulation":"Confirm Message Send"))
+        {
+            SetStatus("Send cancelled. No campaign was created or sent.");
+            return;
+        }
+
         var snapshot=JsonSerializer.Serialize(eligible);
         requestDue??=DateTime.UtcNow;
-        await store.CreateAsync(requestId,SelectedTemplate(),SelectedChannel(),eligible.Select(row=>row.ContactId),announcement.Text,
-            requestDue.Value,token:lifetime.Token,reviewed:snapshot);
+        await store.CreateAsync(requestId,SelectedTemplate(),SelectedChannel(),eligible.Select(row=>row.ContactId),
+            announcement.Text,requestDue.Value,token:lifetime.Token,reviewed:snapshot);
         savedSignature=Signature();
         sendNow.Enabled=false;
         prepare.Enabled=false;
 
+        // SQL owns the immutable live/simulation snapshot. If mode changed while
+        // the dialog was open, preserve the draft but never dispatch unexpectedly.
         var summary=await store.CallAsync("CampaignSummary",lifetime.Token,SqlCommunicationStore.P("@Id",requestId));
-        var row=summary.Rows[0];
-        int count=Convert.ToInt32(row["Recipients"]);
-        bool simulation=Convert.ToInt32(row["Simulation"])==1;
-        if(!simulation && Convert.ToInt32(row["UnknownCosts"])>0)
+        if(summary.Rows.Count==0)throw new InvalidOperationException("The prepared campaign could not be verified.");
+        var saved=summary.Rows[0];
+        bool simulation=Convert.ToInt32(saved["Simulation"])==1;
+        if(simulation != (mode=="Simulation"))
         {
-            SetStatus("Draft saved. Ask your administrator to configure message pricing before sending.",PageStatusKind.Warning);
+            SetStatus("Sending mode changed during confirmation. The draft was saved, but nothing was submitted. Review it in History before proceeding.",PageStatusKind.Warning);
             return;
         }
-        string channelName=SelectedChannel()==MessageChannel.Sms?"SMS":"WhatsApp";
-        string cost=simulation?"Simulation only. No external messages will be sent.":$"Estimated provider cost: {row["EstimatedCost"]} {row["Currency"]}.";
-        if(!ModernMessageDialog.Confirm(FindForm(),$"Submit {count} reviewed {channelName} message(s)? {included.Count-count} selected contacts will be skipped. {cost}","Confirm Message Send"))
+        if(!simulation && Convert.ToInt32(saved["UnknownCosts"])>0)
         {
-            SetStatus("Draft saved in History. No send was requested.");
+            SetStatus("Draft saved but not submitted. Provider pricing must be reviewed in Settings.",PageStatusKind.Warning);
             return;
         }
         await store.TransitionAsync(requestId,"Submit",lifetime.Token);
-        await DispatchCampaignAsync(requestId,count);
+        await DispatchCampaignAsync(requestId,Convert.ToInt32(saved["Recipients"]));
     }
 
     private async Task DispatchCampaignAsync(Guid campaign,int count)
