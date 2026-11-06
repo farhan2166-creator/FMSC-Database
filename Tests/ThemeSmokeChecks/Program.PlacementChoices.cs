@@ -83,9 +83,7 @@ internal static partial class Program
             data.Rows[0]["StudentName"]="Fictional student"; data.Rows[0]["Current"]="A / One / 1";
             Set("data",data); Field<DataGridView>("students").DataSource=data; Call("Suggest");
             var review = Field<ModernButton>("review");
-            Check(targetCampus.Enabled && !review.Enabled, task+": loaded rows unlock destinations while review still requires a reason");
-            Field<ModernTextBox>("reason").Text = "Placement test";
-            Check(review.Enabled, task+": a reason and assigned student unlock review");
+            Check(targetCampus.Enabled && review.Enabled, task+": an assigned student unlocks review with no reason");
             Call("SelectRows",false);
             Check(!review.Enabled, task+": clearing the processing selection disables review again");
             Call("SelectRows",true);

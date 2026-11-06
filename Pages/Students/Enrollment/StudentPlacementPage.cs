@@ -91,11 +91,11 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         historyRoot.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
         historyRoot.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.ButtonHeight+AppScale.Scale(8)));historyRoot.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         var historyFields=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2};historyFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));historyFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,75));
-        historyFields.Controls.Add(HumanUi.Field("Correction Date",historyDate),0,0);historyFields.Controls.Add(HumanUi.Field("Reason for Undoing Promotion",historyReason),1,0);
+        historyFields.Controls.Add(HumanUi.Field("Correction Date",historyDate),0,0);historyFields.Controls.Add(HumanUi.Field("Reason for Undoing Promotion (optional)",historyReason),1,0);
         historyDates=AddAction("Student History / Dates",(_,_)=>OpenStudentHistory(),"Secondary");RelocateFromActions(historyDates);
         historyRetry=AddAction("Check / Retry Plan",async(_,_)=>await Guard(Retry),"Warning");RelocateFromActions(historyRetry);historyRetry.Visible=false;
         var historyActions=CenteredActionRow(new Control[]{records,old},new Control[]{historyDates},new Control[]{undo,historyRetry});
-        historyRoot.Controls.Add(new Label{Dock=DockStyle.Fill,Text="Review saved movements. To undo an unused promotion, select its record and enter the correction date and reason."},0,0);
+        historyRoot.Controls.Add(new Label{Dock=DockStyle.Fill,Text="Review saved movements. To undo an unused promotion, select its record and check the correction date."},0,0);
         historyRoot.Controls.Add(historyFields,0,1);historyRoot.Controls.Add(historyActions,0,2);historyRoot.Controls.Add(history,0,3);history.Dock=DockStyle.Fill;
         ConfigureHistoryGrid();
         body.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldCardHeight(2,false)+AppMetrics.FieldRowHeight));
@@ -114,8 +114,6 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         WirePlacementChoices();
         students.SelectionChanged += (_, _) => RefreshActionAvailability();
         history.SelectionChanged += (_, _) => RefreshActionAvailability();
-        reason.TextChanged += (_, _) => RefreshActionAvailability();
-        historyReason.TextChanged += (_, _) => RefreshActionAvailability();
         RefreshActionAvailability();
         Disposed+=(_,_)=>{
             studentActionsMenu?.Dispose();
@@ -138,7 +136,7 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
     {
         StudentPlacementTask.AnnualPromotion=>"Promote students into the next academic year, with repeaters and individual exceptions.",
         StudentPlacementTask.Transfer=>"Move groups between campuses, classes and sections within the same academic year.",
-        StudentPlacementTask.Correction=>"Correct placements and dates with a reason, or review a promotion undo.",
+        StudentPlacementTask.Correction=>"Correct placements and dates, or review a promotion undo.",
         StudentPlacementTask.History=>"Review saved placement movements and safely correct unused promotions.",
         _=>throw new ArgumentOutOfRangeException(nameof(task))
     };
@@ -169,7 +167,7 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         foreach(var control in new Control[]{targetYear,targetCampus,targetClass,effective,fees,reason,carry})control.Parent?.Controls.Remove(control);
         if(Annual){Field(destination,"Academic Year",targetYear,0,0);Field(destination,"Campus",targetCampus,1,0);Field(destination,"Promotion Date",effective,0,1);Field(destination,"Monthly Concessions",carry,1,1);}
         else{Field(destination,"Campus",targetCampus,0,0);Field(destination,"Class",targetClass,1,0);Field(destination,operation==2?"Correction Date":"Transfer Date",effective,0,1);Field(destination,"Transfer Fee Policy",fees,1,1);}
-        var explanation=HumanUi.Field(operation==2?"Correction Explanation":"Reason",reason);fields.Controls.Add(explanation,0,1);fields.SetColumnSpan(explanation,2);
+        var explanation=HumanUi.Field(operation==2?"Correction Explanation (optional)":"Reason (optional)",reason);fields.Controls.Add(explanation,0,1);fields.SetColumnSpan(explanation,2);
         foreach(var wrapper in oldFields)wrapper.Dispose();
         carry.Visible=Annual;
         SetToolTip(targetCampus,"Leave blank to keep each student's current campus.");SetToolTip(targetClass,"Leave blank to keep each student's current class.");
@@ -182,10 +180,9 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         ((DataGridViewComboBoxColumn)students.Columns["Decision"]).DataSource=choices.DefaultView;
     }
 
-    private async Task Guard(Func<Task> work, LookupBox? focusedLookup = null)
+    private async Task Guard(Func<Task> work)
     {
         if(busy)return;
-        bool restoreFocus = focusedLookup?.Focused == true;
         busy=true;pageContent.Enabled=false;
         try{await work();}catch(Exception ex){Fail(ex);}finally{
             busy=false;
@@ -193,8 +190,6 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
             {
                 pageContent.Enabled = true;
                 RefreshActionAvailability();
-                if (restoreFocus && FindForm()?.ContainsFocus == true && focusedLookup!.CanFocus)
-                    focusedLookup.Focus();
             }
         }
     }
@@ -213,12 +208,12 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
             history.Enabled = records.Enabled = old.Enabled = editable;
             historyDates.Enabled = editable && canAdminister && movement is not null;
             historyReason.Enabled = historyDate.Enabled = canUndo;
-            undo.Enabled = canUndo && !string.IsNullOrWhiteSpace(historyReason.Text);
+            undo.Enabled = canUndo;
             historyRetry.Visible = historyRetry.Enabled = !editable;
             return;
         }
 
-        bool hasSource = editable && choicesReady && sourceYear.SelectedId > 0;
+        bool hasSource = editable && choicesReady && !refreshingSource && sourceYear.SelectedId > 0;
         bool hasStudents = hasSource && data.Rows.Count > 0;
         bool hasDestination = hasStudents && targetYear.SelectedId > 0;
         bool canAdjustFees = CurrentUser.HasPermission("Fees.Adjust");
@@ -246,7 +241,7 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         retry.Visible = retry.Enabled = !editable;
 
         var selected = SelectedPlanRows();
-        review.Enabled = hasDestination && !string.IsNullOrWhiteSpace(reason.Text)
+        review.Enabled = hasDestination
             && selected.Length > 0 && selected.All(row => Id(row, "Destination") > 0);
     }
 
@@ -417,13 +412,17 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         SetToolTip(totals,totals.Text);
         RefreshActionAvailability();
     }
+    // The database requires a nonblank reason for the saved movement.
+    private static string PlacementReason(string text) =>
+        string.IsNullOrWhiteSpace(text) ? "No reason provided." : text.Trim();
+
     private async Task Process()
     {
         if(pending is not null){await Retry();return;}
         students.EndEdit();
         var selected = SelectedPlanRows();
         if(selected.Length==0)throw new InvalidOperationException("Select students to process.");
-        if(targetYear.SelectedId<=0 || reason.Text.Trim().Length==0)throw new InvalidOperationException("Choose the destination year and enter a reason.");
+        if(targetYear.SelectedId<=0)throw new InvalidOperationException("Choose the destination year.");
         if(selected.Any(r=>Convert.ToInt32(r["Destination"])<=0))throw new InvalidOperationException("Choose a destination for every selected student. Final-class students can repeat or be skipped for departure review.");
         if(selected.Any(r=>Annual ? Convert.ToString(r["Decision"]) is not ("PROMOTE" or "HOLD") : Convert.ToString(r["Decision"]) is not ("MOVE" or "CORRECT")))throw new InvalidOperationException("Choose decisions that match the selected action.");
         if(Annual && carry.Checked && !CurrentUser.HasPermission("Fees.Adjust"))
@@ -445,19 +444,20 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         }).ToArray();
         if(plan.Any(item=>item.FeePolicy is not null) && !CurrentUser.HasPermission("Fees.Adjust"))
             throw new UnauthorizedAccessException("Changing destination fees requires fee adjustment access.");
+        string planReason = PlacementReason(reason.Text);
         var json=PlacementPlan.Serialize(plan);Guid id=Guid.NewGuid();
         SetStatus("Validating the complete plan, including lifecycle and fee rules…");
-        var preview=await PlacementPlan.RunAsync(id,json,targetYear.SelectedId,effective.Value.Date,reason.Text.Trim(),Annual && carry.Checked,true);
+        var preview=await PlacementPlan.RunAsync(id,json,targetYear.SelectedId,effective.Value.Date,planReason,Annual && carry.Checked,true);
         using var reviewed=JsonDocument.Parse(Convert.ToString(preview.Rows[0]["ResultJson"])!);
-        if(!ReviewDetails(selected,reviewed.RootElement))
+        if(!ReviewDetails(selected,reviewed.RootElement,planReason))
         {
             SetStatus("Review closed. Your plan is ready to edit.");
             return;
         }
-        pending=(id,json,targetYear.SelectedId,effective.Value.Date,reason.Text.Trim(),Annual && carry.Checked,reviewed.RootElement.GetProperty("ReviewHash").GetString()!);
+        pending=(id,json,targetYear.SelectedId,effective.Value.Date,planReason,Annual && carry.Checked,reviewed.RootElement.GetProperty("ReviewHash").GetString()!);
         await Retry();
     }
-    private bool ReviewDetails(DataRow[] selected,JsonElement reviewed)
+    private bool ReviewDetails(DataRow[] selected,JsonElement reviewed,string planReason)
     {
         var summary=new DataTable();foreach(var name in new[]{"Student","From","Decision","To","Fees Before","Fees After","Bill Difference"})summary.Columns.Add(name);
         string FeeText(JsonElement effect, string property)
@@ -479,7 +479,7 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         var grid=HumanUi.Grid(false);grid.Dock=DockStyle.Fill;grid.DataSource=summary;
         var root=new TableLayoutPanel{Dock=DockStyle.Fill,RowCount=3,ColumnCount=1,Padding=new Padding(12)};
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,85));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.ButtonRowHeight));
-        root.Controls.Add(new Label{Dock=DockStyle.Fill,Text=$"{selected.Length:N0} students · {effective.Value:dd-MMM-yyyy} · {targetYear.Text}\n{reason.Text.Trim()}\n"+(Annual?"New placements await return admission before billing. "+(carry.Checked?"Carry monthly concessions.":"Reset concessions for return review."):fees.Text+". Paid reductions remain as student advance.")+" All selected students succeed together; a failure rolls back the entire plan."},0,0);
+        root.Controls.Add(new Label{Dock=DockStyle.Fill,Text=$"{selected.Length:N0} students · {effective.Value:dd-MMM-yyyy} · {targetYear.Text}\n{planReason}\n"+(Annual?"New placements await return admission before billing. "+(carry.Checked?"Carry monthly concessions.":"Reset concessions for return review."):fees.Text+". Paid reductions remain as student advance.")+" All selected students succeed together; a failure rolls back the entire plan."},0,0);
         root.Controls.Add(grid,0,1);var apply=new ModernButton{Text="Process Reviewed Plan",DialogResult=DialogResult.OK};var cancel=new ModernButton{Text="Back to Plan",DialogResult=DialogResult.Cancel};root.Controls.Add(HumanUi.DialogButtons(apply,cancel),0,2);
         using var dialog=Window("Review Placement Plan",root);dialog.CancelButton=cancel;return dialog.ShowDialog(FindForm())==DialogResult.OK;
     }
@@ -552,13 +552,13 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
             throw new UnauthorizedAccessException("Student administration access is required to undo a promotion.");
         if(pending is not null)throw new InvalidOperationException(BusyMessage);
         if(history.CurrentRow?.DataBoundItem is not DataRowView row)throw new InvalidOperationException("Select a promotion in History first.");
-        if(historyReason.Text.Trim().Length==0)throw new InvalidOperationException("Enter the reason for undoing the selected promotion on Placement History.");
+        string planReason = PlacementReason(historyReason.Text);
         var item=new PlacementPlanItem(Convert.ToInt32(row["DestinationEnrollmentId"]),Convert.ToInt32(row["CurrentPlacementId"]),Convert.ToString(row["CurrentStamp"])!,"UNDO",0,null,Convert.ToInt32(row["ItemId"]));
         string json=PlacementPlan.Serialize(new[]{item});Guid id=Guid.NewGuid();int year=Convert.ToInt32(row["AcademicYearId"]);
-        var preview=await PlacementPlan.RunAsync(id,json,year,historyDate.Value.Date,historyReason.Text.Trim(),false,true);
+        var preview=await PlacementPlan.RunAsync(id,json,year,historyDate.Value.Date,planReason,false,true);
         using var reviewed=JsonDocument.Parse(Convert.ToString(preview.Rows[0]["ResultJson"])!);
-        if(ModernMessageDialog.Show(this,$"Restore the previous placement for {row["StudentName"]}?\n\nThe mistaken destination and original promotion history remain recorded.\nReason: {historyReason.Text.Trim()}","Review Promotion Correction",MessageBoxButtons.OKCancel,MessageBoxIcon.Warning)!=DialogResult.OK)return;
-        pending=(id,json,year,historyDate.Value.Date,historyReason.Text.Trim(),false,reviewed.RootElement.GetProperty("ReviewHash").GetString()!);await Retry();
+        if(ModernMessageDialog.Show(this,$"Restore the previous placement for {row["StudentName"]}?\n\nThe mistaken destination and original promotion history remain recorded.\nReason: {planReason}","Review Promotion Correction",MessageBoxButtons.OKCancel,MessageBoxIcon.Warning)!=DialogResult.OK)return;
+        pending=(id,json,year,historyDate.Value.Date,planReason,false,reviewed.RootElement.GetProperty("ReviewHash").GetString()!);await Retry();
     }
     private async void OpenStudentHistory()
     {

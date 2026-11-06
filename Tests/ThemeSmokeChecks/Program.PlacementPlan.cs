@@ -55,9 +55,7 @@ internal static partial class Program
                 Check(!historyGrid.Columns.Cast<DataGridViewColumn>().Any(column=>column.Visible && column.DataPropertyName is "RequestId" or "ItemId" or "UndoneBy"),"History retains recovery fields in its data without exposing request IDs as user-facing columns.");
                 var selected=(DataRowView)typeof(StudentPlacementPage).GetMethod("SelectedStudent",flags)!.Invoke(page,null)!;
                 Check(Convert.ToString(selected["StudentName"])=="Fictional History Student","History actions use the selected history student.");
-                Check(!Field<ModernButton>(page,"undo").Enabled,"History undo requires a reason for the selected promotion.");
-                Field<ModernTextBox>(page,"historyReason").Text="Fictional undo explanation";
-                Check(Field<ModernButton>(page,"undo").Enabled,"A recorded promotion and reason unlock undo review.");
+                Check(Field<ModernButton>(page,"undo").Enabled,"A recorded promotion unlocks undo review with no reason.");
             }
             else
             {

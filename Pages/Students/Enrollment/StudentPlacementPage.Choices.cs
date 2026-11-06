@@ -6,6 +6,8 @@ public sealed partial class StudentPlacementPage
 {
     private DataTable campusCatalog = new(), yearCatalog = new(), sectionCatalog = new(), sourcePlacements = new();
     private bool choicesReady;
+    private int sourceRefreshVersion;
+    private bool refreshingSource;
     internal Func<int, Task<DataTable>> ReadSourceChoices = PlacementPlan.ReadSourcesAsync;
     internal Func<int,int,int,int,Task<DataTable>> ReadStudents = PlacementPlan.ReadAsync;
 
@@ -21,7 +23,10 @@ public sealed partial class StudentPlacementPage
     {
         sourceYear.SelectedIndexChanged += async (_, _) => {
             if (!choicesReady || binding || pending is not null) return;
-            await Guard(async () => {
+            int version = ++sourceRefreshVersion;
+            refreshingSource = true;
+            try
+            {
                 InvalidatePlan();
                 WithChoiceBinding(() => {
                     sourceCampus.SelectedIndex = 0;
@@ -30,7 +35,19 @@ public sealed partial class StudentPlacementPage
                     if (targetCampus.SelectedId == 0) targetClass.SelectedIndex = 0;
                 });
                 await RefreshSourceContext(true);
-            }, sourceYear);
+            }
+            catch (Exception ex)
+            {
+                if (!IsDisposed && version == sourceRefreshVersion) Fail(ex);
+            }
+            finally
+            {
+                if (version == sourceRefreshVersion)
+                {
+                    refreshingSource = false;
+                    RefreshActionAvailability();
+                }
+            }
         };
         sourceCampus.SelectedIndexChanged += (_, _) => {
             if (!choicesReady || binding || pending is not null) return;
@@ -93,8 +110,9 @@ public sealed partial class StudentPlacementPage
         WithChoiceBinding(() => { RefreshSourceFilters(); RefreshTargetYears(chooseNextYear); RefreshTargetClasses(); });
         int year = sourceYear.SelectedId;
         if (year <= 0) return;
+        int version = sourceRefreshVersion;
         var rows = await ReadSourceChoices(year);
-        if (IsDisposed || sourceYear.SelectedId != year) { rows.Dispose(); return; }
+        if (IsDisposed || sourceRefreshVersion != version || sourceYear.SelectedId != year) { rows.Dispose(); return; }
         sourcePlacements.Dispose(); sourcePlacements = rows;
         WithChoiceBinding(() => {
             RefreshSourceFilters(); RestoreLookup(sourceCampus, selected.Campus);

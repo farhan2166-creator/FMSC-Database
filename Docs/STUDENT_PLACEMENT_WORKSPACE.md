@@ -21,7 +21,7 @@ exceptions. They must be mapped, repeated or skipped before processing.
 
 To promote one student, click **Clear Selection** and tick **Process** beside
 that student. Leave their decision on **Promote** and check the destination
-placement. Enter a reason, click **Review**, and then click **Process Reviewed
+placement. Add a reason if needed, click **Review**, and then click **Process Reviewed
 Plan** if the details are correct. **Confirm Return Admission** is a separate
 step after promotion, before the new placement can be billed.
 
@@ -75,7 +75,7 @@ year's active list; skipped students remain for later processing.
 
 Undo Selected Promotion is available for unchanged annual placements created by
 this workspace, before return admission/billing, payments, certificates or later
-movement. It requires student administration permission and a correction reason.
+movement. It requires student administration permission. The correction reason is optional.
 It closes the mistaken destination and restores the original placement, retaining
 both enrollments, original promotion records and correction history. Changed fee
 agreements also prevent undo. Certificate checks are deliberately conservative:
