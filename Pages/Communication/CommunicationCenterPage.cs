@@ -353,7 +353,6 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         int unknown=rows.AsEnumerable().Count(r=>r.IsNull("EstimatedCost"));
         string? sendBlock=ready==0
             ? rows.Rows.Count==1?Convert.ToString(rows.Rows[0]["Exclusion"]):"No eligible contacts. Check the Exclusion column."
-            : SelectedChannel()!=MessageChannel.WhatsApp?"Choose WhatsApp to use Send Now."
             : schedule.Checked?"Clear Send after to send immediately."
             : !CurrentUser.HasPermission("Communication.Send")?"Ask an administrator for permission to send messages."
             : ready>1 && !CurrentUser.HasPermission("Communication.Bulk")?"Select one contact or ask for bulk sending permission."
@@ -383,6 +382,31 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private string TemplateHint()=>templateChoice.Items.Count==0?"No reviewed template: open Templates or ask an administrator.":"Choose a reviewed template before previewing.";
     private async Task RefreshOperational(){var data=await ReadAsync("Operational");if(!IsDisposed&&data.Rows.Count>0){var r=data.Rows[0];sendingSummary=$"Mode: {r["Mode"]} · master pause: {r["Paused"]}. ";operational.Text=sendingSummary+$"Dispatcher {(dispatchTask is {IsCompleted:false}?"running":"stopped")}. Scheduled work requires a running dispatcher; accepted does not mean delivered.";}}
     private Task RefreshHistory()=>LoadGridAsync(history,()=>ReadAsync(CurrentUser.HasPermission("Communication.History")?"History":"Outbox",historyPage,historySearch.Text,historyState.SelectedIndex<=0?"":Convert.ToString(historyState.SelectedItem)!),rows=>{
+        if(rows.Columns.Contains("State"))
+        {
+            rows.Columns.Add("DisplayStatus",typeof(string));
+            foreach(DataRow row in rows.Rows)
+            {
+                string state=Convert.ToString(row["State"])??"";
+                row["DisplayStatus"]=state switch
+                {
+                    "Draft"=>"Draft",
+                    "AwaitingApproval"=>"Awaiting approval",
+                    "Scheduled"=>"Scheduled",
+                    "Queued"=>"Pending send",
+                    "Submitting"=>"Submitting",
+                    "Accepted"=>"Accepted by provider",
+                    "Sent"=>"Sent (provider reported)",
+                    "Delivered"=>"Delivered",
+                    "Read"=>"Read",
+                    "Failed"=>"Failed",
+                    "Rejected"=>"Rejected",
+                    "DeliveryUnknown"=>"Needs provider review",
+                    "Cancelled"=>"Cancelled",
+                    _=>state
+                };
+            }
+        }
         history.DataSource=rows;ApplyMessageColumns();
         if(rows.Rows.Count>0)SetStatus($"Page {historyPage+1} · {rows.Rows.Count} messages shown. Select a message to review its campaign and available actions.");
     });
@@ -397,9 +421,9 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         }
         SetColumns(recipients,["Include","Student","ContactName","Class","Outstanding"]);
         SetColumns(preview,["ContactName","Destination","Body","Exclusion","EstimatedCost","Currency"]);
-        SetColumns(history,["Student","Recipient","Template","State","Simulation","UpdatedUtc"]);
+        SetColumns(history,["Student","Recipient","Template","DisplayStatus","Simulation","UpdatedUtc"]);
         if(history.Columns.Contains("UpdatedUtc"))history.Columns["UpdatedUtc"].HeaderText="Last updated (UTC)";
-        if(history.Columns.Contains("State"))history.Columns["State"].HeaderText="Status";
+        if(history.Columns.Contains("DisplayStatus"))history.Columns["DisplayStatus"].HeaderText="Status";
     }
     private Task RefreshContacts()=>LoadGridAsync(contacts,()=>ReadAsync("Contacts",contactPage));
     private Task RefreshRules()=>CurrentUser.HasPermission("Communication.Configure")?LoadGridAsync(rules,()=>ReadAsync("Rules")):Task.CompletedTask;
