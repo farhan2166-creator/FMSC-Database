@@ -366,18 +366,40 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         preview.DefaultCellStyle.WrapMode=DataGridViewTriState.True;preview.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.DisplayedCells;
         bool eligible=rows.Rows.Count==included.Count && rows.AsEnumerable().All(r=>Convert.ToString(r["Exclusion"])=="");
         int ready=rows.AsEnumerable().Count(r=>Convert.ToString(r["Exclusion"])=="");
-        previewSignature=ready>0?signature:"";prepare.Enabled=eligible&&CurrentUser.HasPermission("Communication.Compose");
+        previewSignature=ready>0?signature:"";
+        prepare.Enabled=eligible&&CurrentUser.HasPermission("Communication.Compose");
         int unknown=rows.AsEnumerable().Count(r=>r.IsNull("EstimatedCost"));
+
+        // A valid recipient preview is not proof that the sending environment is
+        // ready. Expose mode/pause/unknown pricing before the operator clicks Send.
+        var operationalSettings=await ReadAsync("Operational");
+        if(IsDisposed || Signature()!=signature)return;
+        var sending=operationalSettings.Rows.Count>0?operationalSettings.Rows[0]:null;
+        string mode=sending is not null && sending.Table.Columns.Contains("Mode")
+            ?Convert.ToString(sending["Mode"])??"Disabled":"Disabled";
+        bool paused=sending is not null && sending.Table.Columns.Contains("Paused") && Convert.ToBoolean(sending["Paused"]);
         string? sendBlock=ready==0
             ? rows.Rows.Count==1?Convert.ToString(rows.Rows[0]["Exclusion"]):"No eligible contacts. Check the Exclusion column."
             : schedule.Checked?"Clear Send after to send immediately."
             : !CurrentUser.HasPermission("Communication.Send")?"Ask an administrator for permission to send messages."
             : ready>1 && !CurrentUser.HasPermission("Communication.Bulk")?"Select one contact or ask for bulk sending permission."
+            : mode=="Disabled"?"Sending is disabled in Settings."
+            : paused?"Sending is paused in Settings."
+            : mode=="Live" && unknown>0?"Live sending requires provider pricing for every eligible recipient."
             : null;
         sendNow.Enabled=sendBlock is null;
-        sendHint.Text=sendBlock is null?$"{ready} ready to send. Review the preview, then choose Send Now.":$"Send Now unavailable. {sendBlock}";
-        SetStatus(eligible?$"Preview ready: {rows.Rows.Count} recipients. {(unknown>0?"Cost estimate unavailable for some recipients; live dispatch will be blocked.":"Estimated provider cost: "+rows.AsEnumerable().Sum(r=>Convert.ToDecimal(r["EstimatedCost"])).ToString("0.0000")+" "+rows.Rows[0]["Currency"])}"
-            :$"Preview: {ready} eligible, {included.Count-ready} skipped. Review the exclusion column before sending.");
+        sendHint.Text=sendBlock is null
+            ? mode=="Simulation"
+                ?$"{ready} ready for SIMULATION only. No real message will be sent."
+                :$"{ready} ready to send. Review the preview, then choose Send Now."
+            :$"Send Now unavailable. {sendBlock}";
+        string feedback=mode=="Simulation"
+            ?"Simulation only: no phones will be contacted."
+            :unknown>0?"Cost estimate unavailable for some recipients."
+            :"Estimated provider cost: "+rows.AsEnumerable().Where(r=>!r.IsNull("EstimatedCost")).Sum(r=>Convert.ToDecimal(r["EstimatedCost"])).ToString("0.0000")+" "+(rows.Rows.Count>0?rows.Rows[0]["Currency"]:"");
+        SetStatus(eligible
+            ?$"Preview ready: {rows.Rows.Count} recipients. {feedback}"
+            :$"Preview: {ready} eligible, {included.Count-ready} skipped. Review the exclusion column. {feedback}");
     }
     private Task RefreshTemplates()=>LoadGridAsync(templates,()=>ReadAsync("Templates",templatePage),BindTemplateChoices);
     private void BindTemplateChoices(DataTable rows)
