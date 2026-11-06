@@ -204,6 +204,11 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         }
         void ShowComposeOptions(bool show)
         {
+            if(!show && schedule.Checked)
+            {
+                SetStatus("Clear the scheduled send time before hiding More Options.",PageStatusKind.Warning);
+                return;
+            }
             composeOptionsExpanded=show;
             foreach(var option in composeOptions)option.Visible=show;
             messageFields.ColumnStyles[0].Width=show?20:0;
@@ -303,9 +308,14 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     {
         if(!CurrentUser.HasPermission("Communication.Compose"))
             throw new ArgumentException("This action requires permission to compose messages.");
-        int campusId=campus.SelectedId,yearId=year.SelectedId,classId=cls.SelectedId,sectionId=section.SelectedId;
-        if(campusId==0 && classId==0 && sectionId==0)
-            throw new ArgumentException("Choose a campus, class or section before selecting matching contacts.");
+        int campusId=campus.SelectedId;
+        int yearId=composeOptionsExpanded?year.SelectedId:0;
+        int classId=audience.SelectedIndex is 1 or 2?cls.SelectedId:0;
+        int sectionId=audience.SelectedIndex is 1 or 2?section.SelectedId:0;
+        if(campusId==0)
+            throw new ArgumentException("Choose a campus before previewing a group message.");
+        if(audience.SelectedIndex==1 && classId==0)
+            throw new ArgumentException("Choose a class before previewing a class/section message.");
         if(recipientFilter.SelectedIndex is not (0 or 1))
             throw new ArgumentException("Choose the student or outstanding-balance filter for a school group.");
         string term=search.Text;
@@ -335,7 +345,10 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     {
         if(!CurrentUser.HasPermission("Communication.Compose"))return Task.CompletedTask;
         return LoadGridAsync(recipients,()=>ReadAsync("Recipients",recipientPage,search.Text,recipientFilter.SelectedIndex==0?"":Convert.ToString(recipientFilter.SelectedItem)!,
-            SqlCommunicationStore.P("@Campus",audience.SelectedIndex>=4?0:campus.SelectedId),SqlCommunicationStore.P("@Year",audience.SelectedIndex>=4?0:year.SelectedId),SqlCommunicationStore.P("@Class",audience.SelectedIndex>=4?0:cls.SelectedId),SqlCommunicationStore.P("@Section",audience.SelectedIndex>=4?0:section.SelectedId)),rows=>{
+            SqlCommunicationStore.P("@Campus",audience.SelectedIndex>=4?0:campus.SelectedId),
+            SqlCommunicationStore.P("@Year",audience.SelectedIndex<4&&composeOptionsExpanded?year.SelectedId:0),
+            SqlCommunicationStore.P("@Class",audience.SelectedIndex is 1 or 2?cls.SelectedId:0),
+            SqlCommunicationStore.P("@Section",audience.SelectedIndex is 1 or 2?section.SelectedId:0)),rows=>{
             populating=true;
             try{rows.Columns.Add("Include",typeof(bool));recipients.DataSource=rows;foreach(DataGridViewColumn c in recipients.Columns)c.ReadOnly=c.Name!="Include";
                 recipients.Columns["Include"].DisplayIndex=0;ApplyMessageColumns();ApplyTicks();}
