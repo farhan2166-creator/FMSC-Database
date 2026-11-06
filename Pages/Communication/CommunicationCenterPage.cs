@@ -36,6 +36,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private readonly ModernButton sendNow=new(){Text="Send Now",ThemeRole="Primary",Enabled=false};
     private readonly Label sendHint=new(){AutoEllipsis=true,ForeColor=AppTheme.Text,Text="Preview the message before sending."};
     private readonly List<Control> advancedControls=new();
+    private bool advancedView;
     private int recipientPage,historyPage,contactPage,templatePage;
     private Guid requestId=Guid.NewGuid();private DateTime? requestDue;private string previewSignature="",savedSignature="";
     private bool populating;
@@ -71,11 +72,13 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         catch(OperationCanceledException) when(lifetime.IsCancellationRequested){}
         catch(Exception ex){if(!IsDisposed)SetStatus(DbMessage.UserMessage(ex),PageStatusKind.Warning);}
     }
-    private ModernButton Button(string text,Func<Task> action,string permission="Communication.View",string role="Secondary",DataGridView? selectedGrid=null)
+    private ModernButton Button(string text,Func<Task> action,string permission="Communication.View",string role="Secondary",
+        DataGridView? selectedGrid=null,Func<DataRow,bool>? available=null)
     {
         var b=new ModernButton{Text=text,ThemeRole=role,Height=AppMetrics.ButtonHeight,Margin=new Padding(4)};AppMetrics.FitButtonWidth(b,minWidth:100);
         b.Enabled=CurrentUser.HasPermission(permission);
-        if(selectedGrid is not null){void Update()=>b.Enabled=CurrentUser.HasPermission(permission)&&Selected(selectedGrid) is not null;selectedGrid.SelectionChanged+=(_,_)=>Update();Update();}
+        if(selectedGrid is not null){void Update()=>b.Enabled=CurrentUser.HasPermission(permission)&&Selected(selectedGrid) is { } row
+            && (available?.Invoke(row)??true);selectedGrid.SelectionChanged+=(_,_)=>Update();Update();}
         b.Click+=async(_,_)=>{
             if(!CurrentUser.HasPermission(permission)||!installed){SetStatus("This action needs permission and completed communication setup. Ask your administrator.",PageStatusKind.Warning);return;}
             await ExecuteAsync(action);
@@ -112,6 +115,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         messageFields.Controls.Add(scheduleField,2,0);
         var filters=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=1};
         foreach(var item in new[]{("Campus",campus),("Academic year",year),("Class",cls),("Section",section)}){filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));filters.Controls.Add(HumanUi.Field(item.Item1,item.Item2),filters.Controls.Count,0);}
+        advancedControls.Add(filters.GetControlFromPosition(1,0)!);
         Row(filters,78);
         search.PlaceholderText="Contact or student name";search.Width=220;
         var findContacts=Button("Find Contacts",async()=>{recipientPage=0;await RefreshRecipients();},"Communication.Compose");
@@ -172,10 +176,9 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         tabs.TabPages.Add(Tab("Gateway Settings",gateway));
         var advancedTabs=tabs.TabPages.Cast<TabPage>().Skip(2).ToArray();
         var advancedToggle=new ModernButton{Text="Advanced Settings",AutoSize=true,Height=AppMetrics.ButtonHeight};
-        bool advanced=false;
         void SetAdvanced(bool show)
         {
-            advanced=show;
+            advancedView=show;
             if(show)tabs.TabPages.AddRange(advancedTabs);
             else
             {
@@ -183,22 +186,31 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
                 foreach(var page in advancedTabs)tabs.TabPages.Remove(page);
                 schedule.Checked=false;
                 channel.SelectedItem="WhatsApp";
+                if(year.SelectedId!=0)
+                {
+                    year.SelectedIndex=0;
+                    RecipientFiltersChanged();
+                }
+                historyState.SelectedIndex=0;
             }
             foreach(var control in advancedControls)control.Visible=show;
             operational.Visible=show;
             messageFields.ColumnStyles[0].Width=show?20:0;
             messageFields.ColumnStyles[1].Width=show?45:100;
             messageFields.ColumnStyles[2].Width=show?35:0;
+            for(int column=0;column<4;column++)
+                filters.ColumnStyles[column].Width=show?25:column==1?0:100f/3;
+            ApplyMessageColumns();
             advancedToggle.Text=show?"Back to Simple View":"Advanced Settings";
         }
         advancedToggle.Click+=(_,_)=>{
             if(IsBusy)return;
-            if(advanced && HasUnsavedChanges && (schedule.Checked || SelectedChannel()!=MessageChannel.WhatsApp))
+            if(advancedView && HasUnsavedChanges && (schedule.Checked || SelectedChannel()!=MessageChannel.WhatsApp || year.SelectedId!=0))
             {
                 SetStatus("Finish the advanced draft or choose New Message before returning to Simple View.");
                 return;
             }
-            SetAdvanced(!advanced);
+            SetAdvanced(!advancedView);
         };
         SetAdvanced(false);
         tabs.Enabled=false;TabStrip.Apply(tabs,AppTheme.Primary);
@@ -260,7 +272,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
             SqlCommunicationStore.P("@Campus",campus.SelectedId),SqlCommunicationStore.P("@Year",year.SelectedId),SqlCommunicationStore.P("@Class",cls.SelectedId),SqlCommunicationStore.P("@Section",section.SelectedId)),rows=>{
             populating=true;
             try{rows.Columns.Add("Include",typeof(bool));recipients.DataSource=rows;foreach(DataGridViewColumn c in recipients.Columns)c.ReadOnly=c.Name!="Include";
-                recipients.Columns["Include"].DisplayIndex=0;recipients.Columns["ContactId"].Visible=false;ApplyTicks();}
+                recipients.Columns["Include"].DisplayIndex=0;ApplyMessageColumns();ApplyTicks();}
             finally{populating=false;}
             selection.Text=$"Page {recipientPage+1} · {rows.Rows.Count} contacts shown · {included.Count} selected across all pages. Preview checks consent. "+TemplateHint();
         },EmptyRecipients());
@@ -282,7 +294,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         try{rows=await store.PreviewAsync(SelectedTemplate(),SelectedChannel(),included,announcement.Text,token:lifetime.Token);}
         catch{if(!IsDisposed){sendHint.Text="Preview could not be checked. Try Preview Messages again.";UiHelper.SetGridState(preview,UiHelper.GridDisplayState.Failed,"Preview could not be checked. Try Preview Messages again; no draft was created.");}throw;}
         if(IsDisposed||Signature()!=signature)return;UiHelper.ClearGridState(preview);preview.DataSource=rows;
-        foreach(string name in new[]{"ContactId","AdmissionId","FamilyId","Parameters"})if(preview.Columns.Contains(name))preview.Columns[name].Visible=false;
+        ApplyMessageColumns();
         preview.DefaultCellStyle.WrapMode=DataGridViewTriState.True;preview.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.DisplayedCells;
         bool eligible=rows.Rows.Count==included.Count && rows.AsEnumerable().All(r=>Convert.ToString(r["Exclusion"])=="");
         int ready=rows.AsEnumerable().Count(r=>Convert.ToString(r["Exclusion"])=="");
@@ -320,9 +332,24 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private string TemplateHint()=>templateChoice.Items.Count==0?"No reviewed template: open Templates or ask an administrator.":"Choose a reviewed template before previewing.";
     private async Task RefreshOperational(){var data=await ReadAsync("Operational");if(!IsDisposed&&data.Rows.Count>0){var r=data.Rows[0];sendingSummary=$"Mode: {r["Mode"]} · master pause: {r["Paused"]}. ";operational.Text=sendingSummary+$"Dispatcher {(dispatchTask is {IsCompleted:false}?"running":"stopped")}. Scheduled work requires a running dispatcher; accepted does not mean delivered.";}}
     private Task RefreshHistory()=>LoadGridAsync(history,()=>ReadAsync(CurrentUser.HasPermission("Communication.History")?"History":"Outbox",historyPage,historySearch.Text,historyState.SelectedIndex<=0?"":Convert.ToString(historyState.SelectedItem)!),rows=>{
-        history.DataSource=rows;foreach(string name in new[]{"MessageId","CreatedBy","ApprovedBy","ProviderReference"})if(history.Columns.Contains(name))history.Columns[name].Visible=false;
+        history.DataSource=rows;ApplyMessageColumns();
         if(rows.Rows.Count>0)SetStatus($"Page {historyPage+1} · {rows.Rows.Count} messages shown. Select a message to review its campaign and available actions.");
     });
+    private void ApplyMessageColumns()
+    {
+        void SetColumns(DataGridView grid,string[] everyday)
+        {
+            foreach(DataGridViewColumn column in grid.Columns)
+                column.Visible=column.Name is not ("ContactId" or "AdmissionId" or "EnrollmentId" or "FamilyId"
+                    or "Parameters" or "MessageId" or "CampaignId" or "CreatedBy" or "ApprovedBy" or "ProviderReference")
+                    && (advancedView || everyday.Contains(column.Name));
+        }
+        SetColumns(recipients,["Include","Student","ContactName","Class","Outstanding"]);
+        SetColumns(preview,["ContactName","Destination","Body","Exclusion","EstimatedCost","Currency"]);
+        SetColumns(history,["Student","Recipient","Template","State","Simulation","UpdatedUtc"]);
+        if(history.Columns.Contains("UpdatedUtc"))history.Columns["UpdatedUtc"].HeaderText="Last updated (UTC)";
+        if(history.Columns.Contains("State"))history.Columns["State"].HeaderText="Status";
+    }
     private Task RefreshContacts()=>LoadGridAsync(contacts,()=>ReadAsync("Contacts",contactPage));
     private Task RefreshRules()=>CurrentUser.HasPermission("Communication.Configure")?LoadGridAsync(rules,()=>ReadAsync("Rules")):Task.CompletedTask;
     private async Task EvaluateRules(){await store.CallAsync("Evaluate",lifetime.Token);SetStatus("Events checked. Review campaigns in Outbox. Sending may need approval and a running dispatcher; delivery is not confirmed.");}

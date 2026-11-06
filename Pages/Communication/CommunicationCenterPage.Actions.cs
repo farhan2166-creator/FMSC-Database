@@ -93,7 +93,10 @@ public sealed partial class CommunicationCenterPage
             {
                 if(Convert.ToString(s["Status"])!="Queued" || Convert.ToString(s["Channel"])!="WhatsApp")
                     throw new ArgumentException("Choose a queued WhatsApp campaign. Submit a draft or obtain approval first.");
-                if(ModernMessageDialog.Confirm(FindForm(),context+"Process eligible pending messages in this campaign now?","Confirm WhatsApp Send"))
+                bool simulation=Convert.ToInt32(s["Simulation"])==1;
+                string prompt=simulation?"Run this queued WhatsApp simulation now? No phone will be contacted."
+                    :"Send the remaining eligible WhatsApp messages from this batch? Provider charges may apply.";
+                if(ModernMessageDialog.Confirm(FindForm(),prompt,simulation?"Run Simulation":"Send Pending Messages"))
                     await DispatchCampaignAsync(id,Convert.ToInt32(s["Recipients"]));
                 return;
             }
@@ -101,12 +104,15 @@ public sealed partial class CommunicationCenterPage
             await store.TransitionAsync(id,action,lifetime.Token);
             await AfterSavedAsync(RefreshHistory,action switch {"Submit"=>"Campaign submitted. Review its current state: approval, schedule, mode, master pause and dispatcher availability still govern sending. No delivery is implied.","Approve"=>"Campaign approval recorded. Review the schedule and dispatcher before sending.","Pause"=>"Campaign paused. Already submitted provider messages cannot be recalled.","Resume"=>"Campaign resumed. Eligible unsent work will follow its schedule and sending safeguards.",_=>"Campaign cancelled for unsent work. Already submitted provider messages and history are preserved."});
         }
-        historySearch.PlaceholderText="Student, contact, campaign or error";historySearch.Width=220;
+        historySearch.PlaceholderText="Student or recipient name";historySearch.Width=220;
         historyState.Items.Add("All states");historyState.Items.AddRange(Enum.GetNames<DeliveryState>());historyState.SelectedIndex=0;
+        advancedControls.Add(historyState);
         var toolbar=Bar([historySearch,historyState,Button("Search",async()=>{historyPage=0;await RefreshHistory();}),
             Button("Refresh",RefreshHistory),..Paging(history,()=>historyPage,value=>historyPage=value,RefreshHistory),
             Button("Submit",()=>Transition("Submit"),"Communication.Send","Primary",history),Button("Approve",()=>Transition("Approve"),"Communication.Approve",selectedGrid:history),
-            Button("Send Pending Now",()=>Transition("Send Now"),"Communication.Send",selectedGrid:history),
+            Button("Send Pending Now",()=>Transition("Send Now"),"Communication.Send",selectedGrid:history,
+                available:row=>row.Table.Columns.Contains("State") && row.Table.Columns.Contains("CampaignStatus")
+                    && Convert.ToString(row["State"])=="Queued" && Convert.ToString(row["CampaignStatus"])=="Queued"),
             Button("Pause",()=>Transition("Pause"),"Communication.Compose",selectedGrid:history),Button("Resume",()=>Transition("Resume"),"Communication.Send",selectedGrid:history),Button("Cancel Campaign",()=>Transition("Cancel"),"Communication.Compose",selectedGrid:history),
             Button("Details",async()=>{
                 var row=Selected(history)??throw new ArgumentException("Select a message first.");
