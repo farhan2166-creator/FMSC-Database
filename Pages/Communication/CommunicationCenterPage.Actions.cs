@@ -223,7 +223,7 @@ public sealed partial class CommunicationCenterPage
         bool Flag(string name)=>original is not null&&Convert.ToBoolean(original[name]);
         editor.Flag("verified","I verified that this contact controls this number",Flag("Verified"));editor.Flag("sms","Recorded SMS consent",Flag("SmsConsent"));editor.Flag("whatsapp","Recorded WhatsApp consent",Flag("WhatsAppConsent"));editor.Flag("financial","Financial-message consent (student contacts only)",Flag("FinancialConsent"));editor.Flag("announcements","School-announcement consent",Flag("AnnouncementConsent"));editor.Flag("optout","Opted out — suppress sending",Flag("OptedOut"));editor.TextField("source","Consent source / reference / date",original is not null?CellText(original,"ConsentSource"):"");
         editor.OnChange("phone",()=>{foreach(string flag in new[]{"verified","sms","whatsapp","financial","announcements"})editor.ClearFlag(flag);});
-        if(editor.ShowDialog(FindForm())==DialogResult.OK){await AfterSavedAsync(RefreshContacts,"Contact and consent saved. Return to Compose / Bulk and find contacts; no message has been sent.");}
+        if(editor.ShowDialog(FindForm())==DialogResult.OK){await AfterSavedAsync(RefreshContacts,"Contact and consent saved. Return to Send Message and find contacts; no message has been sent.");}
     }
     private async Task EditTemplate()
     {
