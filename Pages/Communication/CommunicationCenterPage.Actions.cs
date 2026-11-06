@@ -297,11 +297,64 @@ public sealed partial class CommunicationCenterPage
         toolbar.Controls.AddRange([term,find,previous,next,use]);dialog.Controls.Add(grid);dialog.Controls.Add(toolbar);dialog.Controls.Add(feedback);
         dialog.FormClosing+=(_,_)=>stop.Cancel();dialog.Shown+=async(_,_)=>await Load();dialog.ShowDialog(FindForm());return Task.FromResult(picked);
     }
+    private static string GuardianAdmissionPreferenceNote(string contactNumber,string admissionNumber,
+        bool whatsappConsent,DateTime recordedUtc)
+    {
+        bool sameNumber=false;
+        try
+        {
+            sameNumber=string.Equals(
+                CommunicationPhone.Normalize(contactNumber,"+92"),
+                CommunicationPhone.Normalize(admissionNumber,"+92"),
+                StringComparison.Ordinal);
+        }
+        catch(ArgumentException) { /* Invalid or missing numbers cannot be assumed equal. */ }
+
+        string evidence=$"Admission preference recorded {recordedUtc:dd-MMM-yyyy} (UTC). ";
+        if(!whatsappConsent)
+            return evidence+"WhatsApp was not agreed to on the admission record. Do not infer consent from a phone number; any later consent must be independently documented.";
+        return evidence+(sameNumber
+            ?"WhatsApp was agreed to for this number. Verify current ownership, opt-outs, and the intended message purpose before making this a communication contact."
+            :"WhatsApp was agreed to for a different or invalid number. That admission choice cannot authorize this contact number; obtain and document fresh consent.");
+    }
+    private static async Task<string> GuardianAdmissionPreferenceAsync(int admissionId,string candidateNumber)
+    {
+        if(!CurrentUser.HasPermission("Students.View"))
+            return "Admission communication preferences are restricted. An authorized school operator must review guardian consent before messaging.";
+        // Read only: the admission preference is evidence, not a verified
+        // comm.Contact. Its existence cannot grant ownership or purpose consent.
+        using var preferences=await DatabaseHelper.QuerySqlAsync("""
+            EXEC dbo.RequirePermission @UserId,N'Students.View';
+            SELECT Phone,WhatsAppConsent,RecordedUtc
+            FROM dbo.StudentGuardianCommunication
+            WHERE AdmissionId=@AdmissionId;
+            """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@AdmissionId",admissionId));
+        if(preferences.Rows.Count==0)
+            return "No admission WhatsApp preference is recorded for this student. Verify consent and contact ownership before sending.";
+        var preference=preferences.Rows[0];
+        return GuardianAdmissionPreferenceNote(candidateNumber,
+            Convert.ToString(preference["Phone"])??"",
+            Convert.ToBoolean(preference["WhatsAppConsent"]),
+            Convert.ToDateTime(preference["RecordedUtc"]));
+    }
     private async Task EditContact(DataRow? original,DataRow? candidate)
     {
         Guid id=original is null?Guid.NewGuid():(Guid)original["ContactId"];
         string kind=original is not null?CellText(original,"OwnerKind"):candidate is not null?CellText(candidate,"OwnerKind"):"Manual";
         int? Owner(string name,string target)=>original is not null?(original.IsNull(name)?null:Convert.ToInt32(original[name])):candidate is not null&&kind==target?Convert.ToInt32(candidate["OwnerId"]):null;
+        string? guardianNote=null;
+        if(kind=="Student" && Owner("AdmissionId","Student") is int admission)
+        {
+            string candidateNumber=original is not null?CellText(original,"Destination")
+                :candidate is not null?CellText(candidate,"ContactNumber"):"";
+            try{guardianNote=await GuardianAdmissionPreferenceAsync(admission,candidateNumber);}
+            catch(Exception ex) when(ex is Microsoft.Data.SqlClient.SqlException or InvalidOperationException)
+            {
+                // Contact setup remains possible, but no admission consent is
+                // inferred when the read cannot be verified.
+                guardianNote="Admission preference could not be verified. Record explicit current consent before enabling messages.";
+            }
+        }
         using var editor=new CommunicationEditor("Contact and Recorded Consent — "+kind,async e=>{
             await store.CallAsync("SaveContact",lifetime.Token,SqlCommunicationStore.P("@Id",id),SqlCommunicationStore.P("@Kind",kind),SqlCommunicationStore.P("@AdmissionId",Owner("AdmissionId","Student")),SqlCommunicationStore.P("@FamilyId",Owner("FamilyId","Family")),SqlCommunicationStore.P("@StaffId",Owner("StaffId","Staff")),
                 SqlCommunicationStore.P("@Name",e.Value("name")),SqlCommunicationStore.P("@Phone",CommunicationPhone.Normalize(e.Value("phone"),e.Value("country"))),SqlCommunicationStore.P("@Language",e.Value("language")),SqlCommunicationStore.P("@Channel",e.Value("channel")),
@@ -310,6 +363,7 @@ public sealed partial class CommunicationCenterPage
         editor.TextField("name","Actual parent / guardian / staff contact name",original is not null?CellText(original,"ContactName"):candidate is not null?CellText(candidate,"Guardian"):"");
         editor.TextField("phone","Mobile number (candidate number is not proof of ownership)",original is not null?CellText(original,"Destination"):candidate is not null?CellText(candidate,"ContactNumber"):"");editor.TextField("country","Default country code; use a full international number elsewhere","+92");
         editor.Choice("language","Preferred language",["en","ur","en_US"],original is not null?CellText(original,"Language"):"en");editor.Choice("channel","Preferred channel",["Sms","WhatsApp"],original is not null?CellText(original,"PreferredChannel"):"Sms");
+        if(guardianNote is not null)editor.Notice(guardianNote);
         bool Flag(string name)=>original is not null&&Convert.ToBoolean(original[name]);
         editor.Flag("verified","I verified that this contact controls this number",Flag("Verified"));editor.Flag("sms","Recorded SMS consent",Flag("SmsConsent"));editor.Flag("whatsapp","Recorded WhatsApp consent",Flag("WhatsAppConsent"));editor.Flag("financial","Financial-message consent (student contacts only)",Flag("FinancialConsent"));editor.Flag("announcements","School-announcement consent",Flag("AnnouncementConsent"));editor.Flag("optout","Opted out — suppress sending",Flag("OptedOut"));editor.TextField("source","Consent source / reference / date",original is not null?CellText(original,"ConsentSource"):"");
         editor.OnChange("phone",()=>{foreach(string flag in new[]{"verified","sms","whatsapp","financial","announcements"})editor.ClearFlag(flag);});
