@@ -29,7 +29,7 @@ internal static partial class Program
                 return rows;
             }
             // Admission preference is evidence, never automatic verification or purpose consent.
-            var noteMethod=typeof(CommunicationCenterPage).GetMethod("GuardianAdmissionPreferenceNote",flags)!;
+            var noteMethod=typeof(CommunicationCenterPage).GetMethod("GuardianAdmissionPreferenceNote",BindingFlags.Static|BindingFlags.NonPublic)!;
             string Note(string contact,string recorded,bool consent)=>
                 (string)noteMethod.Invoke(null,[contact,recorded,consent,new DateTime(2026,11,6)])!;
             Check(Note("03001234567","+923001234567",true).Contains("agreed to for this number"),
