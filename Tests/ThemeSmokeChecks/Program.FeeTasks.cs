@@ -20,7 +20,8 @@ internal static partial class Program
             foreach(string name in new[]{"Frequency","Status","ConcessionLabel","StudentName","AdmissionNumber","YearName"})data.Columns.Add(name);
             foreach(string name in new[]{"StartDate","EndDate","EnrollmentDate","BillingMonth"})data.Columns.Add(name,typeof(DateTime));
             data.Columns.Add("BillingChargeId",typeof(long));
-            var first=new DateTime(DateTime.Today.Year,1,1);var end=first.AddYears(1).AddDays(-1);
+            var current=new DateTime(DateTime.Today.Year,DateTime.Today.Month,1);
+            var first=current.AddMonths(-7);var last=current.AddMonths(4);var end=last.AddMonths(1).AddDays(-1);
             data.Rows.Add("One Time","Active",DBNull.Value,"Preview student","6592","Preview year",first,end,first,first,321L);
             SqlParameter[]? captured=null;decimal paid=0,oldDiscount=0;int saves=0;bool mixedTerms=false;
             Task<DataSet> Query(SqlParameter[] args)
@@ -48,8 +49,8 @@ internal static partial class Program
                 Show(form);Capture(form,"choose-task");
                 Check(Field<ModernButton[]>(form,"taskButtons").All(button=>button.Visible&&button.Enabled),
                     "All four fee actions are directly visible and keyboard-accessible.");
-                Check(!Field<ModernComboBox>(form,"scope").Visible&&!Field<ModernDatePicker>(form,"fromMonth").Visible,
-                    "A single bill has a fixed scope and no irrelevant monthly date controls.");
+                Check(!Field<ModernComboBox>(form,"scope").Visible&&!Field<ModernComboBox>(form,"fromMonth").Visible,
+                    "A single bill has a fixed scope and hides month choices.");
                 Check(!Field<ModernComboBox>(form,"paidReduction").Visible&&!Field<TabControl>(form,"comparisons").Visible,
                     "No overpayment question or empty comparison tabs are shown before review.");
                 ClickTask(form,0);
@@ -102,8 +103,23 @@ internal static partial class Program
                 ClickTask(form,2);
                 Check(Field<ModernComboBox>(form,"action").SelectedIndex==2,"The fee correction quick action selects the existing rate-change task.");
                 Field<ModernTextBox>(form,"newRate").Text="12000";Field<ModernTextBox>(form,"reason").Text="Correct agreed rate";
-                Check(Field<ModernDatePicker>(form,"fromMonth").Visible&&Field<ModernDatePicker>(form,"throughMonth").Visible,
-                    "Monthly fee plans offer a start and through month.");
+                var from=Field<ModernComboBox>(form,"fromMonth");
+                var through=Field<ModernComboBox>(form,"throughMonth");
+                Check(from.Visible&&through.Visible&&from.DropDownStyle==ComboBoxStyle.DropDownList&&through.DropDownStyle==ComboBoxStyle.DropDownList,
+                    "Monthly fee plans offer month-only dropdowns.");
+                Check(from.Items.Cast<DateTime>().SequenceEqual(Enumerable.Range(0,5).Select(current.AddMonths))&&
+                    through.Items.Cast<DateTime>().SequenceEqual(Enumerable.Range(1,4).Select(current.AddMonths))&&
+                    Equals(from.SelectedItem,current)&&Equals(through.SelectedItem,last)&&from.Text==current.ToString("MMMM yyyy"),
+                    "Admissions defaults to the current month through year-end, with Through choices starting one month later.");
+                through.SelectedItem=current.AddMonths(1);
+                from.SelectedItem=current.AddMonths(2);
+                Check(through.Items.Cast<DateTime>().SequenceEqual(new[]{current.AddMonths(3),last})&&Equals(through.SelectedItem,current.AddMonths(3)),
+                    "Moving From later updates an invalid Through selection to the next month.");
+                from.SelectedItem=last;
+                Check(through.Items.Cast<DateTime>().SequenceEqual(new[]{last})&&Equals(through.SelectedItem,last),
+                    "The final available month can be selected on its own.");
+                from.SelectedItem=current;
+                Check(Equals(through.SelectedItem,last),"A Through selection within the new range is retained.");
                 Check(Field<ModernTextBox>(form,"newRate").Visible&&!Field<ModernTextBox>(form,"amount").Visible,
                     "Correct Fee Amount exposes only its own amount input.");
                 Click(form,"review");
@@ -140,11 +156,11 @@ internal static partial class Program
                 if(collection)form.ConfigureCollectionAction(choice);else Field<ModernComboBox>(form,"action").SelectedIndex=choice;
                 if(collection)
                 {
-                    Check(Field<ModernDatePicker>(form,"fromMonth").Value==Field<ModernDatePicker>(form,"throughMonth").Value,
+                    Check(Equals(Field<ModernComboBox>(form,"fromMonth").SelectedItem,Field<ModernComboBox>(form,"throughMonth").SelectedItem),
                         "Collection intentionally resets the end month to its start month");
                     // Compare both entry points for the SAME explicitly chosen period;
                     // their different initial through-month defaults are owner-approved.
-                    Field<ModernDatePicker>(form,"throughMonth").Value=new DateTime(DateTime.Today.Year,12,1);
+                    Field<ModernComboBox>(form,"throughMonth").SelectedItem=last;
                 }
                 Show(form);Field<ModernComboBox>(form,"scope").SelectedIndex=scope;
                 if(choice==0)Field<ModernTextBox>(form,"amount").Text="1500";

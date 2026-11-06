@@ -16,7 +16,10 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     private readonly ModernComboBox action = HumanUi.Combo(), scope = HumanUi.Combo();
     private readonly ModernTextBox newRate = HumanUi.TextBox(false,20), amount = HumanUi.TextBox(false,20), reason = HumanUi.TextBox(false,500);
     private readonly ModernComboBox concession = HumanUi.Combo(), paidReduction = HumanUi.Combo();
-    private readonly ModernDatePicker fromMonth = HumanUi.Date(), throughMonth = HumanUi.Date();
+    private readonly ModernComboBox fromMonth = HumanUi.Combo(), throughMonth = HumanUi.Combo();
+    private readonly DateTime firstPeriodMonth=First(DateTime.Today), lastPeriodMonth=First(DateTime.Today);
+    private DateTime FromMonth => (DateTime?)fromMonth.SelectedItem ?? firstPeriodMonth;
+    private DateTime ThroughMonth => (DateTime?)throughMonth.SelectedItem ?? lastPeriodMonth;
     private readonly Label impact = new() { AutoSize=true, Dock=DockStyle.Fill, Padding=new Padding(6) };
     private readonly DataGridView bills = HumanUi.Grid(false), schedule = HumanUi.Grid(false);
     private readonly ModernButton review = new() { Text="Review Fee Change", ThemeRole="Secondary" },
@@ -95,6 +98,11 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         concession.FormattingEnabled=true;
         concession.Format+=(_,e)=>e.Value=FeeConcessionLabels.Display(Convert.ToString(e.ListItem)??"");
         paidReduction.Items.AddRange(new object[]{"Keep as advance credit","Refund the excess payment"}); paidReduction.SelectedIndex=0;
+        foreach(var dropdown in new[]{fromMonth,throughMonth})
+        {
+            dropdown.FormattingEnabled=true;
+            dropdown.Format+=(_,e)=>{if(e.ListItem is DateTime month) e.Value=month.ToString("MMMM yyyy");};
+        }
         if(context is not null)
         {
             DateTime Date(string column,DateTime fallback)=>context.Table.Columns.Contains(column)&&context[column] is DateTime value?First(value):fallback;
@@ -107,15 +115,14 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
             }
             if(first<=last)
             {
-                fromMonth.Format=throughMonth.Format=DateTimePickerFormat.Custom;
-                fromMonth.CustomFormat=throughMonth.CustomFormat="MMMM yyyy";
-                fromMonth.Value=throughMonth.Value=first;
-                fromMonth.MinDate=throughMonth.MinDate=first; fromMonth.MaxDate=throughMonth.MaxDate=last;
-                fromMonth.Value=First(DateTime.Today)<first?first:First(DateTime.Today)>last?last:First(DateTime.Today);
-                throughMonth.Value=last;
-                if(!monthly) fromMonth.Value=first;
+                firstPeriodMonth=first;
+                lastPeriodMonth=last;
+                DateTime start=monthly?ClampMonth(First(DateTime.Today)):first;
                 if(billId is not null && context.Table.Columns.Contains("BillingMonth") && context["BillingMonth"] is DateTime month)
-                    fromMonth.Value=throughMonth.Value=First(month);
+                    start=last=First(month);
+                SetMonths(fromMonth,start,monthly&&billId is null?last:start,start);
+                if(monthly&&billId is null) UpdateThroughMonths(last);
+                else SetMonths(throughMonth,last,last,last);
             }
             else validContext=false;
         }
@@ -125,7 +132,12 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         amount.TextChanged+=(_,_)=>InvalidateReview();
         reason.TextChanged+=(_,_)=>InvalidateReview(updateChoices:false);
         newRate.TextChanged+=(_,_)=>InvalidateReview(); concession.SelectedIndexChanged+=(_,_)=>InvalidateReview();
-        fromMonth.ValueChanged+=(_,_)=>InvalidateReview(); throughMonth.ValueChanged+=(_,_)=>InvalidateReview();
+        fromMonth.SelectedIndexChanged+=(_,_)=>{
+            if(monthly&&billId is null&&fromMonth.SelectedIndex>=0) UpdateThroughMonths(ThroughMonth);
+        };
+        throughMonth.SelectedIndexChanged+=(_,_)=>{
+            if(throughMonth.SelectedIndex>=0) InvalidateReview();
+        };
         paidReduction.SelectedIndexChanged+=(_,_)=>InvalidateReview(keepPaidDecision:true);
         review.Click+=async(_,_)=>await ReviewAsync(); save.Click+=async(_,_)=>await SaveAsync(); check.Click+=async(_,_)=>await CheckOutcomeAsync();
         editChoices.Click+=(_,_)=>InvalidateReview();
@@ -140,20 +152,41 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         ReadPending(); State();
     }
     private static DateTime First(DateTime value)=>new(value.Year,value.Month,1);
-    // Owner decision — 31 October 2026 (Docs/Decisions/FEE_MANAGEMENT_SHARED_RULES.md):
-    // Admissions and Collection share all fee rules, fields, scopes and one-screen confirmation.
-    // Collection alone opens a fixed action from its own menu, hiding the admission action tabs,
-    // and resets BOTH From and Through to its starting month (clicked charge, or current month,
-    // clamped to the valid fee period). Admissions retains its normal through-month default.
-    internal void ConfigureCollectionAction(int choice,DateTime? chargeMonth=null)
+    private DateTime ClampMonth(DateTime month)=>month<firstPeriodMonth?firstPeriodMonth:month>lastPeriodMonth?lastPeriodMonth:month;
+    private static void SetMonths(ModernComboBox dropdown,DateTime first,DateTime last,DateTime selected)
+    {
+        dropdown.Items.Clear();
+        for(DateTime month=first;;month=month.AddMonths(1))
+        {
+            dropdown.Items.Add(month);
+            if(month==last) break;
+        }
+        dropdown.SelectedItem=selected<first?first:selected;
+    }
+    private void UpdateThroughMonths(DateTime selected)
+    {
+        DateTime first=FromMonth;
+        // Collection can use its opening month alone. The final month also stands on its own.
+        if(first<lastPeriodMonth && !(collectionAction is not null && fromMonth.SelectedIndex==0))
+            first=first.AddMonths(1);
+        SetMonths(throughMonth,first,lastPeriodMonth,selected);
+    }
+    internal void ConfigureCollectionAction(int choice,DateTime? oneTimeChargeMonth=null)
     {
         if(choice is <0 or >3 || billId is not null)
             throw new ArgumentException("Choose a fee-plan action.",nameof(choice));
         collectionAction=choice;
         action.SelectedIndex=choice;
-        DateTime selected=First(chargeMonth??DateTime.Today);
-        selected=selected<fromMonth.MinDate?fromMonth.MinDate:selected>fromMonth.MaxDate?fromMonth.MaxDate:selected;
-        fromMonth.Value=throughMonth.Value=selected;
+        if(validContext)
+        {
+            if(monthly) UpdateThroughMonths(FromMonth);
+            else
+            {
+                DateTime selected=ClampMonth(First(oneTimeChargeMonth??DateTime.Today));
+                SetMonths(fromMonth,selected,selected,selected);
+                SetMonths(throughMonth,selected,selected,selected);
+            }
+        }
         Text=$"{action.Items[choice]} — {feeName}";
         initial=Draft();State();
     }
@@ -184,7 +217,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         initial=Draft();State();
     }
     private string Draft()=>string.Join("|",action.SelectedIndex,scope.SelectedIndex,amount.Text,concession.Text,
-        First(fromMonth.Value),First(throughMonth.Value),paidReduction.Text,reason.Text,newRate.Text);
+        FromMonth,ThroughMonth,paidReduction.Text,reason.Text,newRate.Text);
     private void ConfigureConcession()
     {
         string previous=Convert.ToString(concession.SelectedItem)??"";
@@ -247,13 +280,13 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         }
         if(RateAction&&!originalWaiver&&originalDiscount>rate)
         {impact.Text=$"The new fee is below the existing Rs. {originalDiscount:N0} discount. Review or remove that discount first.";return false;}
-        if(First(fromMonth.Value)>First(throughMonth.Value)){impact.Text="The through month must be on or after the from month.";return false;}
+        if(FromMonth>ThroughMonth){impact.Text="The through month must be on or after the from month.";return false;}
         return true;
     }
     private SqlParameter[] Args(bool preview)=>new[]{
         DatabaseHelper.Int("@StudentFeeAssignmentId",assignment),DatabaseHelper.P("@DiscountAmount",ChosenDiscount),
         DatabaseHelper.P("@ConcessionLabel",ChosenLabel),
-        DatabaseHelper.Date("@EffectiveFrom",First(fromMonth.Value)),DatabaseHelper.Date("@EffectiveThrough",First(throughMonth.Value)),
+        DatabaseHelper.Date("@EffectiveFrom",FromMonth),DatabaseHelper.Date("@EffectiveThrough",ThroughMonth),
         DatabaseHelper.P("@NewAmount",RateAction?ParseWholeAmount(newRate.Text):null),
         DatabaseHelper.Bit("@ApplyAvailableCredit",false),DatabaseHelper.Bit("@UpdateAgreement",UpdateAgreement),DatabaseHelper.P("@BillingChargeId",billId),DatabaseHelper.Bit("@FullFeeWaiver",FullWaiver),
         DatabaseHelper.Bit("@ApplyToBills",ApplyBills),DatabaseHelper.P("@PaidReductionAction",RateAction&&paidReduction.SelectedIndex==1?"Refund":"Credit"),
@@ -307,7 +340,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     {
         var row=result.Tables[0].Rows[0];
         string summary=fixedBillAction is not null
-            ?$"{(RemoveAction?"Review Discount Removal":"Review Discount")}\r\n{feeName} · {fromMonth.Value:MMM yyyy}. This bill only."
+            ?$"{(RemoveAction?"Review Discount Removal":"Review Discount")}\r\n{feeName} · {FromMonth:MMM yyyy}. This bill only."
             :$"{action.Text}: {feeName}. {ScopeText()}";
         if(ApplyBills && result.Tables[1].Rows.Count>0 && result.Tables[1].Columns.Contains("Current Bill") && result.Tables[1].Columns.Contains("Proposed Bill"))
         {
@@ -325,7 +358,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         else if(RemoveAction) summary+=fixedBillAction is not null?" The bill discount is removed. Earlier payments remain recorded.":" The discount or full waiver is removed.";
         else summary+=$" Full fee: Rs. {standardAmount:N0} → Rs. {ParseWholeAmount(newRate.Text):N0}. " +
             (originalWaiver?"The existing full waiver is retained.":$"Existing discount retained: Rs. {originalDiscount:N0}.");
-        if(monthly&&billId is null) summary+=$"\r\nPeriod: {fromMonth.Value:MMM yyyy} through {throughMonth.Value:MMM yyyy}.";
+        if(monthly&&billId is null) summary+=$"\r\nPeriod: {FromMonth:MMM yyyy} through {ThroughMonth:MMM yyyy}.";
         if(releasedPayment>0) summary+=$"\r\nExcess already paid: Rs. {releasedPayment:N0}, {(paidReduction.SelectedIndex==1?"to refund":"to keep as advance credit")}.";
         return summary+"\r\nNo payment is collected here.";
     }
@@ -389,7 +422,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         int actor=CurrentUser.UserId;string scope=await RecoverableMutationWriter.GetScopeAsync();
         if(IsDisposed||CurrentUser.UserId!=actor)throw new InvalidOperationException("The operator or window changed before submission. Review again.");
         using var journal=MutationRecoveryJournal.Begin(MutationKind.FeeConcession,actor,scope,
-            RecoverableMutationWriter.PayloadHash(MutationKind.FeeConcession,actor,args),$"Fee change for assignment {assignment}, {First(fromMonth.Value):MMM yyyy}–{First(throughMonth.Value):MMM yyyy}");
+            RecoverableMutationWriter.PayloadHash(MutationKind.FeeConcession,actor,args),$"Fee change for assignment {assignment}, {FromMonth:MMM yyyy}–{ThroughMonth:MMM yyyy}");
         pending=journal.Intent;blocked=true;
         return await RecoverableMutationWriter.SaveAsync(journal.Intent,args);
     }

@@ -107,11 +107,13 @@ placement's bill never reopens it or rewrites its historical agreement.
 
 ### BD-11
 
-Shared fee editor (31 Oct): Admissions and Collection use the same rules,
+Shared fee editor (updated 6 Nov): Admissions and Collection use the same rules,
 options, factory, permissions, snapshots and save recovery. Admissions has action
-tabs; Collection preselects its fixed action. Collection deliberately defaults
-both From/Through to the clicked/start month; Admissions keeps its normal range.
-Do not make their defaults identical as a cosmetic consistency change.
+tabs and defaults monthly changes from the current month through the end of the
+academic year. Collection preselects its fixed action and defaults both months
+to the current month. Month dropdowns respect the fee's effective period. Through
+starts one month after From, with single-month choices for Collection's opening
+month and the last available month.
 
 ### BD-12
 

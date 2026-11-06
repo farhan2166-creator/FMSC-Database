@@ -162,7 +162,7 @@ public sealed partial class ChangeFeeDiscountForm
         fixedScope.Visible=HasAction&&scope.Items.Count==1&&fixedBillAction is null;
         fixedScope.Text=$"Apply to: {scope.Text}";
         scopeNote.Visible=HasAction;
-        scopeNote.Text=fixedBillAction is not null?$"This bill only · {fromMonth.Value:MMM yyyy}. Fee plan unchanged.":ScopeText();
+        scopeNote.Text=fixedBillAction is not null?$"This bill only · {FromMonth:MMM yyyy}. Fee plan unchanged.":ScopeText();
         amountField.Visible=DiscountAction;rateField.Visible=RateAction;
         concessionField.Visible=fixedBillAction is null&&(DiscountAction||WaiverAction);
         fields.SetColumnSpan(amountField,fixedBillAction is not null?2:1);
@@ -181,7 +181,7 @@ public sealed partial class ChangeFeeDiscountForm
         bool choosePeriod=HasAction&&monthly&&billId is null;
         fromField.Visible=throughField.Visible=choosePeriod;
         periodNote.Visible=HasAction&&!choosePeriod&&fixedBillAction is null;
-        periodNote.Text=billId is not null?$"Bill period: {fromMonth.Value:MMMM yyyy}.":$"Fee period: {fromMonth.Value:MMM yyyy} through {throughMonth.Value:MMM yyyy}.";
+        periodNote.Text=billId is not null?$"Bill period: {FromMonth:MMMM yyyy}.":$"Fee period: {FromMonth:MMM yyyy} through {ThroughMonth:MMM yyyy}.";
         reasonField.Visible=HasAction;
         paidField.Visible=RateAction&&ApplyBills;
         comparisons.Visible=false;

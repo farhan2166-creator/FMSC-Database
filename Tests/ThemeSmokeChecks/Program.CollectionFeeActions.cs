@@ -23,6 +23,7 @@ internal static partial class Program
             context.Columns.Add("StudentFeeAssignmentId",typeof(int));context.Columns.Add("BillingChargeId",typeof(long));
             context.Columns.Add("Balance",typeof(decimal));
             int year=DateTime.Today.Year;var month=new DateTime(year,3,1);
+            var current=new DateTime(year,DateTime.Today.Month,1);
             var row=context.Rows.Add("Monthly","Active",DBNull.Value,"Preview Student","542","Preview year",new DateTime(year,1,1),new DateTime(year,12,31),new DateTime(year,1,1),month,41,321L,300m);
             using(var routed=context.Copy())
             {
@@ -42,10 +43,10 @@ internal static partial class Program
                     Check(!Field<Panel>(form,"actionField").Visible&&!Field<TabControl>(form,"comparisons").Visible,
                         "A collection menu action hides only the action tabs, with no review screen");
                 }
-                var clickedMonth=month.AddMonths(1);
+                var clickedMonth=current.Month==1?current.AddMonths(1):current.AddMonths(-1);
                 using var correction=(ChangeFeeDiscountForm)create.Invoke(null,new object?[]{41,planRoute.Rows[0],Enum.ToObject(choiceType,2),clickedMonth})!;
-                Check(Field<ModernDatePicker>(correction,"fromMonth").Value==clickedMonth&&Field<ModernDatePicker>(correction,"throughMonth").Value==clickedMonth,
-                    "The owner-approved collection default resets both months to the clicked charge month");
+                Check(Equals(Field<ModernComboBox>(correction,"fromMonth").SelectedItem,current)&&Equals(Field<ModernComboBox>(correction,"throughMonth").SelectedItem,current),
+                    "Monthly collection actions start in the current month even when opened from a charge for a different month");
             }
             using(var plan=context.Copy())
             {
@@ -57,14 +58,13 @@ internal static partial class Program
                     form.ConfigureCollectionAction(choice);form.Show();Application.DoEvents();
                     Check(!Field<Panel>(form,"actionField").Visible,"Collection action dialogs hide the four action tabs");
                     Check(Field<ModernComboBox>(form,"action").SelectedIndex==choice,"Each collection dialog selects its menu action");
-                    var current=new DateTime(DateTime.Today.Year,DateTime.Today.Month,1);
-                    Check(Field<ModernDatePicker>(form,"fromMonth").Value==current&&Field<ModernDatePicker>(form,"throughMonth").Value==current,
+                    Check(Equals(Field<ModernComboBox>(form,"fromMonth").SelectedItem,current)&&Equals(Field<ModernComboBox>(form,"throughMonth").SelectedItem,current),
                         "The owner-approved collection default resets both months to the starting month");
                     Check(Field<ModernComboBox>(form,"scope").Items.Count==3,"Collection retains the shared fee-plan and existing-bill scopes");
                 }
                 using var admission=new ChangeFeeDiscountForm(41,"Tuition Fee",700m,0m,plan.Rows[0],
                     _=>Task.FromResult(new DataSet()),_=>throw new InvalidOperationException("Unexpected write"));
-                Check(Field<ModernDatePicker>(admission,"throughMonth").Value==new DateTime(year,12,1),"Admission retains the academic-year end default");
+                Check(Equals(Field<ModernComboBox>(admission,"throughMonth").SelectedItem,new DateTime(year,12,1)),"Admission retains the academic-year end default");
                 using var future=plan.Copy();
                 foreach(string name in new[]{"EffectiveFrom","EffectiveTo","BillingStartDate"})future.Columns.Add(name,typeof(DateTime));
                 var firstBillingMonth=new DateTime(DateTime.Today.Year,DateTime.Today.Month,1).AddMonths(1);
@@ -77,10 +77,15 @@ internal static partial class Program
                 futureCorrection.ConfigureCollectionAction(2);
                 foreach(string name in new[]{"fromMonth","throughMonth"})
                 {
-                    var picker=Field<ModernDatePicker>(futureCorrection,name);
-                    Check(picker.Value==firstBillingMonth&&picker.MinDate==firstBillingMonth&&picker.MaxDate==firstBillingMonth.AddMonths(2),
+                    var picker=Field<ModernComboBox>(futureCorrection,name);
+                    Check(Equals(picker.SelectedItem,firstBillingMonth)&&picker.Items.Cast<DateTime>().SequenceEqual(Enumerable.Range(0,3).Select(firstBillingMonth.AddMonths)),
                         "A future-start fee defaults to its first billing month and limits corrections to its effective period");
                 }
+                var from=Field<ModernComboBox>(futureCorrection,"fromMonth");
+                var through=Field<ModernComboBox>(futureCorrection,"throughMonth");
+                from.SelectedItem=firstBillingMonth.AddMonths(1);
+                Check(through.Items.Cast<DateTime>().SequenceEqual(new[]{firstBillingMonth.AddMonths(2)})&&Equals(through.SelectedItem,firstBillingMonth.AddMonths(2)),
+                    "Moving Collection's From month forward starts Through choices one month later");
             }
             SqlParameter[]? captured=null;int reads=0,writes=0;bool stale=false;
             Task<DataSet> Review(SqlParameter[] args)
@@ -115,7 +120,7 @@ internal static partial class Program
                 form.ConfigureCollectionBill();Show(form);
                 Check(Field<ModernButton[]>(form,"taskButtons").All(button=>!button.Visible&&!button.Enabled),"A collection discount has no action-switching buttons");
                 Check(!Field<ModernComboBox>(form,"scope").Visible&&!Field<ModernComboBox>(form,"concession").Visible
-                    &&!Field<ModernTextBox>(form,"newRate").Visible&&!Field<ModernDatePicker>(form,"fromMonth").Visible,
+                    &&!Field<ModernTextBox>(form,"newRate").Visible&&!Field<ModernComboBox>(form,"fromMonth").Visible,
                     "The focused bill has no fee-plan, type, rate, waiver or date choices");
                 Check(Field<ModernButton>(form,"save").Visible&&!Field<ModernButton>(form,"review").Visible
                     &&!Field<ModernButton>(form,"editChoices").Visible&&!Field<TabControl>(form,"comparisons").Visible,

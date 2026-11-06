@@ -15,7 +15,10 @@ internal static partial class Program
             CurrentUser.SignIn(7781,"Concession fixture","Administrator",false,Array.Empty<string>());
             var context=new DataTable();context.Columns.Add("Frequency");context.Columns.Add("ConcessionLabel");
             foreach(string column in new[]{"StartDate","EndDate","EnrollmentDate"})context.Columns.Add(column,typeof(DateTime));
-            int year=DateTime.Today.Year;context.Rows.Add("Monthly","Scholarship",new DateTime(year,1,1),new DateTime(year,12,31),new DateTime(year,1,1));
+            int year=DateTime.Today.Year;
+            var current=new DateTime(year,DateTime.Today.Month,1);
+            var start=current.AddMonths(1);var end=current.AddMonths(2);
+            context.Rows.Add("Monthly","Scholarship",current.AddMonths(-7),current.AddMonths(5).AddDays(-1),current.AddMonths(-7));
             var replies=new Queue<TaskCompletionSource<DataSet>>();var queries=new List<Microsoft.Data.SqlClient.SqlParameter[]>();
             Task<DataSet> Query(Microsoft.Data.SqlClient.SqlParameter[] args){queries.Add(args);var reply=new TaskCompletionSource<DataSet>();replies.Enqueue(reply);return reply.Task;}
             var writes=new Queue<TaskCompletionSource<MutationWriteResult>>();int submissions=0;
@@ -46,19 +49,19 @@ internal static partial class Program
             labels.SelectedItem="None";
             Check(PreviewArgs().Single(p=>p.ParameterName=="@ConcessionLabel").Value is DBNull,
                 "An operator can explicitly remove the legacy scholarship classification");
-            Field<ModernDatePicker>("throughMonth").Value=new DateTime(year,11,1);
+            Field<ModernComboBox>("throughMonth").SelectedItem=end;
             Check(Convert.ToString(labels.SelectedItem)=="None","Changing dates does not undo an explicit label removal");
             labels.SelectedItem="Scholarship";Field<ModernTextBox>("amount").Text="1000";
-            var from=Field<ModernDatePicker>("fromMonth");var through=Field<ModernDatePicker>("throughMonth");
+            var from=Field<ModernComboBox>("fromMonth");var through=Field<ModernComboBox>("throughMonth");
             Check(from.Enabled&&through.Enabled,"The operator can choose concession start and end months");
-            from.Value=new DateTime(year,5,1);through.Value=new DateTime(year,6,1);Field<ModernTextBox>("reason").Text="Approved temporary scholarship";
+            from.SelectedItem=start;through.SelectedItem=end;Field<ModernTextBox>("reason").Text="Approved temporary scholarship";
             Click(Field<ModernButton>("save"));
             Check(queries.Count==1&&RefusesClose(),"Concession review locks its inputs and keeps its modal owner until the result is known");
             Check((string)queries[0].Single(p=>p.ParameterName=="@ConcessionLabel").Value=="Scholarship",
                 "The actual SQL review retains the partial scholarship classification");
-            Check((DateTime)queries[0].Single(p=>p.ParameterName=="@EffectiveFrom").Value==new DateTime(year,5,1)&&
-                (DateTime)queries[0].Single(p=>p.ParameterName=="@EffectiveThrough").Value==new DateTime(year,6,1),"The chosen period reaches the SQL review unchanged");
-            through.Value=new DateTime(year,7,1);replies.Dequeue().SetResult(Plan());
+            Check((DateTime)queries[0].Single(p=>p.ParameterName=="@EffectiveFrom").Value==start&&
+                (DateTime)queries[0].Single(p=>p.ParameterName=="@EffectiveThrough").Value==end,"The chosen period reaches the SQL review unchanged");
+            through.SelectedItem=end.AddMonths(1);replies.Dequeue().SetResult(Plan());
             PumpUntil(()=>Field<ModernButton>("save").Enabled,"Stale concession check settles");
             Check(submissions==0,"Changing the period invalidates an in-flight financial check before any write");
             Check(!Field<ModernComboBox>("paidReduction").Visible,"Concessions preserve paid money without offering a credit/refund choice");
