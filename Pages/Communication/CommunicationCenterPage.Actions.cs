@@ -92,6 +92,23 @@ public sealed partial class CommunicationCenterPage
             return;
         }
         await store.TransitionAsync(requestId,"Submit",lifetime.Token);
+        var submitted=await store.CallAsync("CampaignSummary",lifetime.Token,SqlCommunicationStore.P("@Id",requestId));
+        string status=submitted.Rows.Count>0?Convert.ToString(submitted.Rows[0]["Status"])??"":"";
+        if(status=="AwaitingApproval")
+        {
+            await AfterSavedAsync(RefreshHistory,"Message request submitted for approval. Nothing has been sent yet.");
+            return;
+        }
+        if(status=="Scheduled")
+        {
+            await AfterSavedAsync(RefreshHistory,"Message is scheduled. Delivery requires a running, authorized dispatcher.");
+            return;
+        }
+        if(status!="Queued")
+        {
+            SetStatus("Message request saved, but it is not ready to send. Check its status in History.",PageStatusKind.Warning);
+            return;
+        }
         await DispatchCampaignAsync(requestId,Convert.ToInt32(saved["Recipients"]));
     }
 
