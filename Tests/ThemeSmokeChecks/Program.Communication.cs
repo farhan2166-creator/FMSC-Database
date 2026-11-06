@@ -26,7 +26,11 @@ internal static partial class Program
             T Field<T>(string name)=>(T)typeof(CommunicationCenterPage).GetField(name,flags)!.GetValue(page)!;
             using var parent=new Form{ClientSize=new Size(1000,620)};parent.Controls.Add(page);parent.Show();Application.DoEvents();
             Check(!page.IsBusy&&!page.HasUnsavedChanges,"An unopened communication draft starts clean and idle");
-            var tabs=Field<TabControl>("tabs");Check(tabs.TabPages.Count==6&&!tabs.Enabled,"All communication workspaces remain disabled until the schema contract is verified");
+            var tabs=Field<TabControl>("tabs");
+            Check(tabs.TabPages.Count==2&&!tabs.Enabled,"Only Send Message and History are shown by default, pending schema verification");
+            Check(!Field<Control>("schedule").Visible && !Field<Control>("prepare").Visible,"Scheduling and drafts are hidden in the simple view");
+            Descendants(page).OfType<ModernButton>().Single(button=>button.Text=="Advanced Settings").PerformClick();
+            Check(tabs.TabPages.Count==6,"Advanced settings restores the administration and automation tabs");
             Field<ModernTextBox>("announcement").Text="Fictional school notice";
             Check(page.HasUnsavedChanges,"A substantive unsaved message gets the existing navigation guard");
             var dispatcher=(Task?)typeof(CommunicationCenterPage).GetField("dispatchTask",flags)!.GetValue(page);
@@ -50,7 +54,7 @@ internal static partial class Program
             tabs.Enabled=true;
             var tabButtons=Descendants(tabs.Parent!.Parent!).OfType<ModernButton>().Where(b=>b.ThemeRole is "TabActive" or "TabInactive").ToArray();
             Check(tabButtons.Length==6,"Communication uses one shared navigation button per tab");
-            var first=tabButtons.Single(b=>b.Text=="Compose / Bulk");
+            var first=tabButtons.Single(b=>b.Text=="Send Message");
             foreach(var selectedTheme in AppTheme.SelectableThemes)
             {
                 AppTheme.SetTheme(selectedTheme);Application.DoEvents();

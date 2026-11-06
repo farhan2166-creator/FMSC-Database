@@ -36,6 +36,7 @@ internal static partial class Program
             string Status()=>((Label)typeof(V2Page).GetField("StatusLabel",flags)!.GetValue(page)!).Text;
             using var parent=new Form{ClientSize=new Size(1100,720)};parent.Controls.Add(page);parent.Show();Application.DoEvents();
             var tabs=Field<TabControl>("tabs");typeof(CommunicationCenterPage).GetField("installed",flags)!.SetValue(page,true);tabs.Enabled=true;
+            Descendants(page).OfType<ModernButton>().Single(button=>button.Text=="Advanced Settings").PerformClick();
             for(int index=1;index<6;index++)
             {
                 tabs.SelectedIndex=index;PumpUntil(()=>!page.IsBusy,"Tab data load settles");
@@ -90,9 +91,8 @@ internal static partial class Program
             using var restricted=new CommunicationCenterPage(store,false);
             var restrictedTabs=(TabControl)typeof(CommunicationCenterPage).GetField("tabs",flags)!.GetValue(restricted)!;
             Check(restrictedTabs.SelectedIndex==1,"A view-only operator starts in the outbox rather than an unavailable compose workflow");
-            restrictedTabs.SelectedIndex=2;
-            typeof(CommunicationCenterPage).GetMethod("ShowTabGuidance",flags)!.Invoke(restricted,null);
-            Check(((string)typeof(V2Page).GetField("_headerGuidance",flags)!.GetValue(restricted)!).Contains("requires Communication.Configure"),"Restricted operators get permission-aware guidance rather than unexplained empty administration tabs");
+            Check(restrictedTabs.TabPages.Count==2 && restrictedTabs.SelectedTab?.Text=="History",
+                "A view-only operator sees History without administration tabs in the simple view");
         }
         finally{CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Item5);}
     }

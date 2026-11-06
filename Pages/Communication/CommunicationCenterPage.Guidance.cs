@@ -38,8 +38,8 @@ public sealed partial class CommunicationCenterPage
     {
         SetPageHeaderText("Communication Center",tabs.SelectedTab?.Text??"");
         string text=tabs.SelectedIndex switch {
-            0=>CurrentUser.HasPermission("Communication.Compose")?"Choose a channel, reviewed template and saved contacts. Preview, then Create Draft. Drafts send nothing; submit from Outbox.":"View records in Outbox / Schedule / History. Composing requires Communication.Compose.",
-            1=>"Submit drafts, approve when required, then run the dispatcher. Provider acceptance is not proof of delivery.",
+            0=>CurrentUser.HasPermission("Communication.Compose")?"Choose who to message, pick a template, then preview and send.":"View previous messages in History.",
+            1=>"Check what happened to each message. Open Advanced Settings for approvals, drafts, and dispatcher controls.",
             2=>CurrentUser.HasPermission("Communication.Configure")?"Verify number ownership and record channel/purpose consent. Saving a contact sends nothing.":"Contact and consent administration requires Communication.Configure. Ask an authorized administrator to add or update a contact.",
             3=>"Review text, language and recipient context. New Version / Review saves an immutable version; approve before composing. WhatsApp requires an approved provider mapping.",
             4=>CurrentUser.HasPermission("Communication.Configure")?"Rules apply to future events and require contacts, consent and reviewed templates. Evaluation prepares eligible campaigns; approval and dispatcher controls still apply.":"Automation configuration requires Communication.Configure. Ask an authorized administrator to review the rules.",

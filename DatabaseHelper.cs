@@ -7,7 +7,7 @@ public static class DatabaseHelper
     public const string LocalDbInstance = @"(localdb)\MSSQLLocalDB";
     private const string DatabaseName = "FMSC_DB";
     // Version and required schema features are checked together by DatabaseCompatibility.
-    public const string RequiredDatabaseSchemaVersion = "3";
+    public const string RequiredDatabaseSchemaVersion = "5";
 #if !FMSC_LEVEL2
     private static volatile bool _databaseAttachConfirmed;
     private static readonly object DatabaseAttachSync = new();
@@ -559,13 +559,49 @@ FOR ATTACH;";
         return table;
     }
 
+    internal static Task<DataSet> SaveAdmissionWithGuardianAsync(string procedure, SqlParameter[] parameters,
+        int admissionId, string email, string phone, bool consent)
+    {
+        int actor = CurrentUser.UserId;
+        return QueryUserSetCoreAsync(procedure, 120, CancellationToken.None, WithCurrentUser(parameters),
+            saveGuardian: async (connection, transaction, result, token) =>
+            {
+                int id = admissionId;
+                if (id <= 0)
+                {
+                    var table = result.Tables.Cast<DataTable>().FirstOrDefault(item => item.Columns.Contains("AdmissionId"));
+                    if (table?.Rows.Count != 1 || table.Rows[0]["AdmissionId"] is not int savedId || savedId <= 0)
+                        throw new InvalidOperationException("The saved admission could not be identified.");
+                    id = savedId;
+                }
+
+                using var preference = new SqlCommand("""
+                    UPDATE dbo.StudentGuardianCommunication WITH (UPDLOCK, HOLDLOCK)
+                    SET Email=@Email, Phone=@Phone, WhatsAppConsent=@Consent,
+                        RecordedUtc=SYSUTCDATETIME(), RecordedBy=@UserId
+                    WHERE AdmissionId=@Id AND EXISTS (
+                        SELECT @Email,@Phone,@Consent EXCEPT SELECT Email,Phone,WhatsAppConsent
+                    );
+                    IF NOT EXISTS (SELECT 1 FROM dbo.StudentGuardianCommunication WITH (UPDLOCK,HOLDLOCK) WHERE AdmissionId=@Id)
+                        INSERT dbo.StudentGuardianCommunication (AdmissionId, Email, Phone, WhatsAppConsent, RecordedUtc, RecordedBy)
+                        VALUES (@Id,@Email,@Phone,@Consent,SYSUTCDATETIME(),@UserId);
+                    """, connection, transaction);
+                preference.Parameters.AddRange([Int("@Id", id), P("@Email", email.Length == 0 ? null : email),
+                    P("@Phone", phone.Length == 0 ? null : phone), Bit("@Consent", consent), Int("@UserId", actor)]);
+                await preference.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            });
+    }
+
     private static async Task<DataSet> QueryUserSetCoreAsync(string procedure, int timeout, CancellationToken token,
-        SqlParameter[] parameters, bool singleResult = false)
+        SqlParameter[] parameters, bool singleResult = false,
+        Func<SqlConnection,SqlTransaction,DataSet,CancellationToken,Task>? saveGuardian = null)
     {
         token.ThrowIfCancellationRequested();
         using var cn = GetConnection();
         using var cmd = CreateUserCommand(procedure, timeout, parameters, cn);
         await OpenConnectionAsync(cn, token).ConfigureAwait(false);
+        using var transaction = saveGuardian is null ? null : (SqlTransaction)await cn.BeginTransactionAsync(token).ConfigureAwait(false);
+        cmd.Transaction = transaction;
         var result = new DataSet();
         using (var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false))
         {
@@ -582,6 +618,11 @@ FOR ATTACH;";
                     result.Tables.Count == 0 ? "Table" : $"Table{result.Tables.Count}", token).ConfigureAwait(false);
                 result.Tables.Add(table);
             } while (await reader.NextResultAsync(token).ConfigureAwait(false));
+        }
+        if (saveGuardian is not null)
+        {
+            await saveGuardian(cn, transaction!, result, token).ConfigureAwait(false);
+            await transaction!.CommitAsync(token).ConfigureAwait(false);
         }
         Core.LookupDataCache.OperationCompleted(procedure);
         // Close the reader before issuing the admission-number lookup on this connection.

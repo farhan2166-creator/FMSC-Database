@@ -8,6 +8,75 @@ namespace FMSC_SMS.Pages.Communication;
 
 public sealed partial class CommunicationCenterPage
 {
+    private async Task TrySampleAsync()
+    {
+        const string body="School notice: Classes finish at noon tomorrow.";
+        if(!ModernMessageDialog.Confirm(FindForm(),$"To: Sample parent\n\n{body}\n\nSend this practice message?","Sample WhatsApp Preview"))
+            return;
+        var message=new MessageEnvelope(Guid.NewGuid(),Guid.Empty,MessageChannel.WhatsApp,"",body,"","en",[],1,true);
+        await new SimulationProvider(MessageChannel.WhatsApp).SubmitAsync(message,lifetime.Token);
+        SetStatus("Practice complete. No phone was contacted and nothing was added to History.");
+    }
+
+    private async Task SendReviewedAsync(DataTable reviewed)
+    {
+        var operationalSettings=await ReadAsync("Operational");
+        var settings=operationalSettings.Rows[0];
+        if(Convert.ToString(settings["Mode"])=="Disabled" || Convert.ToBoolean(settings["Paused"]))
+        {
+            SetStatus("Sending is disabled or paused. Ask your administrator to check sending settings.",PageStatusKind.Warning);
+            return;
+        }
+        var eligible=reviewed.AsEnumerable().Where(row=>Convert.ToString(row["Exclusion"])=="").Select(row=>new
+        {
+            ContactId=row.Field<Guid>("ContactId"),
+            Destination=row.Field<string>("Destination"),
+            Body=row.Field<string>("Body"),
+            Parameters=row.Field<string>("Parameters"),
+            EstimatedCost=row.Field<decimal?>("EstimatedCost"),
+            Currency=row.Field<string>("Currency")
+        }).ToArray();
+        var snapshot=JsonSerializer.Serialize(eligible);
+        requestDue??=DateTime.UtcNow;
+        await store.CreateAsync(requestId,SelectedTemplate(),SelectedChannel(),eligible.Select(row=>row.ContactId),announcement.Text,
+            requestDue.Value,token:lifetime.Token,reviewed:snapshot);
+        savedSignature=Signature();
+        sendNow.Enabled=false;
+        prepare.Enabled=false;
+
+        var summary=await store.CallAsync("CampaignSummary",lifetime.Token,SqlCommunicationStore.P("@Id",requestId));
+        var row=summary.Rows[0];
+        int count=Convert.ToInt32(row["Recipients"]);
+        bool simulation=Convert.ToInt32(row["Simulation"])==1;
+        if(!simulation && Convert.ToInt32(row["UnknownCosts"])>0)
+        {
+            SetStatus("Draft saved. Ask your administrator to configure WhatsApp pricing before sending.",PageStatusKind.Warning);
+            return;
+        }
+        string cost=simulation?"Simulation. No messages go to WhatsApp.":$"Estimated provider cost: {row["EstimatedCost"]} {row["Currency"]}.";
+        if(!ModernMessageDialog.Confirm(FindForm(),$"Send {count} reviewed WhatsApp message(s)? {included.Count-count} selected contacts will be skipped. {cost}","Confirm WhatsApp Send"))
+        {
+            SetStatus("Draft saved in History. No send was requested.");
+            return;
+        }
+        await store.TransitionAsync(requestId,"Submit",lifetime.Token);
+        await DispatchCampaignAsync(requestId,count);
+    }
+
+    private async Task DispatchCampaignAsync(Guid campaign,int count)
+    {
+        int attempted=0;
+        while(attempted<count && await dispatcher.DispatchOneAsync(lifetime.Token,campaign))
+        {
+            attempted++;
+            if(attempted<count)await Task.Delay(TimeSpan.FromSeconds(1),lifetime.Token);
+        }
+        string result=attempted==count
+            ? "Submission results recorded. Open History to see the outcome for each recipient."
+            : $"Processed {attempted} of {count} messages in this send. Check History for approval, limits, or remaining messages.";
+        await AfterSavedAsync(RefreshHistory,result);
+    }
+
     private static DataRow? Selected(DataGridView grid)=>(grid.CurrentRow?.DataBoundItem as DataRowView)?.Row;
     private Control BuildHistory()
     {
@@ -20,15 +89,24 @@ public sealed partial class CommunicationCenterPage
             var s=summary.Rows[0];string context=$"Campaign {id} · {s["Channel"]} · {s["Recipients"]} recipients · template {s["Code"]} {s["Language"]} v{s["Version"]}. "
                 +(Convert.ToInt32(s["Simulation"])==1?"SIMULATION — no external delivery. ":"LIVE provider submission may incur charges. ")
                 +(s.IsNull("EstimatedCost")?"Estimated cost unavailable. ":$"Estimated {s["EstimatedCost"]} {s["Currency"]}. ");
+            if(action=="Send Now")
+            {
+                if(Convert.ToString(s["Status"])!="Queued" || Convert.ToString(s["Channel"])!="WhatsApp")
+                    throw new ArgumentException("Choose a queued WhatsApp campaign. Submit a draft or obtain approval first.");
+                if(ModernMessageDialog.Confirm(FindForm(),context+"Process eligible pending messages in this campaign now?","Confirm WhatsApp Send"))
+                    await DispatchCampaignAsync(id,Convert.ToInt32(s["Recipients"]));
+                return;
+            }
             if(!ModernMessageDialog.Confirm(FindForm(),context+(action=="Submit"?"Submit this entire campaign? Eligible messages may incur provider charges when a dispatcher runs. Large or automated campaigns require approval.":action+" this campaign? Only unsent work can be paused or cancelled."),"Communication Campaign"))return;
             await store.TransitionAsync(id,action,lifetime.Token);
             await AfterSavedAsync(RefreshHistory,action switch {"Submit"=>"Campaign submitted. Review its current state: approval, schedule, mode, master pause and dispatcher availability still govern sending. No delivery is implied.","Approve"=>"Campaign approval recorded. Review the schedule and dispatcher before sending.","Pause"=>"Campaign paused. Already submitted provider messages cannot be recalled.","Resume"=>"Campaign resumed. Eligible unsent work will follow its schedule and sending safeguards.",_=>"Campaign cancelled for unsent work. Already submitted provider messages and history are preserved."});
         }
         historySearch.PlaceholderText="Student, contact, campaign or error";historySearch.Width=220;
         historyState.Items.Add("All states");historyState.Items.AddRange(Enum.GetNames<DeliveryState>());historyState.SelectedIndex=0;
-        return ListHost(history,Bar([historySearch,historyState,Button("Search",async()=>{historyPage=0;await RefreshHistory();}),
+        var toolbar=Bar([historySearch,historyState,Button("Search",async()=>{historyPage=0;await RefreshHistory();}),
             Button("Refresh",RefreshHistory),..Paging(history,()=>historyPage,value=>historyPage=value,RefreshHistory),
             Button("Submit",()=>Transition("Submit"),"Communication.Send","Primary",history),Button("Approve",()=>Transition("Approve"),"Communication.Approve",selectedGrid:history),
+            Button("Send Pending Now",()=>Transition("Send Now"),"Communication.Send",selectedGrid:history),
             Button("Pause",()=>Transition("Pause"),"Communication.Compose",selectedGrid:history),Button("Resume",()=>Transition("Resume"),"Communication.Send",selectedGrid:history),Button("Cancel Campaign",()=>Transition("Cancel"),"Communication.Compose",selectedGrid:history),
             Button("Details",async()=>{
                 var row=Selected(history)??throw new ArgumentException("Select a message first.");
@@ -48,7 +126,11 @@ public sealed partial class CommunicationCenterPage
                 var status=await gateways.Provider(MessageChannel.Sms,Http).QueryAsync(Convert.ToString(row["ProviderReference"])!,lifetime.Token);
                 await store.CallAsync("StatusUpdate",lifetime.Token,SqlCommunicationStore.P("@Id",row["MessageId"]),SqlCommunicationStore.P("@Provider","Twilio"),SqlCommunicationStore.P("@Reference",status.Reference),SqlCommunicationStore.P("@State",status.State.ToString()));await AfterSavedAsync(RefreshHistory,"Provider status checked: "+status.State+". Accepted is not proof of delivery.");
             },"Communication.Configure",selectedGrid:history),
-            Button("Start Dispatcher",StartDispatcher,"Communication.Send"),Button("Stop Dispatcher",()=>{if(dispatchTask is not {IsCompleted:false}){SetStatus("Dispatcher is already stopped. Queued messages remain stored.");return Task.CompletedTask;}dispatchStop?.Cancel();operational.Text="Stopping dispatcher. In-flight submissions are recorded before stopping.";SetStatus(operational.Text);return Task.CompletedTask;},"Communication.Send")]));
+            Button("Start Dispatcher",StartDispatcher,"Communication.Send"),Button("Stop Dispatcher",()=>{if(dispatchTask is not {IsCompleted:false}){SetStatus("Dispatcher is already stopped. Queued messages remain stored.");return Task.CompletedTask;}dispatchStop?.Cancel();operational.Text="Stopping dispatcher. In-flight submissions are recorded before stopping.";SetStatus(operational.Text);return Task.CompletedTask;},"Communication.Send")]);
+        advancedControls.AddRange(toolbar.Controls.Cast<Control>().Where(control=>control.Text is
+            "Submit" or "Approve" or "Pause" or "Resume" or "Cancel Campaign" or "Safe Retry"
+            or "Check Provider Status" or "Start Dispatcher" or "Stop Dispatcher"));
+        return ListHost(history,toolbar);
     }
     private Task StartDispatcher()
     {

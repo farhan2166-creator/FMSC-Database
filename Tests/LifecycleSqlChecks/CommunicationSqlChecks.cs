@@ -48,6 +48,36 @@ internal static class CommunicationSqlChecks
             await report.Refused("A restricted user cannot read communication history",()=>new SqlCommunicationStore(DatabaseHelper.GetConnection,f.Restricted).ReadAsync("History"),50001,50002,50003);
         });
         if(!installed)return;
+        await report.Stage("Communication: reviewed content and campaign-scoped sending",async()=>{
+            await Settings();
+            var due=new DateTime(2026,1,1);
+            var older=Guid.NewGuid();
+            var selected=Guid.NewGuid();
+            await store.CreateAsync(older,template,MessageChannel.Sms,[contact],"Older queued notice",due);
+            await store.TransitionAsync(older,"Submit");
+
+            var preview=await store.PreviewAsync(template,MessageChannel.Sms,[contact],"Reviewed notice");
+            var reviewed=JsonSerializer.Serialize(preview.AsEnumerable().Select(row=>new
+            {
+                ContactId=row.Field<Guid>("ContactId"),
+                Destination=row.Field<string>("Destination"),
+                Body=row.Field<string>("Body"),
+                Parameters=row.Field<string>("Parameters"),
+                EstimatedCost=row.Field<decimal?>("EstimatedCost"),
+                Currency=row.Field<string>("Currency")
+            }));
+            await report.Refused("Changed preview text cannot become a send snapshot",
+                ()=>store.CreateAsync(selected,template,MessageChannel.Sms,[contact],"Changed notice",due,reviewed:reviewed),51001);
+            await store.CreateAsync(selected,template,MessageChannel.Sms,[contact],"Reviewed notice",due,reviewed:reviewed);
+            await store.TransitionAsync(selected,"Submit");
+            Ready();
+            var claim=await store.ClaimAsync(default,selected) ?? throw new InvalidOperationException("Selected campaign did not produce a claim.");
+            report.Check(claim.Body.Contains("Reviewed notice") &&
+                Sql.Count("SELECT COUNT(*) FROM comm.Message WHERE CampaignId=@Id AND State='Queued'",Sql.P("@Id",older))==1,
+                "An explicit send claims the reviewed message and leaves unrelated queued work alone.");
+            await store.CompleteAsync(claim,"Fixture",new(DeliveryState.Accepted,Reference:"scoped-fixture"));
+            await store.TransitionAsync(older,"Cancel");
+        });
         await report.Stage("Communication: durable claims, unknown acknowledgement and restart",async()=>{
             await Settings();
             var id=Guid.NewGuid();await store.CreateAsync(id,template,MessageChannel.Sms,[contact],"Synthetic message",new DateTime(2026,1,1));

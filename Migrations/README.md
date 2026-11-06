@@ -9,7 +9,15 @@ entries.
 
 Application **1.0.2** requires schema **3**. Migration `3.sql` reserves
 legacy activation for active students and clears the legacy setup flag when
-a former student is successfully readmitted. Future migrations start at **4.sql**.
+a former student is successfully readmitted.
+
+Migration `4.sql` supports staff-initiated WhatsApp sends. It updates two
+procedures in the optional communication module when present and records
+schema **4**. It does not install the optional module or modify school records.
+
+Migration `5.sql` adds storage for the optional guardian email and WhatsApp
+choice on the admission form. Existing admissions start with no recorded
+choice.
 
 Disposable tests publish the complete schema-only baseline directly at version 1. Old development migrations are retired and must never be replayed on baseline 1. See [the baseline decision](../Docs/FIRST_RELEASE_BASELINE.md).
 

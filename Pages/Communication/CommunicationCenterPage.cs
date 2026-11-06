@@ -33,6 +33,9 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private readonly ModernDatePicker schedule=HumanUi.Date();
     private readonly Label selection=new(){Dock=DockStyle.Top,Height=30,Font=AppTheme.NormalFont,ForeColor=AppTheme.Text};
     private readonly ModernButton prepare=new(){Text="Create Draft",ThemeRole="Primary",Enabled=false};
+    private readonly ModernButton sendNow=new(){Text="Send Now",ThemeRole="Primary",Enabled=false};
+    private readonly Label sendHint=new(){AutoEllipsis=true,ForeColor=AppTheme.Text,Text="Preview the message before sending."};
+    private readonly List<Control> advancedControls=new();
     private int recipientPage,historyPage,contactPage,templatePage;
     private Guid requestId=Guid.NewGuid();private DateTime? requestDue;private string previewSignature="",savedSignature="";
     private bool populating;
@@ -86,7 +89,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     {var p=new Panel{Dock=DockStyle.Fill};p.Controls.Add(grid);p.Controls.Add(toolbar);return p;}
     private void BuildWorkspace()
     {
-        channel.Items.AddRange(["Sms","WhatsApp"]);channel.SelectedIndex=0;
+        channel.Items.AddRange(["Sms","WhatsApp"]);channel.SelectedIndex=1;
         recipientFilter.Items.AddRange(["Student / family / manual","Outstanding","Family","Staff","Manual","Pending"]);recipientFilter.SelectedIndex=CurrentUser.HasPermission("Students.View")?0:CurrentUser.HasPermission("Staff.View")?3:4;
         channel.Width=AppScale.Scale(120);recipientFilter.Width=AppScale.Scale(150);templateChoice.Width=AppScale.Scale(320);
         schedule.ShowCheckBox=true;schedule.Checked=false;schedule.Format=DateTimePickerFormat.Custom;schedule.CustomFormat="dd-MMM-yyyy HH:mm";
@@ -101,50 +104,112 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         messageFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,45));
         messageFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,35));
         messageFields.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-        messageFields.Controls.Add(HumanUi.Field("Channel",channel),0,0);
-        messageFields.Controls.Add(HumanUi.Field("Reviewed template",templateChoice),1,0);
-        messageFields.Controls.Add(HumanUi.Field("Send after (local time, optional)",schedule),2,0);
-        Row(messageFields,80);
-        Row(HumanUi.Field("Announcement text (only the approved announcement field can be customized)",announcement),120);
+        var channelField=HumanUi.Field("Channel",channel);
+        var scheduleField=HumanUi.Field("Send after (optional)",schedule);
+        advancedControls.AddRange([channelField,scheduleField,prepare]);
+        messageFields.Controls.Add(channelField,0,0);
+        messageFields.Controls.Add(HumanUi.Field("Message template",templateChoice),1,0);
+        messageFields.Controls.Add(scheduleField,2,0);
         var filters=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=1};
         foreach(var item in new[]{("Campus",campus),("Academic year",year),("Class",cls),("Section",section)}){filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));filters.Controls.Add(HumanUi.Field(item.Item1,item.Item2),filters.Controls.Count,0);}
         Row(filters,78);
         search.PlaceholderText="Contact or student name";search.Width=220;
-        Row(Bar([recipientFilter,search,Button("Find Contacts",async()=>{recipientPage=0;await RefreshRecipients();},"Communication.Compose"),
+        var findContacts=Button("Find Contacts",async()=>{recipientPage=0;await RefreshRecipients();},"Communication.Compose");
+        search.KeyDown+=(_,e)=>{if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;findContacts.PerformClick();}};
+        Row(Bar([recipientFilter,search,findContacts,
             ..Paging(recipients,()=>recipientPage,value=>recipientPage=value,RefreshRecipients,"Communication.Compose"),
+            Button("Select Matching Contacts",SelectMatchingContactsAsync,"Communication.Bulk"),
             Button("Clear Selection",()=>{included.Clear();InvalidatePreview();ApplyTicks();return Task.CompletedTask;},"Communication.Compose")]),0);
         Row(selection,44);Row(recipients,220);
+        Row(messageFields,80);
+        var noticeField=HumanUi.Field("Notice text",announcement);
+        int noticeRow=root.RowCount;
+        Row(noticeField,100);
+        void UpdateNoticeField()
+        {
+            bool usesNotice=templateChoice.SelectedItem is DataRowView selected && selected.Row.Table.Columns.Contains("Body")
+                && (selected.Row.Field<string>("Body")?.Contains("{{announcement}}",StringComparison.Ordinal)??false);
+            noticeField.Visible=usesNotice;
+            root.RowStyles[noticeRow].Height=usesNotice?AppScale.Scale(100):0;
+        }
+        templateChoice.SelectedIndexChanged+=(_,_)=>UpdateNoticeField();
+        UpdateNoticeField();
         recipients.ReadOnly=false;
         recipients.CurrentCellDirtyStateChanged+=(_,_)=>{if(recipients.IsCurrentCellDirty)recipients.CommitEdit(DataGridViewDataErrorContexts.Commit);};
         recipients.CellValueChanged+=(_,e)=>{if(populating||e.RowIndex<0||e.ColumnIndex<0||recipients.Columns[e.ColumnIndex].Name!="Include")return;
             var row=recipients.Rows[e.RowIndex];Guid id=(Guid)row.Cells["ContactId"].Value;
             if(Convert.ToBoolean(row.Cells["Include"].Value??false))included.Add(id);else included.Remove(id);InvalidatePreview();};
-        prepare.Click+=async(_,_)=>{if(!CurrentUser.HasPermission("Communication.Compose")||previewSignature!=Signature()||!installed)return;
+        prepare.Click+=async(_,_)=>{if(!prepare.Enabled||!CurrentUser.HasPermission("Communication.Compose")||previewSignature!=Signature()||!installed)return;
             await ExecuteAsync(async()=>{
                 if(!ModernMessageDialog.Confirm(FindForm(),$"Save a draft for {included.Count} selected contacts? Nothing is sent until Submit is confirmed.","Create Communication Draft"))return;
                 requestDue??=schedule.Checked?schedule.Value.ToUniversalTime():DateTime.UtcNow;
                 await service.PrepareAsync(requestId,SelectedTemplate(),SelectedChannel(),included,announcement.Text,requestDue.Value,lifetime.Token);
                 savedSignature=Signature();SetStatus("Draft saved. Nothing has been sent. "+(CurrentUser.HasPermission("Communication.Send")?"Open Outbox to review and submit. Approval may be required.":"Ask an authorized sender to review and submit it from Outbox / Schedule / History."));
                 prepare.Enabled=false;
+                sendNow.Enabled=false;
             });};
-        Row(Bar(Button("Preview Messages",PreviewAsync,"Communication.Compose","Primary"),prepare,Button("New Message",()=>{
+        sendNow.Click+=async(_,_)=>{
+            if(!installed || !sendNow.Enabled || savedSignature.Length>0 || !CurrentUser.HasPermission("Communication.Send")
+                || previewSignature!=Signature() || preview.DataSource is not DataTable reviewed)return;
+            await ExecuteAsync(()=>SendReviewedAsync(reviewed));
+        };
+        Row(Bar(Button("Preview Messages",PreviewAsync,"Communication.Compose","Primary"),sendNow,prepare,Button("New Message",()=>{
             if(HasUnsavedChanges&&!ModernMessageDialog.ConfirmDiscardIfDirty(FindForm(),()=>HasUnsavedChanges,UnsavedChangesMessage))return Task.CompletedTask;
             ResetComposition();return Task.CompletedTask;
         },"Communication.Compose")),60);
+        Row(sendHint,42);
         Row(preview,260);compose.Controls.Add(root);
         compose.Resize+=(_,_)=>root.Width=Math.Max(AppScale.Scale(760),compose.ClientSize.Width-SystemInformation.VerticalScrollBarWidth);
         root.Width=AppScale.Scale(900);
         foreach(Control c in new Control[]{channel,templateChoice,announcement,schedule})
         {if(c is ModernComboBox cb)cb.SelectedIndexChanged+=(_,_)=>InvalidatePreview();else if(c is ModernDatePicker dp)dp.ValueChanged+=(_,_)=>InvalidatePreview();else c.TextChanged+=(_,_)=>InvalidatePreview();}
-        tabs.TabPages.Add(Tab("Compose / Bulk",compose));
-        tabs.TabPages.Add(Tab("Outbox / Schedule / History",BuildHistory()));
+        tabs.TabPages.Add(Tab("Send Message",compose));
+        tabs.TabPages.Add(Tab("History",BuildHistory()));
         tabs.TabPages.Add(Tab("Contacts / Consent",BuildContacts()));
         tabs.TabPages.Add(Tab("Templates",ListHost(templates,Bar([Button("Refresh",RefreshTemplates),Button("New Version / Review",EditTemplate,"Communication.Configure"),Button("Revoke Selected",async()=>{var row=Selected(templates)??throw new ArgumentException("Select a template first.");if(!ModernMessageDialog.Confirm(FindForm(),"Revoke this template? Unsubmitted messages will be suppressed; past messages remain in history.","Revoke Template"))return;await store.CallAsync("RevokeTemplate",lifetime.Token,SqlCommunicationStore.P("@Id",row["TemplateId"]));await AfterSavedAsync(RefreshTemplates,"Template revoked. Unsubmitted messages using it are blocked; past messages stay in History.");},"Communication.Configure",selectedGrid:templates),..Paging(templates,()=>templatePage,value=>templatePage=value,RefreshTemplates)]))));
         tabs.TabPages.Add(Tab("Automation Rules",ListHost(rules,Bar(Button("Refresh",RefreshRules,"Communication.Configure"),Button("New / Edit Rule",EditRule,"Communication.Configure"),Button("Evaluate Committed Events",EvaluateRules,"Communication.Configure")))));
         var gateway=new Panel{Dock=DockStyle.Fill,AutoScroll=true};gateway.Controls.Add(Bar(Button("Sending Mode / Limits",EditSettings,"Communication.Configure"),Button("Secure Gateway Credentials",EditGateway,"Communication.Configure")));
         tabs.TabPages.Add(Tab("Gateway Settings",gateway));
+        var advancedTabs=tabs.TabPages.Cast<TabPage>().Skip(2).ToArray();
+        var advancedToggle=new ModernButton{Text="Advanced Settings",AutoSize=true,Height=AppMetrics.ButtonHeight};
+        bool advanced=false;
+        void SetAdvanced(bool show)
+        {
+            advanced=show;
+            if(show)tabs.TabPages.AddRange(advancedTabs);
+            else
+            {
+                if(tabs.SelectedIndex>=2)tabs.SelectedIndex=0;
+                foreach(var page in advancedTabs)tabs.TabPages.Remove(page);
+                schedule.Checked=false;
+                channel.SelectedItem="WhatsApp";
+            }
+            foreach(var control in advancedControls)control.Visible=show;
+            operational.Visible=show;
+            messageFields.ColumnStyles[0].Width=show?20:0;
+            messageFields.ColumnStyles[1].Width=show?45:100;
+            messageFields.ColumnStyles[2].Width=show?35:0;
+            advancedToggle.Text=show?"Back to Simple View":"Advanced Settings";
+        }
+        advancedToggle.Click+=(_,_)=>{
+            if(IsBusy)return;
+            if(advanced && HasUnsavedChanges && (schedule.Checked || SelectedChannel()!=MessageChannel.WhatsApp))
+            {
+                SetStatus("Finish the advanced draft or choose New Message before returning to Simple View.");
+                return;
+            }
+            SetAdvanced(!advanced);
+        };
+        SetAdvanced(false);
         tabs.Enabled=false;TabStrip.Apply(tabs,AppTheme.Primary);
-        var content=new Panel{Dock=DockStyle.Fill};content.Controls.Add(TabStrip.CreateHost(tabs));content.Controls.Add(operational);SetContent(content);
+        var sample=new ModernButton{Text="Try a Sample",AutoSize=true,Height=AppMetrics.ButtonHeight};
+        sample.Click+=async(_,_)=>{if(!IsBusy)await ExecuteAsync(TrySampleAsync);};
+        var content=new Panel{Dock=DockStyle.Fill};
+        content.Controls.Add(TabStrip.CreateHost(tabs));
+        content.Controls.Add(Bar(sample,advancedToggle));
+        content.Controls.Add(operational);
+        SetContent(content);
+        Disposed+=(_,_)=>{foreach(var page in advancedTabs)if(page.Parent is null)page.Dispose();};
         if(!CurrentUser.HasPermission("Communication.Compose"))tabs.SelectedIndex=1;
         ConfigureGuidance();
         foreach(var input in new[]{campus,year,cls,section})input.UserSelectionChanged+=(_,_)=>RecipientFiltersChanged();
@@ -153,9 +218,41 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private Guid SelectedTemplate()=>templateChoice.SelectedValue is Guid id?id:throw new ArgumentException("Choose a reviewed template.");
     private MessageChannel SelectedChannel()=>Enum.Parse<MessageChannel>(Convert.ToString(channel.SelectedItem)!);
     private string Signature()=>string.Join("|",templateChoice.SelectedValue,channel.SelectedItem,announcement.Text,string.Join(',',included.Order()),schedule.Checked,schedule.Checked?schedule.Value.ToUniversalTime().ToString("O"):"");
-    private void InvalidatePreview(){previewSignature="";prepare.Enabled=false;preview.DataSource=null;UiHelper.SetGridState(preview,UiHelper.GridDisplayState.Waiting,"Preview required. Select contacts and a reviewed template, then choose Preview Messages.");selection.Text=$"{included.Count} contacts selected across all result pages. Preview required before saving. "+TemplateHint();}
+    private void InvalidatePreview(){previewSignature="";prepare.Enabled=false;sendNow.Enabled=false;sendHint.Text="Preview the message before sending.";preview.DataSource=null;UiHelper.SetGridState(preview,UiHelper.GridDisplayState.Waiting,"Preview required. Select contacts and a reviewed template, then choose Preview Messages.");selection.Text=$"{included.Count} contacts selected across all result pages. Preview required before sending. "+TemplateHint();}
     private void ApplyTicks()
     {populating=true;try{foreach(DataGridViewRow r in recipients.Rows)if(!r.IsNewRow)r.Cells["Include"].Value=included.Contains((Guid)r.Cells["ContactId"].Value);}finally{populating=false;}}
+    private async Task SelectMatchingContactsAsync()
+    {
+        if(!CurrentUser.HasPermission("Communication.Compose"))
+            throw new ArgumentException("This action requires permission to compose messages.");
+        int campusId=campus.SelectedId,yearId=year.SelectedId,classId=cls.SelectedId,sectionId=section.SelectedId;
+        if(campusId==0 && classId==0 && sectionId==0)
+            throw new ArgumentException("Choose a campus, class or section before selecting matching contacts.");
+        if(recipientFilter.SelectedIndex is not (0 or 1))
+            throw new ArgumentException("Choose the student or outstanding-balance filter for a school group.");
+        string term=search.Text;
+        string filter=recipientFilter.SelectedIndex==0?"":"Outstanding";
+        SqlParameter[] Scope()=>[SqlCommunicationStore.P("@Campus",campusId),SqlCommunicationStore.P("@Year",yearId),
+            SqlCommunicationStore.P("@Class",classId),SqlCommunicationStore.P("@Section",sectionId)];
+        var settings=await ReadAsync("Operational");
+        int limit=Convert.ToInt32(settings.Rows[0]["MaxBatch"]);
+        var matching=new HashSet<Guid>();
+        for(int page=0;page<=limit/100;page++)
+        {
+            var rows=await ReadAsync("Recipients",page,term,filter,Scope());
+            foreach(DataRow row in rows.Rows)matching.Add(row.Field<Guid>("ContactId"));
+            if(matching.Count>limit)
+                throw new ArgumentException($"More than {limit} contacts match. Narrow the filters to stay within the configured send limit.");
+            if(rows.Rows.Count<100)break;
+            if(page==limit/100)throw new ArgumentException("Narrow the filters and search again before sending.");
+        }
+        if(matching.Count==0)throw new ArgumentException(EmptyRecipients());
+        included.Clear();
+        included.UnionWith(matching);
+        InvalidatePreview();
+        ApplyTicks();
+        SetStatus($"{included.Count} matching contacts selected. Preview Messages to check eligibility.");
+    }
     private Task RefreshRecipients()
     {
         if(!CurrentUser.HasPermission("Communication.Compose"))return Task.CompletedTask;
@@ -171,19 +268,37 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private async Task PreviewAsync()
     {
         if(savedSignature.Length>0)throw new ArgumentException("This campaign snapshot is already saved. Use New Message for another campaign; cancel the old draft in Outbox if it is no longer needed.");
+        if(included.Count==0 && recipients.Enabled && recipients.DataSource is DataTable matches && matches.Rows.Count==1 && recipientPage==0)
+        {
+            included.Add(matches.Rows[0].Field<Guid>("ContactId"));
+            ApplyTicks();
+            selection.Text="The only matching contact is selected.";
+        }
         if(included.Count==0)throw new ArgumentException("Select contacts first. Add verified, consented contacts in Contacts / Consent if none are listed.");
-        string signature=Signature();prepare.Enabled=false;previewSignature="";
+        string signature=Signature();prepare.Enabled=false;sendNow.Enabled=false;previewSignature="";
+        sendHint.Text="Checking who can receive this message…";
         UiHelper.SetGridState(preview,UiHelper.GridDisplayState.Loading,"Checking recipient consent, eligibility and costs…");
         DataTable rows;
         try{rows=await store.PreviewAsync(SelectedTemplate(),SelectedChannel(),included,announcement.Text,token:lifetime.Token);}
-        catch{if(!IsDisposed)UiHelper.SetGridState(preview,UiHelper.GridDisplayState.Failed,"Preview could not be checked. Try Preview Messages again; no draft was created.");throw;}
+        catch{if(!IsDisposed){sendHint.Text="Preview could not be checked. Try Preview Messages again.";UiHelper.SetGridState(preview,UiHelper.GridDisplayState.Failed,"Preview could not be checked. Try Preview Messages again; no draft was created.");}throw;}
         if(IsDisposed||Signature()!=signature)return;UiHelper.ClearGridState(preview);preview.DataSource=rows;
         foreach(string name in new[]{"ContactId","AdmissionId","FamilyId","Parameters"})if(preview.Columns.Contains(name))preview.Columns[name].Visible=false;
         preview.DefaultCellStyle.WrapMode=DataGridViewTriState.True;preview.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.DisplayedCells;
         bool eligible=rows.Rows.Count==included.Count && rows.AsEnumerable().All(r=>Convert.ToString(r["Exclusion"])=="");
-        previewSignature=eligible?signature:"";prepare.Enabled=eligible&&CurrentUser.HasPermission("Communication.Compose");
+        int ready=rows.AsEnumerable().Count(r=>Convert.ToString(r["Exclusion"])=="");
+        previewSignature=ready>0?signature:"";prepare.Enabled=eligible&&CurrentUser.HasPermission("Communication.Compose");
         int unknown=rows.AsEnumerable().Count(r=>r.IsNull("EstimatedCost"));
-        SetStatus(eligible?$"Preview ready: {rows.Rows.Count} recipients. {(unknown>0?"Cost estimate unavailable for some recipients; live dispatch will be blocked.":"Estimated provider cost: "+rows.AsEnumerable().Sum(r=>Convert.ToDecimal(r["EstimatedCost"])).ToString("0.0000")+" "+rows.Rows[0]["Currency"])}":"Preview contains exclusions. Correct contacts, consent or template before saving.");
+        string? sendBlock=ready==0
+            ? rows.Rows.Count==1?Convert.ToString(rows.Rows[0]["Exclusion"]):"No eligible contacts. Check the Exclusion column."
+            : SelectedChannel()!=MessageChannel.WhatsApp?"Choose WhatsApp to use Send Now."
+            : schedule.Checked?"Clear Send after to send immediately."
+            : !CurrentUser.HasPermission("Communication.Send")?"Ask an administrator for permission to send messages."
+            : ready>1 && !CurrentUser.HasPermission("Communication.Bulk")?"Select one contact or ask for bulk sending permission."
+            : null;
+        sendNow.Enabled=sendBlock is null;
+        sendHint.Text=sendBlock is null?$"{ready} ready to send. Review the preview, then choose Send Now.":$"Send Now unavailable. {sendBlock}";
+        SetStatus(eligible?$"Preview ready: {rows.Rows.Count} recipients. {(unknown>0?"Cost estimate unavailable for some recipients; live dispatch will be blocked.":"Estimated provider cost: "+rows.AsEnumerable().Sum(r=>Convert.ToDecimal(r["EstimatedCost"])).ToString("0.0000")+" "+rows.Rows[0]["Currency"])}"
+            :$"Preview: {ready} eligible, {included.Count-ready} skipped. Review the exclusion column before sending.");
     }
     private Task RefreshTemplates()=>LoadGridAsync(templates,()=>ReadAsync("Templates",templatePage),BindTemplateChoices);
     private void BindTemplateChoices(DataTable rows)
@@ -198,7 +313,8 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         {var kept=approved.NewRow();foreach(DataColumn c in rows.Columns)kept[c.ColumnName]=old[c.ColumnName];approved.Rows.Add(kept);}
         approved.Columns.Add("Display",typeof(string));foreach(DataRow row in approved.Rows)row["Display"]=$"{row["Code"]} · {row["Language"]} · v{row["Version"]}";
         templateChoice.DataSource=null;templateChoice.DisplayMember="Display";templateChoice.ValueMember="TemplateId";templateChoice.DataSource=approved;
-        if(selected.HasValue&&approved.AsEnumerable().Any(r=>(Guid)r["TemplateId"]==selected.Value))templateChoice.SelectedValue=selected.Value;else templateChoice.SelectedIndex=-1;
+        if(selected.HasValue&&approved.AsEnumerable().Any(r=>(Guid)r["TemplateId"]==selected.Value))templateChoice.SelectedValue=selected.Value;
+        else templateChoice.SelectedIndex=!selected.HasValue&&approved.Rows.Count==1?0:-1;
         if(approved.Rows.Count==0)SetStatus("No reviewed template on this page. In Templates, choose a stock template and select New Version / Review, or ask your administrator.",PageStatusKind.Warning);
     }
     private string TemplateHint()=>templateChoice.Items.Count==0?"No reviewed template: open Templates or ask an administrator.":"Choose a reviewed template before previewing.";

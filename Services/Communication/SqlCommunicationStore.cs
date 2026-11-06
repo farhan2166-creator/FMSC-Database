@@ -34,9 +34,9 @@ public sealed class SqlCommunicationStore(Func<SqlConnection> connections, int a
     }
     public Task<DataTable> ReadAsync(string view,int page=0,string search="",string filter="",CancellationToken token=default)=>
         CallAsync("Read",token,P("@View",view),P("@Page",page),P("@Search",search),P("@Filter",filter));
-    public async Task<MessageEnvelope?> ClaimAsync(CancellationToken token)
+    public async Task<MessageEnvelope?> ClaimAsync(CancellationToken token,Guid? campaign=null)
     {
-        var rows=await CallAsync("Claim",token).ConfigureAwait(false);
+        var rows=await CallAsync("Claim",token,campaign.HasValue?[P("@OnlyCampaign",campaign.Value)]:[]).ConfigureAwait(false);
         if(rows.Rows.Count==0)return null;
         var r=rows.Rows[0];
         using var parameters=JsonDocument.Parse(Convert.ToString(r["Parameters"])!);
@@ -48,8 +48,8 @@ public sealed class SqlCommunicationStore(Func<SqlConnection> connections, int a
     public Task<DataTable> PreviewAsync(Guid template,MessageChannel channel,IEnumerable<Guid> contacts,string announcement="",int? payment=null,CancellationToken token=default)=>
         CallAsync("Preview",token,P("@TemplateId",template),P("@Channel",channel.ToString()),P("@ContactIds",ContactJson(contacts)),P("@Announcement",announcement),P("@PaymentId",payment));
     private static string ContactJson(IEnumerable<Guid> ids)=>JsonSerializer.Serialize(ids.Distinct().Order().ToArray());
-    public Task CreateAsync(Guid request,Guid template,MessageChannel channel,IEnumerable<Guid> contacts,string announcement,DateTime dueUtc,string? eventKey=null,int? payment=null,CancellationToken token=default)=>
-        CallAsync("CreateCampaign",token,P("@Id",request),P("@TemplateId",template),P("@Channel",channel.ToString()),P("@ContactIds",ContactJson(contacts)),P("@Announcement",announcement),P("@DueUtc",dueUtc),P("@EventKey",eventKey),P("@PaymentId",payment));
+    public Task CreateAsync(Guid request,Guid template,MessageChannel channel,IEnumerable<Guid> contacts,string announcement,DateTime dueUtc,string? eventKey=null,int? payment=null,CancellationToken token=default,string? reviewed=null)=>
+        CallAsync("CreateCampaign",token,[P("@Id",request),P("@TemplateId",template),P("@Channel",channel.ToString()),P("@ContactIds",ContactJson(contacts)),P("@Announcement",announcement),P("@DueUtc",dueUtc),P("@EventKey",eventKey),P("@PaymentId",payment),..(reviewed is null?Array.Empty<SqlParameter>():[P("@Reviewed",reviewed)])]);
     public Task TransitionAsync(Guid campaign,string action,CancellationToken token=default)=>CallAsync("Transition",token,P("@Id",campaign),P("@Action",action));
 }
 public sealed class CommunicationService(SqlCommunicationStore store)
@@ -71,12 +71,12 @@ public sealed class MessageDispatcher(SqlCommunicationStore store,Func<MessageCh
     private readonly SemaphoreSlim single=new(1,1);
     private int submitting;
     public bool IsSubmitting=>Volatile.Read(ref submitting)!=0;
-    public async Task<bool> DispatchOneAsync(CancellationToken token)
+    public async Task<bool> DispatchOneAsync(CancellationToken token,Guid? campaign=null)
     {
         if(!await single.WaitAsync(0,token).ConfigureAwait(false))return false;
         try
         {
-            var message=await store.ClaimAsync(token).ConfigureAwait(false);
+            var message=await store.ClaimAsync(token,campaign).ConfigureAwait(false);
             if(message is null)return false;
             Interlocked.Exchange(ref submitting,1);
             IMessageProvider provider;

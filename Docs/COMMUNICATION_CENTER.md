@@ -29,6 +29,8 @@ Changing a phone clears UI verification/consent checkboxes. A new number or rene
 
 ## Normal operator flow
 
+- **Send Message** and **History** are the everyday views. **Try a Sample** previews and simulates a fictional WhatsApp message without setup. **Advanced Settings** opens contact and template setup, gateway settings, drafts, scheduling and dispatcher controls.
+- For an immediate WhatsApp message, choose contacts or use **Select Matching Contacts** with a campus, class or section filter. Select **Preview Messages**, review the rendered messages and exclusions, then confirm **Send Now**. The app processes the selected campaign during that action. Approval and sending limits still apply. If a queued campaign has eligible work remaining, use **Send Pending Now** from History.
 - Compose / Bulk offers campus, academic year, class, section, family, staff, manual, pending-student and outstanding-balance filters. Search results are bounded to 100 rows per page; selections persist across pages, with a configured campaign maximum (hard ceiling 500).
 - Preview explains missing verification, consent, scope, language, provider mapping or current financial eligibility. Available estimates use configured provider prices; unknown prices block live dispatch. SMS segments distinguish GSM-7 extension characters from UTF-16/Urdu text.
 - Drafts are immutable snapshots. New Message starts another draft. Outbox supports search by student, contact, campaign ID/error code and state, details, scheduled work, submission, approval, pause, cancellation and constrained retry. Preview and final campaign confirmation show recipient count, channel, mode and available cost.
