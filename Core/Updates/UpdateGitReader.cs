@@ -41,10 +41,15 @@ internal static class UpdateGitReader
                 "connectivity and approval of this computer's read-only SSH key. " +
                 error.Reason);
         }
+        catch (FileNotFoundException)
+        {
+            return new(false, false, null,
+                "FMSC's bundled Git/SSH tools are missing. Repair the complete FMSC installation.");
+        }
         catch (Win32Exception)
         {
             return new(false, false, null,
-                "Git/SSH transport is not installed or bundled. No update was attempted.");
+                "FMSC's bundled Git/SSH tools could not start. Repair the complete installation.");
         }
     }
 }
