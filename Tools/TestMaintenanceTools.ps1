@@ -11,6 +11,14 @@ $productionReceive=${function:Receive-FmscTool}
 . (Join-Path $project 'Installer/UpdateRecovery.ps1')
 $script:checks=0
 function Check([bool]$Value,[string]$Reason){if(-not $Value){throw $Reason};$script:checks++}
+# Cover the production ZIP-entry guard without network, tools or extraction.
+foreach($unsafe in @('/absolute','\absolute','C:/evil.exe','../escape.exe','..\escape.exe',
+    'bin/../escape.exe','bin\..\escape.exe','bin/..\escape.exe','bin\../escape.exe')) {
+    Check (-not(Test-FmscSafeZipEntryName $unsafe)) "Unsafe ZIP entry accepted: $unsafe"
+}
+foreach($safe in @('cmd/git.exe','nested/tool.dll','mingit\cmd\git.exe')) {
+    Check (Test-FmscSafeZipEntryName $safe) "Safe ZIP entry rejected: $safe"
+}
 # Signature fixture substitutes only the OS trust provider. Production uses
 # Authenticode; real signed MSI verification remains a Windows package gate.
 function Get-AuthenticodeSignature([string]$LiteralPath){
