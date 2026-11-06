@@ -14,7 +14,7 @@ public sealed partial class CommunicationCenterPage
         read(view,[SqlCommunicationStore.P("@Page",page),SqlCommunicationStore.P("@Search",search),SqlCommunicationStore.P("@Filter",filter),..scope]);
 
     private string EmptyRecipients()=>CurrentUser.HasPermission("Communication.Configure")
-        ? "No saved contacts match these filters. Clear or widen the filters, or open Contacts / Consent → Add From School Records to register a guardian or staff contact. Student phone numbers are not added as consented contacts automatically."
+        ? "No saved contacts match these filters. Clear or widen the filters, or open Settings → Contacts & Consent → Add From School Records to register a guardian or staff contact. Student phone numbers are not added as consented contacts automatically."
         : "No saved contacts match these filters. Clear or widen the filters, or ask an authorized administrator to add and verify the contact and record consent.";
     private void ConfigureGuidance()
     {
