@@ -96,8 +96,8 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private void BuildWorkspace()
     {
         channel.Items.AddRange(["Sms","WhatsApp"]);channel.SelectedIndex=1;
-        audience.Items.AddRange(["Campus","Class / Section","Outstanding Fees","Individual Contact"]);
-        audience.SelectedIndex=0;
+        audience.Items.AddRange(["Campus","Class / Section","Outstanding Fees","Individual Contact","Staff","Manual Contacts"]);
+        audience.SelectedIndex=CurrentUser.HasPermission("Students.View")?0:CurrentUser.HasPermission("Staff.View")?4:5;
         recipientFilter.Items.AddRange(["Student / family / manual","Outstanding","Family","Staff","Manual","Pending"]);recipientFilter.SelectedIndex=CurrentUser.HasPermission("Students.View")?0:CurrentUser.HasPermission("Staff.View")?3:4;
         channel.Width=AppScale.Scale(120);recipientFilter.Width=AppScale.Scale(150);templateChoice.Width=AppScale.Scale(320);
         schedule.ShowCheckBox=true;schedule.Checked=false;schedule.Format=DateTimePickerFormat.Custom;schedule.CustomFormat="dd-MMM-yyyy HH:mm";
@@ -166,7 +166,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         };
         var moreOptions=Button("More Options",()=>{ShowComposeOptions(!composeOptionsExpanded);return Task.CompletedTask;},"Communication.Compose");
         Row(Bar(Button("Preview Messages",async()=>{
-            if(audience.SelectedIndex!=3)await SelectMatchingContactsAsync();
+            if(audience.SelectedIndex<3)await SelectMatchingContactsAsync();
             await PreviewAsync();
         },"Communication.Compose","Primary"),sendNow,prepare,Button("New Message",()=>{
             if(HasUnsavedChanges&&!ModernMessageDialog.ConfirmDiscardIfDirty(FindForm(),()=>HasUnsavedChanges,UnsavedChangesMessage))return Task.CompletedTask;
@@ -181,15 +181,16 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         void UpdateAudience()
         {
             int mode=audience.SelectedIndex;
-            recipientFilter.SelectedIndex=mode==2?1:0;
-            bool individual=mode==3;
+            recipientFilter.SelectedIndex=mode switch {2=>1,4=>3,5=>4,_=>0};
+            bool individual=mode>=3;
             contactToolbar.Visible=individual;
             selection.Visible=individual;
             recipients.Visible=individual;
             root.RowStyles[selectionRow].Height=individual?AppScale.Scale(44):0;
             root.RowStyles[recipientsRow].Height=individual?AppScale.Scale(220):0;
             Control[] scopeFields=Enumerable.Range(0,4).Select(i=>filters.GetControlFromPosition(i,0)!).ToArray();
-            bool[] show=[true,composeOptionsExpanded,mode is 1 or 2,mode is 1 or 2];
+            bool schoolScope=mode<4;
+            bool[] show=[schoolScope,schoolScope&&composeOptionsExpanded,mode is 1 or 2,mode is 1 or 2];
             int count=show.Count(value=>value);
             for(int i=0;i<4;i++)
             {
@@ -210,6 +211,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         audience.SelectedIndexChanged+=(_,_)=>{
             included.Clear();
             search.Text="";
+            RecipientFiltersChanged();
             InvalidatePreview();
             UpdateAudience();
         };
@@ -320,7 +322,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     {
         if(!CurrentUser.HasPermission("Communication.Compose"))return Task.CompletedTask;
         return LoadGridAsync(recipients,()=>ReadAsync("Recipients",recipientPage,search.Text,recipientFilter.SelectedIndex==0?"":Convert.ToString(recipientFilter.SelectedItem)!,
-            SqlCommunicationStore.P("@Campus",campus.SelectedId),SqlCommunicationStore.P("@Year",year.SelectedId),SqlCommunicationStore.P("@Class",cls.SelectedId),SqlCommunicationStore.P("@Section",section.SelectedId)),rows=>{
+            SqlCommunicationStore.P("@Campus",audience.SelectedIndex>=4?0:campus.SelectedId),SqlCommunicationStore.P("@Year",audience.SelectedIndex>=4?0:year.SelectedId),SqlCommunicationStore.P("@Class",audience.SelectedIndex>=4?0:cls.SelectedId),SqlCommunicationStore.P("@Section",audience.SelectedIndex>=4?0:section.SelectedId)),rows=>{
             populating=true;
             try{rows.Columns.Add("Include",typeof(bool));recipients.DataSource=rows;foreach(DataGridViewColumn c in recipients.Columns)c.ReadOnly=c.Name!="Include";
                 recipients.Columns["Include"].DisplayIndex=0;ApplyMessageColumns();ApplyTicks();}
