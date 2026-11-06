@@ -89,6 +89,10 @@ function Test-FmscTool([string]$Root,[string]$Name) {
         return $true
     } catch {return $false}
 }
+function Test-FmscSafeZipEntryName([string]$EntryName) {
+    if([string]::IsNullOrEmpty($EntryName)){return $false}
+    return $EntryName -notmatch '(^[/\\]|:|(^|[/\\])\.\.([/\\]|$))'
+}
 function Receive-FmscTool([string]$Name,[string]$Destination) {
     $spec=Get-FmscToolSpec $Name
     $ProgressPreference='SilentlyContinue'
@@ -109,7 +113,7 @@ function Receive-FmscTool([string]$Name,[string]$Destination) {
             # Reject traversal before expanding a verified upstream ZIP.
             Add-Type -AssemblyName System.IO.Compression.FileSystem
             $zipReader=[IO.Compression.ZipFile]::OpenRead($zip)
-            try {foreach($entry in $zipReader.Entries){if($entry.FullName -match '(^[/\]|:|(^|[/\])\.\.([/\]|$))'){throw 'Unsafe archive path.'}}} finally {$zipReader.Dispose()}
+            try {foreach($entry in $zipReader.Entries){if(-not(Test-FmscSafeZipEntryName $entry.FullName)){throw 'Unsafe archive path.'}}} finally {$zipReader.Dispose()}
             $expanded=Join-Path $temporary 'expanded'
             Expand-Archive -LiteralPath $zip -DestinationPath $expanded
             if($Name -eq 'SqlCmd'){
