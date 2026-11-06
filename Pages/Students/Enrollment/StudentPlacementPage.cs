@@ -277,7 +277,11 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
     private async Task LoadStudents()
     {
         if(pending is not null)throw new InvalidOperationException(BusyMessage);
-        if(sourceYear.SelectedId<=0)throw new InvalidOperationException("Choose the source academic year.");
+        if (sourceYear.SelectedId <= 0)
+        {
+            Warn("Choose the source academic year, then click Load Students.");
+            return;
+        }
         var scope=(Campus:sourceCampus.SelectedId,Class:sourceClass.SelectedId,Section:sourceSection.SelectedId);
         InvalidatePlan();
         if(choicesReady)await RefreshSourceContext(false);
