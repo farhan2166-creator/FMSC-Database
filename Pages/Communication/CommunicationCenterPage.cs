@@ -39,6 +39,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private bool composeOptionsExpanded;
     private int settingsSection;
     private readonly ModernComboBox audience=HumanUi.Combo();
+    private DataTable? reviewedTemplateOptions;
     private int recipientPage,historyPage,contactPage,templatePage;
     private Guid requestId=Guid.NewGuid();private DateTime? requestDue;private string previewSignature="",savedSignature="";
     private bool populating;
@@ -217,6 +218,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
             RecipientFiltersChanged();
             InvalidatePreview();
             UpdateAudience();
+            ApplyTemplateChoices();
         };
         ShowComposeOptions(false);
         tabs.TabPages.Add(Tab("Send Message",compose));
@@ -342,7 +344,9 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
             ApplyTicks();
             selection.Text="The only matching contact is selected.";
         }
-        if(included.Count==0)throw new ArgumentException("Select contacts first. Add verified, consented contacts in Contacts / Consent if none are listed.");
+        if(included.Count==0)throw new ArgumentException("Select contacts first. Add verified, consented contacts in Settings → Contacts & Consent if none are listed.");
+        if(templateChoice.SelectedItem is not DataRowView chosen || !TemplateMatchesAudience(chosen.Row))
+            throw new ArgumentException("Choose a reviewed template that matches the recipients before previewing.");
         string signature=Signature();prepare.Enabled=false;sendNow.Enabled=false;previewSignature="";
         sendHint.Text="Checking who can receive this message…";
         UiHelper.SetGridState(preview,UiHelper.GridDisplayState.Loading,"Checking recipient consent, eligibility and costs…");
@@ -372,19 +376,65 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     {
         templates.DataSource=rows;
         Guid? selected=templateChoice.SelectedValue is Guid id?id:null;
-        var old=(templateChoice.DataSource as DataTable)?.AsEnumerable().FirstOrDefault(r=>selected.HasValue&&(Guid)r["TemplateId"]==selected.Value);
-        var approved=rows.Clone();foreach(DataRow row in rows.Rows)if(Convert.ToBoolean(row["Approved"]))approved.ImportRow(row);
-        // Browsing another template page must not silently replace the current
-        // composition's template. Retain only that one previous choice (bounded).
-        if(old is not null&&!rows.AsEnumerable().Any(r=>(Guid)r["TemplateId"]==selected))
-        {var kept=approved.NewRow();foreach(DataColumn c in rows.Columns)kept[c.ColumnName]=old[c.ColumnName];approved.Rows.Add(kept);}
-        approved.Columns.Add("Display",typeof(string));foreach(DataRow row in approved.Rows)row["Display"]=$"{row["Code"]} · {row["Language"]} · v{row["Version"]}";
-        templateChoice.DataSource=null;templateChoice.DisplayMember="Display";templateChoice.ValueMember="TemplateId";templateChoice.DataSource=approved;
-        if(selected.HasValue&&approved.AsEnumerable().Any(r=>(Guid)r["TemplateId"]==selected.Value))templateChoice.SelectedValue=selected.Value;
-        else templateChoice.SelectedIndex=!selected.HasValue&&approved.Rows.Count==1?0:-1;
-        if(approved.Rows.Count==0)SetStatus("No reviewed template on this page. In Templates, choose a stock template and select New Version / Review, or ask your administrator.",PageStatusKind.Warning);
+        var old=(templateChoice.DataSource as DataTable)?.AsEnumerable()
+            .FirstOrDefault(r=>selected.HasValue&&(Guid)r["TemplateId"]==selected.Value);
+        var approved=rows.Clone();
+        foreach(DataRow row in rows.Rows)
+            if(Convert.ToBoolean(row["Approved"]))approved.ImportRow(row);
+
+        // Keep one previously selected reviewed template across paged browsing,
+        // but never preserve a revoked version returned by the current page.
+        if(old is not null && !rows.AsEnumerable().Any(r=>(Guid)r["TemplateId"]==selected))
+        {
+            var kept=approved.NewRow();
+            foreach(DataColumn column in rows.Columns)kept[column]=old[column.ColumnName];
+            approved.Rows.Add(kept);
+        }
+        reviewedTemplateOptions=approved;
+        ApplyTemplateChoices(selected);
     }
-    private string TemplateHint()=>templateChoice.Items.Count==0?"No reviewed template: open Templates or ask an administrator.":"Choose a reviewed template before previewing.";
+    private bool TemplateMatchesAudience(DataRow row)
+    {
+        // Older UI fixture tables contain only identity/version columns.
+        if(!row.Table.Columns.Contains("Scope"))return true;
+        string scope=Convert.ToString(row["Scope"])??"";
+        return audience.SelectedIndex switch
+        {
+            0 or 1 => scope=="Student", // School-group recipients are student-linked contacts.
+            2 => scope=="Student" && row.Table.Columns.Contains("Code") &&
+                 string.Equals(Convert.ToString(row["Code"]),"outstanding",StringComparison.OrdinalIgnoreCase),
+            4 => scope=="Staff",
+            5 => scope=="Manual",
+            _ => true // Individual contacts can be student, family or manually registered.
+        };
+    }
+    private void ApplyTemplateChoices(Guid? preferred=null)
+    {
+        if(reviewedTemplateOptions is null)return;
+        Guid? selected=preferred??(templateChoice.SelectedValue is Guid id?id:null);
+        var visible=reviewedTemplateOptions.Clone();
+        foreach(DataRow row in reviewedTemplateOptions.Rows)
+            if(TemplateMatchesAudience(row))visible.ImportRow(row);
+        visible.Columns.Add("Display",typeof(string));
+        foreach(DataRow row in visible.Rows)
+            row["Display"]=$"{row["Code"]} · {row["Language"]} · v{row["Version"]}";
+        templateChoice.DataSource=null;
+        templateChoice.DisplayMember="Display";
+        templateChoice.ValueMember="TemplateId";
+        templateChoice.DataSource=visible;
+        if(selected.HasValue && visible.AsEnumerable().Any(r=>(Guid)r["TemplateId"]==selected.Value))
+            templateChoice.SelectedValue=selected.Value;
+        else
+            templateChoice.SelectedIndex=!selected.HasValue&&visible.Rows.Count==1?0:-1;
+        if(visible.Rows.Count==0)
+            SetStatus(audience.SelectedIndex==2
+                ?"No reviewed outstanding-reminder template is available. An administrator must review one in Settings → Templates."
+                :"No reviewed template matches these recipients. Ask an administrator to review an appropriate template in Settings → Templates.",
+                PageStatusKind.Warning);
+    }
+    private string TemplateHint()=>templateChoice.Items.Count==0
+        ?"No reviewed template is available for the selected recipients."
+        :"Choose a reviewed template before previewing.";
     private async Task RefreshOperational(){var data=await ReadAsync("Operational");if(!IsDisposed&&data.Rows.Count>0){var r=data.Rows[0];sendingSummary=$"Mode: {r["Mode"]} · master pause: {r["Paused"]}. ";operational.Text=sendingSummary+$"Dispatcher {(dispatchTask is {IsCompleted:false}?"running":"stopped")}. Scheduled work requires a running dispatcher; accepted does not mean delivered.";}}
     private Task RefreshHistory()=>LoadGridAsync(history,()=>ReadAsync(CurrentUser.HasPermission("Communication.History")?"History":"Outbox",historyPage,historySearch.Text,historyState.SelectedIndex<=0?"":Convert.ToString(historyState.SelectedItem)!),rows=>{
         if(rows.Columns.Contains("State"))
