@@ -122,7 +122,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         foreach(var item in new[]{("Campus",campus),("Academic year",year),("Class",cls),("Section",section)}){filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));filters.Controls.Add(HumanUi.Field(item.Item1,item.Item2),filters.Controls.Count,0);}
         composeOptions.Add(filters.GetControlFromPosition(1,0)!);
         Row(HumanUi.Field("Send to",audience),72);
-        Row(filters,78);
+        int filtersRow=root.RowCount;Row(filters,78);
         search.PlaceholderText="Contact or student name";search.Width=220;
         var findContacts=Button("Find Contacts",async()=>{recipientPage=0;await RefreshRecipients();},"Communication.Compose");
         search.KeyDown+=(_,e)=>{if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;findContacts.PerformClick();}};
@@ -155,7 +155,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
                 if(!ModernMessageDialog.Confirm(FindForm(),$"Save a draft for {included.Count} selected contacts? Nothing is sent until Submit is confirmed.","Create Communication Draft"))return;
                 requestDue??=schedule.Checked?schedule.Value.ToUniversalTime():DateTime.UtcNow;
                 await service.PrepareAsync(requestId,SelectedTemplate(),SelectedChannel(),included,announcement.Text,requestDue.Value,lifetime.Token);
-                savedSignature=Signature();SetStatus("Draft saved. Nothing has been sent. "+(CurrentUser.HasPermission("Communication.Send")?"Open Outbox to review and submit. Approval may be required.":"Ask an authorized sender to review and submit it from Outbox / Schedule / History."));
+                savedSignature=Signature();SetStatus("Draft saved. Nothing has been sent. "+(CurrentUser.HasPermission("Communication.Send")?"Open History → More Actions to review and submit. Approval may be required.":"Ask an authorized sender to review and submit it from History."));
                 prepare.Enabled=false;
                 sendNow.Enabled=false;
             });};
@@ -188,6 +188,8 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
             recipients.Visible=individual;
             root.RowStyles[selectionRow].Height=individual?AppScale.Scale(44):0;
             root.RowStyles[recipientsRow].Height=individual?AppScale.Scale(220):0;
+            filters.Visible=mode<4;
+            root.RowStyles[filtersRow].Height=mode<4?AppScale.Scale(78):0;
             Control[] scopeFields=Enumerable.Range(0,4).Select(i=>filters.GetControlFromPosition(i,0)!).ToArray();
             bool schoolScope=mode<4;
             bool[] show=[schoolScope,schoolScope&&composeOptionsExpanded,mode is 1 or 2,mode is 1 or 2];
