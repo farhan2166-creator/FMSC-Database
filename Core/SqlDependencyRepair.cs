@@ -18,8 +18,20 @@ internal static class SqlDependencyRepair
         string package = Path.Combine(folder, "SqlLocalDB.msi");
         try
         {
-            progress.Report("Downloading SQL Server LocalDB from Microsoft...");
-            await DownloadAsync(package);
+            // Fresh installs and later private updates retain a signed LocalDB
+            // MSI. Prefer this offline copy; legacy installations may download.
+            string bundled = Path.Combine(AppContext.BaseDirectory,
+                "UpdateSupport", "Tools", "SqlLocalDB.msi");
+            if (File.Exists(bundled))
+            {
+                progress.Report("Using FMSC's bundled SQL Server LocalDB installer...");
+                File.Copy(bundled, package, overwrite: false);
+            }
+            else
+            {
+                progress.Report("Downloading SQL Server LocalDB from Microsoft...");
+                await DownloadAsync(package);
+            }
             progress.Report("Verifying the Microsoft package signature...");
             await VerifySignatureAsync(package);
             progress.Report("Installing SQL Server LocalDB. Approve the Windows administrator prompt to continue.");

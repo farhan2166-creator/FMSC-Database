@@ -86,17 +86,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $prereqs = Join-Path $env:GITHUB_WORKSPACE 'out/prerequisites'
-          $zip = Join-Path $prereqs 'sqlcmd-windows-amd64.zip'
-          $url = 'https://github.com/microsoft/go-sqlcmd/releases/download/v1.10.0/sqlcmd-windows-amd64.zip'
-          Invoke-WebRequest -Uri $url -OutFile $zip -MaximumRedirection 5
-          $expected = 'A4C28332FCC6E497D655E53AC8F4939F4AB170F9CFD32D0FA5081B60F4D9D691'
-          $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash
-          if ($actual -ne $expected) { throw "Microsoft sqlcmd archive SHA256 mismatch: $actual" }
-          $extract = Join-Path $prereqs 'sqlcmd-extracted'
-          Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
-          $exe = Get-ChildItem -LiteralPath $extract -Filter 'sqlcmd.exe' -File -Recurse | Select-Object -First 1
-          if ($null -eq $exe) { throw 'Pinned sqlcmd archive did not contain sqlcmd.exe.' }
-          Copy-Item -LiteralPath $exe.FullName -Destination (Join-Path $prereqs 'sqlcmd.exe') -Force
+          & .\Tools\PrepareBundledSqlCmd.ps1 -DestinationFile (Join-Path $prereqs 'sqlcmd.exe')
 
       - name: Prepare pinned bundled Git and OpenSSH
         shell: pwsh
@@ -125,6 +115,7 @@ jobs:
             "-p:PublishDir=$application/",
             "-p:ReleaseRoot=$release/",
             "-p:LocalDbMsiPath=$msi",
+            "-p:BundledSqlCmdPath=$workspace/out/prerequisites/sqlcmd.exe",
             "-p:BundledGitDirectory=$workspace/out/prerequisites/MinGit",
             "-p:DeploymentDatabaseDirectory=$emptyDatabase",
             '-p:PublishSingleFile=false',
@@ -151,6 +142,8 @@ jobs:
             'FMSC_SMS/UpdateTransport/usr/bin/ssh.exe',
             'FMSC_SMS/UpdateTransport/COPYING-GIT.txt',
             'FMSC_SMS/UpdateTransport/THIRD_PARTY_NOTICES.txt',
+            'FMSC_SMS/UpdateSupport/Tools/sqlcmd.exe',
+            'FMSC_SMS/UpdateSupport/Tools/SqlLocalDB.msi',
             'FMSC.Setup.exe',
             'Install FMSC_SMS.bat',
             'core.ps1',
@@ -169,6 +162,14 @@ jobs:
             $expected = (Get-FileHash -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $pair[0]) -Algorithm SHA256).Hash
             $actual = (Get-FileHash -LiteralPath (Join-Path $root $pair[1]) -Algorithm SHA256).Hash
             if ($actual -ne $expected) { throw "Packaged installer asset differs from checked-out source: $($pair[1])" }
+          }
+          foreach ($pair in @(
+            ,@('Tools/sqlcmd.exe','FMSC_SMS/UpdateSupport/Tools/sqlcmd.exe')
+            ,@('Tools/SqlLocalDB.msi','FMSC_SMS/UpdateSupport/Tools/SqlLocalDB.msi')
+          )) {
+            $one=(Get-FileHash -LiteralPath (Join-Path $root $pair[0]) -Algorithm SHA256).Hash
+            $two=(Get-FileHash -LiteralPath (Join-Path $root $pair[1]) -Algorithm SHA256).Hash
+            if ($one -ne $two) { throw "Installed/offline prerequisite mismatch: $($pair[1])" }
           }
           & (Join-Path $env:GITHUB_WORKSPACE 'Tools/TestInstallerLocalDb.ps1') -InstallerPath (Join-Path $root 'core.ps1')
           & (Join-Path $env:GITHUB_WORKSPACE 'Tools/TestInstallerMigrations.ps1') -InstallerPath (Join-Path $root 'core.ps1')
@@ -222,6 +223,7 @@ jobs:
             'Includes the current self-contained .NET 8 app, SQL LocalDB 2022 MSI,'
             'pinned Microsoft sqlcmd tool and current installer core.ps1.'
             'Includes pinned Git for Windows MinGit and OpenSSH; no Git PATH setup needed.'
+            'Installed application retains signed LocalDB MSI and verified sqlcmd for offline update/recovery.'
             'The migrations folder may be empty. Numbered SQL files newer than the'
             'installed database version run in numeric order, with a verified backup'
             'first. Missing intermediate files refuse without touching SQL.'

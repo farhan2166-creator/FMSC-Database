@@ -22,6 +22,10 @@ try {
         New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
         Set-Content -LiteralPath $target -Value 'Synthetic publish-only fixture; not executable.'
     }
+    # These fixture files are never installed or uploaded; release workflows
+    # separately verify the real Microsoft-signed MSI and pinned sqlcmd hash.
+    $sqlCmd = Join-Path $scratch 'synthetic-sqlcmd.exe'
+    Set-Content -LiteralPath $sqlCmd -Value 'Synthetic offline SQL tool; not executable.'
     $prerequisite = Join-Path $scratch 'readability fixture.txt'
     Set-Content -LiteralPath $prerequisite -Value 'Test fixture; not an installer.'
 
@@ -41,7 +45,7 @@ try {
         -c Release -r win-x64 --self-contained true -p:PublishProfile=PortableRelease `
         "-p:PublishDir=$application/" "-p:ReleaseRoot=$release/" `
         "-p:LocalDbMsiPath=$prerequisite" "-p:DeploymentDatabaseDirectory=$database" `
-        "-p:BundledGitDirectory=$transport" `
+        "-p:BundledGitDirectory=$transport" "-p:BundledSqlCmdPath=$sqlCmd" `
         -p:PublishSingleFile=false -p:PublishTrimmed=false 2>&1
     $code = $LASTEXITCODE
     if ($code -ne 0) {
@@ -63,6 +67,8 @@ try {
         'FMSC_SMS/UpdateTransport/usr/bin/ssh.exe',
         'FMSC_SMS/UpdateTransport/COPYING-GIT.txt',
         'FMSC_SMS/UpdateTransport/THIRD_PARTY_NOTICES.txt',
+        'FMSC_SMS/UpdateSupport/Tools/sqlcmd.exe',
+        'FMSC_SMS/UpdateSupport/Tools/SqlLocalDB.msi',
         'UpdateRecovery.ps1', 'core.ps1', 'Install FMSC_SMS.bat', 'FMSC.Setup.exe', 'Tools/SqlLocalDB.msi')) {
         $file = Join-Path $release $relative
         if (-not (Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -eq 0) {
@@ -80,6 +86,16 @@ try {
         $actual = (Get-FileHash -LiteralPath (Join-Path $release $pair[1]) -Algorithm SHA256).Hash
         if ($actual -ne $expected) { throw "Published installer asset differs from checked-out source: $($pair[1])" }
     }
+    foreach ($pair in @(
+        ,@($sqlCmd, (Join-Path $application 'UpdateSupport/Tools/sqlcmd.exe'))
+        ,@($prerequisite, (Join-Path $application 'UpdateSupport/Tools/SqlLocalDB.msi'))
+    )) {
+        if ((Get-FileHash -LiteralPath $pair[0] -Algorithm SHA256).Hash -ne
+            (Get-FileHash -LiteralPath $pair[1] -Algorithm SHA256).Hash) {
+            throw "Published offline SQL fixture differs from its input: $($pair[1])"
+        }
+    }
+    & (Join-Path $ProjectDirectory 'Tools/TestOfflineSqlPrerequisites.ps1')
     & (Join-Path $ProjectDirectory 'Tools/TestWindowlessLauncher.ps1') -LauncherPath (Join-Path $application 'UpdateSupport/FMSC.Launcher.exe')
     # GUI setup is one native executable copied to both first install and
     # private update support. Inspect PE subsystem without running UAC or SQL.

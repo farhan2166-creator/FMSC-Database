@@ -9,6 +9,7 @@ The [Complete Windows Installer ZIP](../.github/workflows/fmsc-complete-installe
 ```text
 FMSC_SMS/                 Published self-contained app and resources
   UpdateTransport/         Pinned bundled MinGit (Git, SSH, DLLs, notices)
+  UpdateSupport/Tools/     Verified sqlcmd.exe and signed LocalDB MSI retained after install
 Database/                 You provide FMSC_DB.mdf and FMSC_DB_log.ldf for a fresh install
 Tools/                    Signed Microsoft SqlLocalDB.msi and verified sqlcmd.exe
 Migrations/               Empty at first-production schema 1; future numbered upgrades begin at 2.sql
@@ -23,7 +24,9 @@ SHA256SUMS.txt            Package content hashes
 **Update dependencies:** The approved x64 build packages the complete pinned
 MinGit runtime (Git plus OpenSSH) with the application, alongside the self-contained
 .NET runtime. Windows PATH and a separate Git installation are not required for
-private update checks. The complete installer also packages SQL LocalDB and sqlcmd.
+private update checks. The complete installer also packages SQL LocalDB and sqlcmd in its
+top-level Tools folder. Both are now retained in the installed application
+for later **offline update installation and SQL dependency repair**.
 School PCs retain their own read-only, DPAPI-protected SSH authorization; no shared
 GitHub credential is added. Existing older installs without bundled Git must first
 be repaired/upgraded using a newly built complete installer if their Git PATH is
@@ -56,7 +59,7 @@ The installer checks `Migrations` for top-level `*.sql` files. An empty or missi
 4. **Never ignore a blocked or failed validation.** Record the exact message and installer logs and stop before retrying or adjusting data files.
 5. After successful installation, launch the application under the intended operator account; verify connection, login, schema compatibility, a read-only student search, a report preview, and permitted user actions.
 
-The app expects `FMSC_DB` under `C:\ProgramData\FMSC_Database` and uses `(localdb)\MSSQLLocalDB` by default. Current required **database schema version: 1** (first-production baseline, 5 November 2026); application version is **1.0.0**. See [first-release baseline](FIRST_RELEASE_BASELINE.md). Future app-only releases can change the application version without changing the database schema.
+The app expects `FMSC_DB` under `C:\ProgramData\FMSC_Database` and uses `(localdb)\MSSQLLocalDB` by default. The **original** approved first-production baseline was application 1.0.0 / database schema 1. The current source at this review has application **1.0.3 / schema 3**, with migrations `2.sql` and `3.sql`. Verify the actual installer version and database schema from the exact new release artifact before a fresh install; never assume the historical baseline is the current required version. See [first-release baseline](FIRST_RELEASE_BASELINE.md).
 
 If silent LocalDB installation fails (for example, MSI code 1603), the setup dialog offers a Yes/No choice to open Microsoft's official installer wizard and reports a verbose log under `C:\ProgramData\FMSC_Database` . A failed/cancelled wizard or restart-required result stops installation safely. Code 1603 alone does not identify the underlying MSI problem; retain the verbose log for diagnosis. An immediate `SQL Server LocalDB installation failed. MSI exit code: 1603` message without this fallback belongs to the older installer: verify the artifact's source commit before retrying.
 
@@ -67,7 +70,7 @@ The in-app updater launches the verified **UpdateSupport/FMSC.Setup.exe** from i
 
 - Take and **verify** a recoverable backup first and note its storage path.
 - Do **not** copy a replacement MDF/LDF over an installed school's existing pair.
-- Run the same verified installer with the app closed. The first-production release requires **schema 1**, supplied in the approved fully updated detached database. There are **no production numbered migration files** at this baseline; future schema changes start with `2.sql` and require a continuous, verified and backed-up upgrade path. Legacy pre-release schemas carrying higher version labels are **not** silently downgraded to 1; use the separately approved fresh-baseline installation procedure in [first-release baseline](FIRST_RELEASE_BASELINE.md).
+- Run the same verified installer with the app closed. The original first-production baseline requires **schema 1**. The current source requires **schema 3** and contains `2.sql` and `3.sql`; a matching approved detached database or its verified migration path is required. Legacy pre-release schemas carrying higher version labels are **not** silently downgraded to 1; use the separately approved fresh-baseline installation procedure in [first-release baseline](FIRST_RELEASE_BASELINE.md).
 - Record the automatic pre-migration safety backup, installer status, original/current version, and post-upgrade application compatibility. Recovery requires a tested restore path.
 - If anything fails, **do not manually rerun SQL migrations on the live school database**. Follow [recovery](BACKUP_RECOVERY.md), and use a verified disposable clone for diagnosis.
 
@@ -84,3 +87,29 @@ Installation under the intended Windows user; existing-data upgrade and rollback
 ## Database-free builds
 
 The app-only ZIP is **not** a fresh-install package. The full-installer workflow includes prerequisites but will not contain student data until you supply the detached pair locally. Never claim release-ready without a confirmed successful installer artifact and manual acceptance.
+
+## Fresh-PC dependency boundaries (reviewed 6 November 2026)
+
+- The Windows x64 complete installer includes a self-contained .NET 8 application,
+  pinned MinGit and OpenSSH, Microsoft's verified go-sqlcmd, and the Microsoft-signed
+  SQL Server 2022 LocalDB MSI. Installation provisions LocalDB system-wide.
+- The installed application retains go-sqlcmd and the Microsoft-signed LocalDB MSI
+  under `UpdateSupport/Tools`. Later private update activation and interrupted
+  update recovery can resolve bundled sqlcmd without Windows PATH or a second
+  download. The in-app SQL dependency repair uses the bundled MSI, verifies its
+  Microsoft signature again, and only falls back to Microsoft's download endpoint
+  on older installs without a bundled copy.
+- Windows x64, Windows PowerShell 5.1, Windows Installer, administrator/UAC
+  approval and a supported OS configuration are still required. These are
+  operating-system requirements, not bundled FMSC components. Use the intended
+  Windows account because LocalDB instances are per-user.
+- The **detached** school MDF/LDF pair is never distributed in public GitHub
+  artifacts. Supplying the owner-approved database, confirming version/schema
+  compatibility and school login credentials remain required. Each computer also
+  needs its read-only public deploy key approved in FMSC-Updates before online
+  updates work. Internet access is needed to download private updates, but not
+  to install Git or SQL tools.
+- A successful workflow package is not a substitute for acceptance on a genuinely
+  clean Windows PC. If Windows lacks components required by SQL Server 2022,
+  its signed LocalDB MSI may refuse installation; inspect the MSI log rather
+  than installing unverified extras or touching the school database.
