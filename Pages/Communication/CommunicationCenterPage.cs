@@ -499,30 +499,14 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         ?"No reviewed template is available for the selected recipients."
         :"Choose a reviewed template before previewing.";
     private async Task RefreshOperational(){var data=await ReadAsync("Operational");if(!IsDisposed&&data.Rows.Count>0){var r=data.Rows[0];sendingSummary=$"Mode: {r["Mode"]} · master pause: {r["Paused"]}. ";operational.Text=sendingSummary+$"Dispatcher {(dispatchTask is {IsCompleted:false}?"running":"stopped")}. Scheduled work requires a running dispatcher; accepted does not mean delivered.";}}
-    private Task RefreshHistory()=>LoadGridAsync(history,()=>ReadAsync(CurrentUser.HasPermission("Communication.History")?"History":"Outbox",historyPage,historySearch.Text,historyState.SelectedIndex<=0?"":Convert.ToString(historyState.SelectedItem)!),rows=>{
+    private Task RefreshHistory()=>LoadGridAsync(history,()=>ReadAsync(CurrentUser.HasPermission("Communication.History")?"History":"Outbox",historyPage,historySearch.Text,historyState.SelectedItem is StatusFilter selectedStatus?selectedStatus.State:""),rows=>{
         if(rows.Columns.Contains("State"))
         {
             rows.Columns.Add("DisplayStatus",typeof(string));
             foreach(DataRow row in rows.Rows)
             {
                 string state=Convert.ToString(row["State"])??"";
-                row["DisplayStatus"]=state switch
-                {
-                    "Draft"=>"Draft",
-                    "AwaitingApproval"=>"Awaiting approval",
-                    "Scheduled"=>"Scheduled",
-                    "Queued"=>"Pending send",
-                    "Submitting"=>"Submitting",
-                    "Accepted"=>"Accepted by provider",
-                    "Sent"=>"Sent (provider reported)",
-                    "Delivered"=>"Delivered",
-                    "Read"=>"Read",
-                    "Failed"=>"Failed",
-                    "Rejected"=>"Rejected",
-                    "DeliveryUnknown"=>"Needs provider review",
-                    "Cancelled"=>"Cancelled",
-                    _=>state
-                };
+                row["DisplayStatus"]=FriendlyDeliveryState(state);
             }
         }
         history.DataSource=rows;ApplyMessageColumns();
