@@ -30,7 +30,7 @@ public sealed partial class StudentPlacementPage
                     if (targetCampus.SelectedId == 0) targetClass.SelectedIndex = 0;
                 });
                 await RefreshSourceContext(true);
-            });
+            }, sourceYear);
         };
         sourceCampus.SelectedIndexChanged += (_, _) => {
             if (!choicesReady || binding || pending is not null) return;
@@ -39,7 +39,7 @@ public sealed partial class StudentPlacementPage
                 sourceClass.SelectedIndex = 0;
                 sourceSection.SelectedIndex = 0;
                 if (targetCampus.SelectedId == 0) targetClass.SelectedIndex = 0;
-                RefreshSourceFilters();
+                RefreshSourceClasses();
                 RefreshTargetClasses();
             });
         };
@@ -118,6 +118,10 @@ public sealed partial class StudentPlacementPage
     {
         using var campuses = Matching(campusCatalog, row => sourcePlacements.AsEnumerable().Any(p => Id(p,"CampusId") == Id(row,"CampusId")));
         BindRetaining(sourceCampus, campuses, "CampusId", "CampusName");
+        RefreshSourceClasses();
+    }
+    private void RefreshSourceClasses()
+    {
         using var classes = Matching(catalog, row => sourcePlacements.AsEnumerable().Any(p => Id(p,"ClassId") == Id(row,"ClassId") && (sourceCampus.SelectedId == 0 || Id(p,"CampusId") == sourceCampus.SelectedId)));
         BindRetaining(sourceClass, classes, "ClassId", "ClassName");
         RefreshSourceSections();

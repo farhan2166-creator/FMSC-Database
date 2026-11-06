@@ -182,15 +182,19 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         ((DataGridViewComboBoxColumn)students.Columns["Decision"]).DataSource=choices.DefaultView;
     }
 
-    private async Task Guard(Func<Task> work)
+    private async Task Guard(Func<Task> work, LookupBox? focusedLookup = null)
     {
-        if(busy)return;busy=true;pageContent.Enabled=false;
+        if(busy)return;
+        bool restoreFocus = focusedLookup?.Focused == true;
+        busy=true;pageContent.Enabled=false;
         try{await work();}catch(Exception ex){Fail(ex);}finally{
             busy=false;
             if (!IsDisposed)
             {
                 pageContent.Enabled = true;
                 RefreshActionAvailability();
+                if (restoreFocus && FindForm()?.ContainsFocus == true && focusedLookup!.CanFocus)
+                    focusedLookup.Focus();
             }
         }
     }
