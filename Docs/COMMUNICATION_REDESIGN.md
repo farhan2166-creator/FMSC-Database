@@ -11,7 +11,7 @@ FMSC is the primary school-management application. Communication must remain opt
 **Top-level screen contract:**
 1. **Send Message** — primary operator workflow. Scope selection replaces the default full contact administration grid. Additional channel, academic-year, scheduling and draft controls are available through More Options.
 2. **History** — readable provider evidence and pending work. More Actions contains approval, queue, retry and dispatcher controls for authorized users.
-3. **Settings** — administrator-only contact/consent management, template reviews and sending/gateway setup. No independent application/dashboard inside FMSC.
+3. **Settings** — administrator-only contact/consent management, template reviews, sending/gateway setup and a limited existing-automation review/disable area. No independent application/dashboard inside FMSC.
 
 ## Backend reuse
 
@@ -19,7 +19,7 @@ Keep the current SQL preview/rendering, immutable campaign snapshots, delivery e
 
 Never interpret `Accepted` as `Delivered`. Treat `DeliveryUnknown` as a reconciliation case rather than a retry instruction. Explicit confirmation must show channel, live/simulation mode, eligible recipient count, exclusions and estimated cost/unknown cost before dispatch.
 
-Direct reviewed sending can use the existing `MessageDispatcher.DispatchOneAsync` for supported channels; draft/scheduled campaigns retain their existing approval/queue constraints.
+Direct reviewed sending can use the existing `MessageDispatcher.DispatchOneAsync` for supported channels; draft/scheduled campaigns retain their existing approval/queue constraints. Canceling the confirmation must not create a draft. A change between Simulation and Live mode during confirmation must never dispatch unexpectedly; a resulting saved draft remains pending for review.
 
 ## Identified integration gaps — do not guess around them
 
@@ -31,10 +31,10 @@ Direct reviewed sending can use the existing `MessageDispatcher.DispatchOneAsync
 
 ### Phase A — task-oriented UI (this branch, first pass)
 
-- Operator-focused recipient mode selection and reviewed preview.
+- Operator-focused recipient mode selection and reviewed preview, with only matching template scopes visible; outstanding reminders require the outstanding template.
 - One Send Now flow for supported SMS/WhatsApp channels.
 - Concise History statuses with specialist actions behind More Actions.
-- Three top-level sections, with Settings shown only for authorized users.
+- Three top-level sections, with Settings shown only for authorized users. Previously enabled automation can be inspected and disabled, but the redesign offers no one-click enablement until worker reliability is addressed.
 - Preserve existing SQL and provider safety boundaries.
 
 ### Phase B — complete functional readiness
