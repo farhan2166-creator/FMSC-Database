@@ -242,7 +242,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     {
         // The daily operator never sees the full module's administration workspaces.
         // Administrators can still reach contacts, templates and gateway settings here.
-        var pages=new Control[3];
+        var pages=new Control[4];
         pages[0]=BuildContacts();
         pages[1]=ListHost(templates,Bar([
             Button("Refresh",RefreshTemplates,"Communication.Configure"),
@@ -258,8 +258,14 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         var gateway=new Panel{Dock=DockStyle.Fill,AutoScroll=true};
         gateway.Controls.Add(Bar(
             Button("Sending Mode / Limits",EditSettings,"Communication.Configure"),
-            Button("Secure Gateway Credentials",EditGateway,"Communication.Configure")));
+            Button("Secure Gateway Credentials",EditGateway,"Communication.Configure"),
+            Button("Try a Sample",TrySampleAsync,"Communication.Configure")));
         pages[2]=gateway;
+        pages[3]=ListHost(rules,Bar(
+            Button("Refresh",RefreshRules,"Communication.Configure"),
+            Button("Disable Selected Rule",DisableSelectedRuleAsync,"Communication.Configure",
+                selectedGrid:rules,available:row=>row.Table.Columns.Contains("Enabled")
+                    && Convert.ToBoolean(row["Enabled"]))));
         var host=new Panel{Dock=DockStyle.Fill};
         foreach(var page in pages)
         {
@@ -271,7 +277,8 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         var navigation=Bar(
             Button("Contacts & Consent",async()=>{settingsSection=0;ShowSection();await LoadSettingsSection();},"Communication.Configure"),
             Button("Templates",async()=>{settingsSection=1;ShowSection();await LoadSettingsSection();},"Communication.Configure"),
-            Button("Sending Setup",async()=>{settingsSection=2;ShowSection();await LoadSettingsSection();},"Communication.Configure"));
+            Button("Sending Setup",async()=>{settingsSection=2;ShowSection();await LoadSettingsSection();},"Communication.Configure"),
+            Button("Existing Automations",async()=>{settingsSection=3;ShowSection();await LoadSettingsSection();},"Communication.Configure"));
         host.Controls.Add(navigation);
         return host;
         void ShowSection()
@@ -283,7 +290,8 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     {
         0=>RefreshContacts(),
         1=>RefreshTemplates(),
-        _=>RefreshOperational()
+        2=>RefreshOperational(),
+        _=>RefreshRules()
     };
     private Guid SelectedTemplate()=>templateChoice.SelectedValue is Guid id?id:throw new ArgumentException("Choose a reviewed template.");
     private MessageChannel SelectedChannel()=>Enum.Parse<MessageChannel>(Convert.ToString(channel.SelectedItem)!);
