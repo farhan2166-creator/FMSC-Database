@@ -36,8 +36,8 @@ internal static partial class Program
             string Status()=>((Label)typeof(V2Page).GetField("StatusLabel",flags)!.GetValue(page)!).Text;
             using var parent=new Form{ClientSize=new Size(1100,720)};parent.Controls.Add(page);parent.Show();Application.DoEvents();
             var tabs=Field<TabControl>("tabs");typeof(CommunicationCenterPage).GetField("installed",flags)!.SetValue(page,true);tabs.Enabled=true;
-            Descendants(page).OfType<ModernButton>().Single(button=>button.Text=="Advanced Settings").PerformClick();
-            for(int index=1;index<6;index++)
+            Check(tabs.TabPages.Count==3,"Communication administrator navigation is limited to Send, History and Settings");
+            for(int index=1;index<3;index++)
             {
                 tabs.SelectedIndex=index;PumpUntil(()=>!page.IsBusy,"Tab data load settles");
                 Check(tabs.SelectedIndex==index,"Busy refresh preserves the operator's selected tab");
@@ -77,7 +77,7 @@ internal static partial class Program
             var templateTable=Rows("Templates",[]);
             for(int i=0;i<100;i++)templateTable.Rows.Add(Guid.NewGuid(),true,"fixture_"+i,"en",1);
             templateReply=templateTable;Await("RefreshTemplates");
-            var templateButtons=Descendants(tabs.TabPages[3]).OfType<ModernButton>().ToArray();
+            var templateButtons=Descendants(Field<DataGridView>("templates").Parent!).OfType<ModernButton>().ToArray();
             Check(templateButtons.Single(b=>b.Text=="Next").Enabled&&!templateButtons.Single(b=>b.Text=="Previous").Enabled,"Paging enables Next only for a full page and disables Previous at the start");
             Guid chosen=(Guid)templateTable.Rows[0]["TemplateId"];Field<ModernComboBox>("templateChoice").SelectedValue=chosen;
             templateReply=templateTable.Clone();templateReply.Rows.Add(Guid.NewGuid(),true,"another_page","en",1);
@@ -92,7 +92,7 @@ internal static partial class Program
             var restrictedTabs=(TabControl)typeof(CommunicationCenterPage).GetField("tabs",flags)!.GetValue(restricted)!;
             Check(restrictedTabs.SelectedIndex==1,"A view-only operator starts in the outbox rather than an unavailable compose workflow");
             Check(restrictedTabs.TabPages.Count==2 && restrictedTabs.SelectedTab?.Text=="History",
-                "A view-only operator sees History without administration tabs in the simple view");
+                "A view-only operator sees History without restricted Settings");
         }
         finally{CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Item5);}
     }
