@@ -31,6 +31,7 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
     private readonly ModernButton load,suggest,assign,select,clear,undo,historyDates,historyRetry,records,old;
     private DataTable catalog=new(), placements=new(), data=new();
     private bool busy, binding;
+    private StyledContextMenu? studentActionsMenu;
     private (Guid Id,string Json,int Year,DateTime Date,string Reason,bool Carry,string Hash)? pending;
     public bool IsBusy=>busy || pending is not null;
     public string BusyMessage=>pending is not null?"A placement plan has an unconfirmed outcome. Use Check / Retry Plan before leaving.":"A placement plan is being reviewed or processed.";
@@ -117,6 +118,7 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         historyReason.TextChanged += (_, _) => RefreshActionAvailability();
         RefreshActionAvailability();
         Disposed+=(_,_)=>{
+            studentActionsMenu?.Dispose();
             unusedContent.Dispose();
             foreach(var control in PlanChoices.Cast<Control>().Concat(new Control[]{effective,reason,historyReason,historyDate,fees,carry,students,history}))
                 if(control.Parent is null && !control.IsDisposed)control.Dispose();
@@ -554,7 +556,9 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         if(busy || pending is not null)return;
         var row=SelectedStudent();if(row is null){Warn("Select a student first.");return;}
         int admission=Convert.ToInt32(row["AdmissionId"]);string name=Convert.ToString(row["StudentName"])!;
-        var menu=new StyledContextMenu();
+        // WinForms still uses the menu after Closed while dispatching an item click.
+        studentActionsMenu?.Dispose();
+        var menu = studentActionsMenu = new StyledContextMenu();
         void Add(string caption,Action action,string permission){var item=menu.Items.Add(caption);item.Enabled=CurrentUser.HasPermission(permission);item.Click+=(_,_)=>{try{action();InvalidatePlan();}catch(Exception ex){Fail(ex);}};}
         Add("Record Departure / Final-Class Completion…",()=>{using var dialog=new CloseAdmissionDialog(admission,name,false);dialog.ShowDialog(FindForm());},"Students.Administer");
         Add("Confirm Return Admission…",()=>{using var dialog=new ConfirmReturnAdmissionDialog(admission);dialog.ShowDialog(FindForm());},"Students.Administer");
@@ -563,7 +567,7 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
             Add("Put on Hold…",()=>{using var dialog=new StudentPostingHoldDialog(admission,name,false);dialog.ShowDialog(FindForm());},"Students.Administer");
             Add("Lift Hold / Resume…",()=>{using var dialog=new StudentPostingHoldDialog(admission,name,true);dialog.ShowDialog(FindForm());},"Students.Administer");
         }
-        menu.Closed+=(_,_)=>menu.Dispose();menu.Show(Cursor.Position);
+        menu.Show(studentActions, new Point(0, studentActions.Height));
     }
     private static ApplicationWindowForm Window(string title,Control content)
     {

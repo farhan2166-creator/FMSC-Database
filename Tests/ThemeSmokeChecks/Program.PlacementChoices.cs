@@ -43,7 +43,7 @@ internal static partial class Program
             var sources = Table(("ClassSectionId",typeof(int)),("CampusId",typeof(int)),("ClassId",typeof(int)),("SectionId",typeof(int)));
             sources.Rows.Add(101,1,10,1); sources.Rows.Add(102,1,10,2); sources.Rows.Add(110,2,10,2);
             Set("campusCatalog",campuses); Set("yearCatalog",years); Set("catalog",classes); Set("sectionCatalog",sections); Set("placements",placements);
-            page.ReadSourceChoices = year => Task.FromResult(year == 9 ? sources.Copy() : sources.Clone());
+            page.ReadSourceChoices = year => Task.FromResult(year is 9 or 100 ? sources.Copy() : sources.Clone());
             Call("BindPlacementChoices");
             var sourceYear = Field<LookupBox>("sourceYear"); var targetYear = Field<LookupBox>("targetYear");
             var sourceCampus = Field<LookupBox>("sourceCampus"); var sourceClass = Field<LookupBox>("sourceClass"); var sourceSection = Field<LookupBox>("sourceSection");
@@ -53,6 +53,18 @@ internal static partial class Program
             Check(Field<ModernButton>("load").Enabled && !Field<ModernButton>("review").Enabled && !targetCampus.Enabled, task+": source selection unlocks loading only");
             sourceCampus.SelectedValue = 1; sourceClass.SelectedValue = 10;
             Check(Options(sourceSection).SequenceEqual(new[]{1,2}), task+": source sections exclude globally defined/unpopulated sections but retain historical sources");
+            sourceSection.SelectedValue = 2;
+            sourceClass.SelectedValue = 0;
+            Check(sourceSection.SelectedId == 0, task+": changing class clears even a still-valid section");
+            sourceClass.SelectedValue = 10; sourceSection.SelectedValue = 2;
+            sourceCampus.SelectedValue = 2;
+            Check(sourceClass.SelectedId == 0 && sourceSection.SelectedId == 0, task+": changing campus clears shared classes and sections");
+            sourceCampus.SelectedValue = 1; sourceClass.SelectedValue = 10; sourceSection.SelectedValue = 2;
+            sourceYear.SelectedValue = 100;
+            Check(sourceCampus.SelectedId == 0 && sourceClass.SelectedId == 0 && sourceSection.SelectedId == 0,
+                task+": changing year resets all source filters even when both years have identical choices");
+            sourceYear.SelectedValue = 9;
+            sourceCampus.SelectedValue = 1; sourceClass.SelectedValue = 10;
             Check(Options(targetCampus).SequenceEqual(new[]{1,2}), task+": unconfigured destination campuses are excluded");
             if (task == StudentPlacementTask.AnnualPromotion) {
                 Check(targetYear.SelectedId == 100 && Options(targetYear).SequenceEqual(new[]{100,2}), "Promotion chooses the closest later year by dates rather than IDs or catalog row order");
@@ -60,7 +72,9 @@ internal static partial class Program
             } else Check(targetYear.SelectedId == 9 && Options(targetYear).SequenceEqual(new[]{9}), task+": transfer/correction remains in the source year");
             targetCampus.SelectedValue = 2;
             Check(Options(targetClass).SequenceEqual(new[]{10,20,99}), task+": destination classes respect the selected campus assignments");
+            targetClass.SelectedValue = 20;
             targetCampus.SelectedValue = 0;
+            Check(targetClass.SelectedId == 0, task+": changing destination campus clears a still-valid destination class");
             if (task != StudentPlacementTask.AnnualPromotion) targetClass.SelectedValue = 20;
             var data = Table(("ClassId",typeof(int)),("CampusId",typeof(int)),("SectionId",typeof(int)),("SourcePlacementId",typeof(int)),("Destination",typeof(int)),
                 ("Decision",typeof(string)),("Note",typeof(string)),("PlacementState",typeof(string)),("LegacySetupPending",typeof(bool)),("PlacementConfirmedAt",typeof(DateTime)),("Selected",typeof(bool)));

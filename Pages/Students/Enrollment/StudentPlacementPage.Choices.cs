@@ -21,20 +21,44 @@ public sealed partial class StudentPlacementPage
     {
         sourceYear.SelectedIndexChanged += async (_, _) => {
             if (!choicesReady || binding || pending is not null) return;
-            await Guard(async () => { InvalidatePlan(); await RefreshSourceContext(true); });
+            await Guard(async () => {
+                InvalidatePlan();
+                WithChoiceBinding(() => {
+                    sourceCampus.SelectedIndex = 0;
+                    sourceClass.SelectedIndex = 0;
+                    sourceSection.SelectedIndex = 0;
+                    if (targetCampus.SelectedId == 0) targetClass.SelectedIndex = 0;
+                });
+                await RefreshSourceContext(true);
+            });
         };
         sourceCampus.SelectedIndexChanged += (_, _) => {
             if (!choicesReady || binding || pending is not null) return;
-            InvalidatePlan(); WithChoiceBinding(() => { RefreshSourceFilters(); RefreshTargetClasses(); });
+            InvalidatePlan();
+            WithChoiceBinding(() => {
+                sourceClass.SelectedIndex = 0;
+                sourceSection.SelectedIndex = 0;
+                if (targetCampus.SelectedId == 0) targetClass.SelectedIndex = 0;
+                RefreshSourceFilters();
+                RefreshTargetClasses();
+            });
         };
         sourceClass.SelectedIndexChanged += (_, _) => {
             if (!choicesReady || binding || pending is not null) return;
-            InvalidatePlan(); WithChoiceBinding(RefreshSourceSections);
+            InvalidatePlan();
+            WithChoiceBinding(() => {
+                sourceSection.SelectedIndex = 0;
+                RefreshSourceSections();
+            });
         };
         sourceSection.SelectedIndexChanged += (_, _) => { if (choicesReady && !binding) InvalidatePlan(); };
         targetCampus.SelectedIndexChanged += (_, _) => {
             if (!choicesReady || binding || pending is not null) return;
-            WithChoiceBinding(RefreshTargetClasses); Suggest();
+            WithChoiceBinding(() => {
+                targetClass.SelectedIndex = 0;
+                RefreshTargetClasses();
+            });
+            Suggest();
         };
         targetClass.SelectedIndexChanged += (_, _) => { if (choicesReady && !binding && pending is null) Suggest(); };
         targetYear.SelectedIndexChanged += (_, _) => {
