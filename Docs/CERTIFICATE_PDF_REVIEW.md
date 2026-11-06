@@ -25,7 +25,12 @@ The generator runs the **actual shipped RDLC templates** with `CertificateUi.Pri
 | Regular Teacher / Lecturer | Teacher and lecturer, female and male wording, subjects |
 | Bank Account Opening | Teacher and lecturer, salary, bank, branch and purpose |
 
-The fictional recipient and parent names use ordinary Pakistani naming conventions. Identifiers and contact details are invented or non-operational. **No database is read, no certificate is issued or collected, and no physical print job runs.**
+The fictional recipient and parent names use ordinary Pakistani naming conventions. Identifiers and contact details are invented or non-operational.
+
+**Source-fidelity rule:** Certificate references are issued by SQL as `PREFIX-YYYY-NNNN` (hyphens, not slashes). The review uses the actual prefixes: `CC` character, `DOB` birth, `REG` regular student, `SLC` school leaving, `CLC` college leaving, `SPT` sports, `NOC` no objection, `SPC` provisional, and `EMP` for both staff/lecturer and bank-account letters. The sequence is per prefix, as in the SQL counter. Character certificates show the production `S.S.C (Matric)` / `H.S.S.C (Intermediate)` wording; provisional certificates show the full examination qualification labels. Birth-certificate dates use the SQL day-with-ordinal format and provisional birth dates use written-number wording. The review also supplies grades consistent with the application's calculation rules.
+
+The Windows checks open the shipped `fmsc.dacpac` to verify SQL numbering triggers, prefixes, display labels, birth-date conventions and subject-source rules. They fail if those contracts drift away from the review data. The workflow is therefore triggered by changes to `fmsc.dacpac` too. The fixtures remain offline: verifying the source model is not executing SQL or issuing certificate numbers.
+ **No database is read, no certificate is issued or collected, and no physical print job runs.**
 
 ## What is checked
 
