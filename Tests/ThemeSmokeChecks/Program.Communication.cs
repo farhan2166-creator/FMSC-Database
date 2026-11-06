@@ -28,6 +28,13 @@ internal static partial class Program
             Check(!page.IsBusy&&!page.HasUnsavedChanges,"An unopened communication draft starts clean and idle");
             var tabs=Field<TabControl>("tabs");
             Check(tabs.TabPages.Count==3&&!tabs.Enabled,"Administrator sees Send Message, History and Settings pending schema verification");
+            var settingsButtons=Descendants(tabs.TabPages[2]).OfType<ModernButton>().Select(button=>button.Text).ToArray();
+            Check(settingsButtons.Contains("Existing Automations") && settingsButtons.Contains("Disable Selected Rule"),
+                "Previously configured rules remain reviewable and explicitly disableable without a new automation enable switch");
+            Check(!settingsButtons.Contains("New / Edit Rule"),
+                "New unattended automation is not enabled from the simplified Settings interface");
+            Check(settingsButtons.Contains("Try a Sample"),
+                "Administrator can test a purely simulated practice message without provider delivery");
             Check(!Field<Control>("schedule").Visible && !Field<Control>("prepare").Visible,"Scheduling and drafts are hidden by default");
             typeof(CommunicationCenterPage).GetField("installed",flags)!.SetValue(page,true);
             tabs.Enabled=true;
