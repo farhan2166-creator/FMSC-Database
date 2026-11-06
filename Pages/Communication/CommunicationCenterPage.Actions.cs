@@ -272,6 +272,33 @@ public sealed partial class CommunicationCenterPage
         editor.Flag("approved","I reviewed the text, recipient scope and any provider template mapping");
         if(editor.ShowDialog(FindForm())==DialogResult.OK){await AfterSavedAsync(RefreshTemplates,"Template version saved. Only reviewed/approved versions are offered for composing; no campaign was created or sent.");}
     }
+    private async Task DisableSelectedRuleAsync()
+    {
+        // The initial redesign does not provision an unattended worker or enable
+        // new automation. Existing rules must still be visible and stoppable.
+        var row=Selected(rules)??throw new ArgumentException("Select an automation rule first.");
+        if(!Convert.ToBoolean(row["Enabled"]))
+        {
+            SetStatus("This automation rule is already disabled.");
+            return;
+        }
+        if(!ModernMessageDialog.Confirm(FindForm(),
+            $"Disable automatic messages from '{row["Name"]}'? Existing queued messages are not recalled; review them in History.",
+            "Disable Automation"))
+            return;
+        await store.CallAsync("SaveRule",lifetime.Token,
+            SqlCommunicationStore.P("@Id",row["RuleId"]),
+            SqlCommunicationStore.P("@Name",row["Name"]),
+            SqlCommunicationStore.P("@Event",row["EventType"]),
+            SqlCommunicationStore.P("@TemplateId",row["TemplateId"]),
+            SqlCommunicationStore.P("@Channel",row["Channel"]),
+            SqlCommunicationStore.P("@Enabled",false),
+            SqlCommunicationStore.P("@Approval",row["RequiresApproval"]),
+            SqlCommunicationStore.P("@Delay",row["DelayMinutes"]),
+            SqlCommunicationStore.P("@Limit",row["BatchLimit"]));
+        await AfterSavedAsync(RefreshRules,"Automation disabled for future events. Already queued messages remain subject to existing approval, pause and cancellation controls in History.");
+    }
+
     private async Task EditRule()
     {
         var original=Selected(rules);Guid id=original is null?Guid.NewGuid():(Guid)original["RuleId"];
