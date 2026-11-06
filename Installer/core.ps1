@@ -8,6 +8,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . ([IO.Path]::Combine($PSScriptRoot,'UpdateRecovery.ps1'))
+. ([IO.Path]::Combine($PSScriptRoot,'MaintenanceTools.ps1'))
 $script:RecoveryRoot = Get-FmscRecoveryRoot
 $script:RecoveryJournal = $null
 if ($ResumeUpdate) { $PreparedRoot = 'pending-recovery' }
@@ -32,7 +33,6 @@ $ReleaseRoot = $PSScriptRoot
 $AppSource      = Join-Path $ReleaseRoot 'FMSC_SMS'
 $DatabaseSource = Join-Path $ReleaseRoot 'Database'
 $MigrationsDir  = Join-Path $ReleaseRoot 'Migrations'
-$LocalDBSource  = Join-Path $ReleaseRoot 'LocalDB'
 $AppDir = 'C:\FMSC School Management'
 $DatabaseDir = 'C:\ProgramData\FMSC_Database'
 # The new application is copied to a staging folder beside the live install and only renamed into place once it has been verified.
@@ -660,209 +660,11 @@ function Test-IsAdministrator {
         [Security.Principal.WindowsBuiltInRole]::Administrator
     )
 }
-function Get-InstallerToolsDirectory {
-    # A release may ship sqlcmd.exe here so that an install needs no network at all, and anything this installer downloads is cached here too.
-    $Tools =
-        Join-Path `
-            $ReleaseRoot `
-            'Tools'
-    if (-not (Test-Path -LiteralPath $Tools)) {
-        New-Item `
-            -ItemType Directory `
-            -Path $Tools `
-            -Force |
-            Out-Null
-    }
-    return $Tools
-}
-function Invoke-PrerequisiteDownload {
-    param(
-        [string]$Url,
-        [string]$Destination,
-        [string]$Description,
-        [string]$ExpectedSha256
-    )
-    Write-Step `
-        "Downloading $Description..."
-    Write-Log `
-        "Download URL: $Url"
-    # Windows PowerShell 5.1 negotiates TLS 1.0 on older builds, and both github.com and dot.net refuse it. Setting it on the process is enough and lasts only as long as the installer runs.
-    [Net.ServicePointManager]::SecurityProtocol =
-        [Net.ServicePointManager]::SecurityProtocol -bor
-        [Net.SecurityProtocolType]::Tls12
-    # The progress bar redraws per block in 5.1 and makes a download dramatically slower as well as noisy.
-    $PreviousProgress =
-        $ProgressPreference
-    $ProgressPreference = 'SilentlyContinue'
-    try {
-        Invoke-WebRequest `
-            -Uri $Url `
-            -OutFile $Destination `
-            -UseBasicParsing
-    }
-    finally {
-        $ProgressPreference =
-            $PreviousProgress
-    }
-    if (-not (Test-Path -LiteralPath $Destination)) {
-        throw `
-            "$Description could not be downloaded."
-    }
-    $Downloaded =
-        Get-Item `
-            -LiteralPath $Destination
-    if ($Downloaded.Length -le 0) {
-        throw `
-            "$Description downloaded as an empty file."
-    }
-    if (-not [string]::IsNullOrWhiteSpace($ExpectedSha256)) {
-        $Actual =
-            (Get-FileHash `
-                -LiteralPath $Destination `
-                -Algorithm SHA256).Hash
-        if ($Actual -ne $ExpectedSha256.ToUpperInvariant()) {
-            Remove-Item `
-                -LiteralPath $Destination `
-                -Force `
-                -ErrorAction SilentlyContinue
-            throw (
-                "$Description failed its integrity check, so it was discarded.`r`n`r`n" +
-                "Expected SHA256: $ExpectedSha256`r`n" +
-                "Actual SHA256:   $Actual"
-            )
-        }
-        Write-Log `
-            "Integrity check passed (SHA256 $Actual)."
-    }
-    Write-Success `
-        "$Description downloaded."
-}
 function Resolve-SqlCmd {
-    # Prefer the complete, hash-verified tool that ships in the new application.
-    # During a prepared update ReleaseRoot points to protected recovery storage,
-    # NOT to the originally downloaded complete-installer ZIP. The app-local copy
-    # removes a second network download and is retained for later recovery.
-    $BundledCopy = Join-Path $AppSource 'UpdateSupport/Tools/sqlcmd.exe'
-    if (Test-Path -LiteralPath $BundledCopy -PathType Leaf) {
-        Write-Success "sqlcmd found in the bundled application: $BundledCopy"
-        return $BundledCopy
-    }
-    # Normal complete installers also have Tools/sqlcmd.exe at their root.
-    $Tools = Get-InstallerToolsDirectory
-    $LocalCopy = Join-Path $Tools 'sqlcmd.exe'
-    if (Test-Path -LiteralPath $LocalCopy -PathType Leaf) {
-        Write-Success "sqlcmd found in the release tools folder: $LocalCopy"
-        return $LocalCopy
-    }
-    # Recovery after restart may no longer have its prepared staging folder.
-    $InstalledCopy = Join-Path $AppDir 'UpdateSupport/Tools/sqlcmd.exe'
-    if (Test-Path -LiteralPath $InstalledCopy -PathType Leaf) {
-        Write-Success "sqlcmd found in the installed application: $InstalledCopy"
-        return $InstalledCopy
-    }
-    # Backward compatibility only for older releases missing the bundled copy.
-    $OnPath = Get-Command 'sqlcmd.exe' -ErrorAction SilentlyContinue
-    if ($OnPath) {
-        Write-Success "sqlcmd found on PATH: $($OnPath.Source)"
-        return $OnPath.Source
-    }
-    $Architecture =
-        if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
-    $AssetName =
-        "sqlcmd-windows-$Architecture.zip"
-    $Archive =
-        Join-Path `
-            $Tools `
-            $AssetName
-    # A version, its asset name and its digest are fixed here instead, so the same FMSC release always installs the same sqlcmd.
-    $PinnedBuilds =
-        @{
-            'amd64' = @{
-                Version =
-                    'v1.10.0'
-                Sha256  =
-                    'A4C28332FCC6E497D655E53AC8F4939F4AB170F9CFD32D0FA5081B60F4D9D691'
-            }
-            'arm64' = @{
-                Version =
-                    'v1.10.0'
-                Sha256  =
-                    'AC6F257DCE55E7F34D618EA9AF736D9077854CADB6AF6FDB0259C90D42E0B8D2'
-            }
-        }
-    $Pinned =
-        $PinnedBuilds[$Architecture]
-    $AssetUrl =
-        'https://github.com/microsoft/go-sqlcmd/releases/download/' +
-        $Pinned.Version + '/' + $AssetName
-    $AssetSha256 =
-        $Pinned.Sha256
-    Write-Log `
-        "sqlcmd is not packaged locally; pinned download in use: $($Pinned.Version) ($Architecture)."
-    try {
-        Invoke-PrerequisiteDownload `
-            -Url $AssetUrl `
-            -Destination $Archive `
-            -Description "the sqlcmd tool (Microsoft go-sqlcmd, $Architecture)" `
-            -ExpectedSha256 $AssetSha256
-    }
-    catch {
-        throw (
-            "sqlcmd is required for database registration and migration, and it " +
-            "could not be obtained automatically.`r`n`r`n" +
-            "Connect this machine to the internet and run the installer again, or " +
-            "do this on a machine that has internet:`r`n`r`n" +
-            "    1. Download:`r`n" +
-            "       $AssetUrl`r`n`r`n" +
-            "    2. Extract sqlcmd.exe from the zip.`r`n`r`n" +
-            "    3. Copy sqlcmd.exe to:`r`n" +
-            "       $LocalCopy`r`n`r`n" +
-            "The installer uses that copy without needing the network at all.`r`n`r`n" +
-            "Original error: $($_.Exception.Message)"
-        )
-    }
-    Expand-Archive `
-        -LiteralPath $Archive `
-        -DestinationPath $Tools `
-        -Force
-    if (-not (Test-Path -LiteralPath $LocalCopy)) {
-        # The zip keeps sqlcmd.exe at its root today; search for it rather than depend on that staying true.
-        $Found =
-            Get-ChildItem `
-                -LiteralPath $Tools `
-                -Filter 'sqlcmd.exe' `
-                -Recurse `
-                -File `
-                -ErrorAction SilentlyContinue |
-                Select-Object `
-                    -First 1
-        if (-not $Found) {
-            throw `
-                "sqlcmd.exe was not found inside $Archive after extracting it."
-        }
-        $LocalCopy =
-            $Found.FullName
-    }
-    Remove-Item `
-        -LiteralPath $Archive `
-        -Force `
-        -ErrorAction SilentlyContinue
-    # Reported, deliberately not enforced: the download was already checked against the SHA-256 GitHub publishes for it.
-    try {
-        $Signature =
-            Get-AuthenticodeSignature `
-                -FilePath $LocalCopy
-        Write-Log `
-            "sqlcmd signature: $($Signature.Status) $($Signature.SignerCertificate.Subject)"
-    }
-    catch {
-        Write-Log `
-            'sqlcmd signature could not be read.'
-    }
-    Write-Success `
-        "sqlcmd downloaded and ready: $LocalCopy"
-    return $LocalCopy
+    $root=Install-FmscMaintenanceTool 'SqlCmd' $AppSource
+    return Join-Path $root 'sqlcmd.exe'
 }
+
 function Copy-ApplicationFiles {
     param(
         [string]$Source,
@@ -1587,47 +1389,16 @@ try {
             $SqlLocalDb = Get-Command 'sqllocaldb.exe' -ErrorAction SilentlyContinue
         }
     }
+    Write-Step 'Retaining verified maintenance tools on this PC...'
+    foreach($ToolName in @('Git','SqlCmd','LocalDb')){
+        $null=Install-FmscMaintenanceTool $ToolName $AppSource
+    }
     if (-not $SqlLocalDb) {
         Write-WarningMessage `
             'SQL Server LocalDB was not found.'
         # The self-contained win-x64 application includes its .NET Desktop Runtime. Tools carries only database prerequisites: sqlcmd.exe and SqlLocalDB.msi.
-        $Tools =
-            Get-InstallerToolsDirectory
-        $MsiPath =
-            Join-Path `
-                $Tools `
-                'SqlLocalDB.msi'
-        if (-not (Test-Path -LiteralPath $MsiPath)) {
-            $LegacyMsi =
-                Join-Path `
-                    $LocalDBSource `
-                    'SqlLocalDB.msi'
-            if (Test-Path -LiteralPath $LegacyMsi) {
-                $MsiPath =
-                    $LegacyMsi
-                Write-Log `
-                    'SqlLocalDB.msi was read from the older LocalDB folder; Tools is the merged location now.'
-            }
-        }
-        if (-not (Test-Path -LiteralPath $MsiPath)) {
-            # Microsoft publishes no stable URL for SqlLocalDB.msi - it ships inside the SQL Server Express media, whose own unattended switches are not documented well enough to rely on.
-            throw (
-                "SQL Server LocalDB is not installed, and its installer was not " +
-                "found.`r`n`r`n" +
-                "Place SqlLocalDB.msi in the release's Tools folder, then run the " +
-                "installer again:`r`n`r`n" +
-                "    $Tools`r`n`r`n" +
-                "(A release packaged before Tools and LocalDB were merged keeps " +
-                "working: the older folder is still read.)`r`n`r`n" +
-                "It is the LocalDB component of the SQL Server 2022 Express media " +
-                "- see https://learn.microsoft.com/en-us/sql/database-engine/" +
-                "configure-windows/sql-server-express-localdb`r`n`r`n" +
-                "This step cannot be skipped: the application needs LocalDB at run " +
-                "time, not only while installing."
-            )
-        }
-        Write-Step `
-            'Installing SQL Server LocalDB...'
+        $MsiRoot=Install-FmscMaintenanceTool 'LocalDb' $AppSource
+        $MsiPath=Join-Path $MsiRoot 'SqlLocalDB.msi'
         Invoke-LocalDbMsiInstallation -MsiPath $MsiPath -LogDirectory $DatabaseDir
         $MachinePath =
             [Environment]::GetEnvironmentVariable(
@@ -1658,7 +1429,7 @@ try {
     }
     Write-Step `
         'Checking sqlcmd...'
-    # Resolve-SqlCmd prefers the staged application and release's verified local tools; older packages may fall back to PATH or a pinned download.
+    # SQL always runs from verified, protected machine storage.
     $script:SqlCmdPath =
         Resolve-SqlCmd
     Write-Step `

@@ -24,6 +24,7 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
         "AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n";
 
     private readonly string _workspace;
+    private (string GitExecutable, string SshExecutable)? _transport;
     private bool _isOpen;
     private bool _disposed;
 
@@ -31,15 +32,14 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
 
     // Complete releases bundle Git, OpenSSH, DLLs and their supporting tools.
     // School machines must not need a separate install or PATH configuration.
-    internal static (string GitExecutable, string SshExecutable) ResolveTransport(string applicationDirectory)
+    internal static (string GitExecutable, string SshExecutable) ResolveTransport(string root)
     {
-        string root = Path.Combine(applicationDirectory, "UpdateTransport");
         string git = Path.Combine(root, "cmd", "git.exe");
         string ssh = Path.Combine(root, "usr", "bin", "ssh.exe");
         if (!File.Exists(git) || !File.Exists(ssh))
             throw new FileNotFoundException(
                 "The bundled FMSC update tools (Git/SSH) are missing. " +
-                "Repair FMSC using a complete installer; copying git.exe alone is insufficient.");
+                "FMSC could not restore its verified Git/SSH maintenance bundle.");
         return (git, ssh);
     }
 
@@ -54,6 +54,9 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
         byte[] privateKey = Array.Empty<byte>();
         try
         {
+            var tool = await MaintenanceTools.EnsureAsync("Git", cancellationToken);
+            // Resolve once per session, after complete-bundle verification.
+            session._transport = ResolveTransport(tool.Root);
             Directory.CreateDirectory(root);
             // Set a user-only ACL BEFORE materializing the short-lived SSH PEM.
             UpdateDeviceKey.RestrictDirectory(root);
@@ -196,7 +199,7 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         linked.CancelAfter(maximumDuration);
-        var transport = ResolveTransport(AppContext.BaseDirectory);
+        var transport = _transport ?? throw new InvalidOperationException("Update transport has not been verified.");
         var start = new ProcessStartInfo(transport.GitExecutable)
         {
             WorkingDirectory = _workspace,

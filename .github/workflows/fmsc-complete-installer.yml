@@ -46,6 +46,10 @@ jobs:
       - name: Compile native WinForms test project
         run: dotnet build Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release
 
+      - name: Verify maintenance tool lifecycle without downloads or SQL
+        shell: pwsh
+        run: .\Tools\TestMaintenanceTools.ps1
+
       - name: Run portable C# regression checks
         run: dotnet run --project Tests/AuditFixChecks/AuditFixChecks.csproj -c Release
 
@@ -59,39 +63,10 @@ jobs:
       # SQL Server 2022 Express LocalDB's standalone x64 MSI from Microsoft.
       # Validate its Authenticode signature before including it in the package.
       # Never use an unsigned mirror or download from the school database.
-      - name: Download signed Microsoft SQL Server 2022 LocalDB MSI
+      - name: Prepare verified maintenance tools
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $prereqs = Join-Path $env:GITHUB_WORKSPACE 'out/prerequisites'
-          New-Item -ItemType Directory -Path $prereqs -Force | Out-Null
-          $msi = Join-Path $prereqs 'SqlLocalDB.msi'
-          $url = 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SqlLocalDB.msi'
-          Invoke-WebRequest -Uri $url -OutFile $msi -MaximumRedirection 5
-          if (-not (Test-Path -LiteralPath $msi -PathType Leaf) -or (Get-Item $msi).Length -lt 1000000) {
-            throw 'The Microsoft LocalDB MSI download is missing or unexpectedly small.'
-          }
-          $signature = Get-AuthenticodeSignature -LiteralPath $msi
-          if ($signature.Status -ne 'Valid' -or $null -eq $signature.SignerCertificate -or
-              $signature.SignerCertificate.Subject -notmatch '(?i)Microsoft Corporation') {
-            throw "SQL LocalDB MSI signature verification failed: $($signature.Status) / $($signature.SignerCertificate.Subject)"
-          }
-          Write-Host "Official signed LocalDB MSI SHA256: $((Get-FileHash -LiteralPath $msi -Algorithm SHA256).Hash)"
-          Write-Host "Verified signer: $($signature.SignerCertificate.Subject)"
-
-      # Pin exactly the same Microsoft go-sqlcmd v1.10.0 AMD64 asset/hash
-      # recorded in Installer/core.ps1. Bundling it avoids target-PC downloads.
-      - name: Download and verify offline sqlcmd prerequisite
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $prereqs = Join-Path $env:GITHUB_WORKSPACE 'out/prerequisites'
-          & .\Tools\PrepareBundledSqlCmd.ps1 -DestinationFile (Join-Path $prereqs 'sqlcmd.exe')
-
-      - name: Prepare pinned bundled Git and OpenSSH
-        shell: pwsh
-        run: |
-          & .\Tools\PrepareBundledGit.ps1 -DestinationDirectory (Join-Path $env:GITHUB_WORKSPACE 'out/prerequisites/MinGit')
+          & .\Tools\PrepareMaintenanceTools.ps1 -ToolsDirectory (Join-Path $env:GITHUB_WORKSPACE 'out/prerequisites') -DownloadMissing
 
       # This uses the EXISTING PortableRelease publish profile and its genuine
       # ValidateDeploymentAssets and CopyDeploymentFiles MSBuild targets.
@@ -142,11 +117,15 @@ jobs:
             'FMSC_SMS/UpdateTransport/usr/bin/ssh.exe',
             'FMSC_SMS/UpdateTransport/COPYING-GIT.txt',
             'FMSC_SMS/UpdateTransport/THIRD_PARTY_NOTICES.txt',
-            'FMSC_SMS/UpdateSupport/Tools/sqlcmd.exe',
-            'FMSC_SMS/UpdateSupport/Tools/SqlLocalDB.msi',
+            'FMSC_SMS/UpdateSupport/Tools/SqlCmd/sqlcmd.exe',
+            'FMSC_SMS/UpdateSupport/Tools/LocalDb/SqlLocalDB.msi',
+            'FMSC_SMS/UpdateSupport/MaintenanceTools.ps1',
+            'FMSC_SMS/UpdateSupport/ToolCatalog.json',
             'FMSC.Setup.exe',
             'Install FMSC_SMS.bat',
             'core.ps1',
+            'MaintenanceTools.ps1',
+            'ToolCatalog.json',
             'Tools/SqlLocalDB.msi',
             'Tools/sqlcmd.exe'
           )
@@ -156,16 +135,26 @@ jobs:
               throw "Required full-installer file missing or empty: $item"
             }
           }
+          $toolApp = Join-Path $root 'FMSC_SMS'
+          . (Join-Path $toolApp 'UpdateSupport/MaintenanceTools.ps1')
+          foreach ($toolName in @('Git','SqlCmd','LocalDb')) {
+            $spec = Get-FmscToolSpec $toolName
+            $bundle = Join-Path $toolApp $spec.folder
+            if ($toolName -ne 'Git') { $bundle = Join-Path $bundle $toolName }
+            if (-not (Test-FmscTool $bundle $toolName)) { throw "Published maintenance bundle failed integrity verification: $toolName" }
+          }
           foreach ($pair in @(
             ,@('Installer/core.ps1', 'core.ps1')
+            ,@('Installer/MaintenanceTools.ps1', 'MaintenanceTools.ps1')
+            ,@('Installer/ToolCatalog.json', 'ToolCatalog.json')
           )) {
             $expected = (Get-FileHash -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $pair[0]) -Algorithm SHA256).Hash
             $actual = (Get-FileHash -LiteralPath (Join-Path $root $pair[1]) -Algorithm SHA256).Hash
             if ($actual -ne $expected) { throw "Packaged installer asset differs from checked-out source: $($pair[1])" }
           }
           foreach ($pair in @(
-            ,@('Tools/sqlcmd.exe','FMSC_SMS/UpdateSupport/Tools/sqlcmd.exe')
-            ,@('Tools/SqlLocalDB.msi','FMSC_SMS/UpdateSupport/Tools/SqlLocalDB.msi')
+            ,@('Tools/sqlcmd.exe','FMSC_SMS/UpdateSupport/Tools/SqlCmd/sqlcmd.exe')
+            ,@('Tools/SqlLocalDB.msi','FMSC_SMS/UpdateSupport/Tools/LocalDb/SqlLocalDB.msi')
           )) {
             $one=(Get-FileHash -LiteralPath (Join-Path $root $pair[0]) -Algorithm SHA256).Hash
             $two=(Get-FileHash -LiteralPath (Join-Path $root $pair[1]) -Algorithm SHA256).Hash

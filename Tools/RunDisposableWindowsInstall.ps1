@@ -13,6 +13,7 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     throw 'Runner lacks elevation needed for the real installer.'
 }
 $project=[IO.Path]::GetFullPath($ProjectDirectory)
+. (Join-Path $project 'Installer/MaintenanceTools.ps1')
 $expectedSchema=[regex]::Match((Get-Content -LiteralPath (Join-Path $project 'Installer/core.ps1') -Raw), '\$DatabaseVersion\s*=\s*''([0-9]+)''').Groups[1].Value
 if (-not $expectedSchema) { throw 'Cannot determine the installer schema contract.' }
 $root=Join-Path $env:RUNNER_TEMP 'fmsc-disposable-installer'
@@ -176,12 +177,9 @@ try {
     Stage 'Real Microsoft SQL Server LocalDB prerequisite'
     $existing=LocalDbExe
     $downloadedMsi=Join-Path $root 'SqlLocalDB.msi'
-    Invoke-WebRequest -Uri 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SqlLocalDB.msi' -OutFile $downloadedMsi -MaximumRedirection 5
+    Invoke-WebRequest -Uri (Get-FmscToolSpec 'LocalDb').url -OutFile $downloadedMsi -MaximumRedirection 5
     if ((Get-Item -LiteralPath $downloadedMsi).Length -lt 1000000) { throw 'LocalDB MSI is incomplete.' }
-    $sig=Get-AuthenticodeSignature -LiteralPath $downloadedMsi
-    if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
-        throw 'LocalDB MSI Microsoft signature validation failed.'
-    }
+    Assert-FmscMicrosoftMsi $downloadedMsi
     Copy-Item -LiteralPath $downloadedMsi -Destination $localMsi
     if ($existing) {
         $msiCoverage='PREINSTALLED_NOT_A_CLEAN_MSI_TEST'
@@ -213,16 +211,7 @@ try {
     $checks.Add('Actual LocalDB instance started using Microsoft-signed prerequisites')
 
     Stage 'Pinned SQL command and full installer publishing'
-    $archive=Join-Path $root 'sqlcmd-windows-amd64.zip'
-    Invoke-WebRequest -Uri 'https://github.com/microsoft/go-sqlcmd/releases/download/v1.10.0/sqlcmd-windows-amd64.zip' -OutFile $archive -MaximumRedirection 5
-    if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne 'A4C28332FCC6E497D655E53AC8F4939F4AB170F9CFD32D0FA5081B60F4D9D691') {
-        throw 'Pinned sqlcmd checksum validation failed.'
-    }
-    $unzip=Join-Path $root 'sqlcmd-extracted'
-    Expand-Archive -LiteralPath $archive -DestinationPath $unzip
-    $tool=Get-ChildItem -LiteralPath $unzip -Filter sqlcmd.exe -File -Recurse | Select-Object -First 1
-    if (-not $tool) { throw 'Verified sqlcmd download does not contain executable.' }
-    Copy-Item -LiteralPath $tool.FullName -Destination $sqlcmd
+    & (Join-Path $project 'Tools/PrepareBundledSqlCmd.ps1') -DestinationFile $sqlcmd
     $transport = Join-Path $root 'MinGit'
     & (Join-Path $project 'Tools/PrepareBundledGit.ps1') -DestinationDirectory $transport
     & dotnet restore (Join-Path $project 'FMSC_SMS.sln')
@@ -239,7 +228,7 @@ try {
     foreach ($file in @('FMSC_SMS/FMSC_SMS.exe','FMSC_SMS/UpdateSupport/FMSC.Setup.exe',
         'FMSC_SMS/UpdateTransport/cmd/git.exe','FMSC_SMS/UpdateTransport/usr/bin/ssh.exe',
         'FMSC_SMS/UpdateTransport/COPYING-GIT.txt',
-        'FMSC_SMS/UpdateSupport/Tools/sqlcmd.exe','FMSC_SMS/UpdateSupport/Tools/SqlLocalDB.msi','core.ps1','Install FMSC_SMS.bat','FMSC.Setup.exe',
+        'FMSC_SMS/UpdateSupport/Tools/SqlCmd/sqlcmd.exe','FMSC_SMS/UpdateSupport/Tools/LocalDb/SqlLocalDB.msi','core.ps1','Install FMSC_SMS.bat','FMSC.Setup.exe',
         'Tools/SqlLocalDB.msi','Tools/sqlcmd.exe')) {
         if (-not (Test-Path -LiteralPath (Join-Path $release $file) -PathType Leaf)) {
             throw "Real installer asset missing: $file"
@@ -299,7 +288,7 @@ EXEC sys.sp_addextendedproperty @name=N'FMSC_DisposableFixture',@value=N'approve
     if ($installedShortcut.TargetPath -ine (Join-Path $recoveryStorage 'FMSC.Launcher.exe') -or $installedShortcut.Arguments) {
         throw 'Installed shortcut does not use the stable external launcher.'
     }
-    foreach ($asset in @('UpdateRecovery.ps1','Launch-FMSC.ps1','FMSC.Launcher.exe')) {
+    foreach ($asset in @('MaintenanceTools.ps1','ToolCatalog.json','UpdateRecovery.ps1','Launch-FMSC.ps1','FMSC.Launcher.exe')) {
         if ((Get-FileHash (Join-Path $recoveryStorage $asset) -Algorithm SHA256).Hash -ne
             (Get-FileHash (Join-Path $app "UpdateSupport/$asset") -Algorithm SHA256).Hash) { throw 'Installed recovery launcher asset differs from source package.' }
     }

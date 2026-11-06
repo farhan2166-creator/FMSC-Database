@@ -88,7 +88,7 @@ function Kill-Checkpoint([string]$Name) {
 try {
     $null = New-Item -ItemType Directory -Path (Join-Path $application 'UpdateSupport'),(Join-Path $prepared 'metadata') -Force
     Set-Content (Join-Path $application 'FMSC_SMS.exe') 'inert target application'
-    foreach ($name in @('core.ps1','UpdateRecovery.ps1','Launch-FMSC.ps1')) {
+    foreach ($name in @('MaintenanceTools.ps1','ToolCatalog.json','core.ps1','UpdateRecovery.ps1','Launch-FMSC.ps1')) {
         Copy-Item -LiteralPath (Join-Path $project "Installer/$name") -Destination (Join-Path $application "UpdateSupport/$name")
     }
     $files = @(Get-ChildItem $application -Recurse -File | ForEach-Object {

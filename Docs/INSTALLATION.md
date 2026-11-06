@@ -9,7 +9,8 @@ The [Complete Windows Installer ZIP](../.github/workflows/fmsc-complete-installe
 ```text
 FMSC_SMS/                 Published self-contained app and resources
   UpdateTransport/         Pinned bundled MinGit (Git, SSH, DLLs, notices)
-  UpdateSupport/Tools/     Verified sqlcmd.exe and signed LocalDB MSI retained after install
+  UpdateSupport/Tools/     SqlCmd/ and LocalDb/ bundles with integrity manifests
+  UpdateSupport/           Shared tool resolver, catalog and recovery support
 Database/                 You provide FMSC_DB.mdf and FMSC_DB_log.ldf for a fresh install
 Tools/                    Signed Microsoft SqlLocalDB.msi and verified sqlcmd.exe
 Migrations/               Empty at first-production schema 1; future numbered upgrades begin at 2.sql
@@ -25,12 +26,35 @@ SHA256SUMS.txt            Package content hashes
 MinGit runtime (Git plus OpenSSH) with the application, alongside the self-contained
 .NET runtime. Windows PATH and a separate Git installation are not required for
 private update checks. The complete installer also packages SQL LocalDB and sqlcmd in its
-top-level Tools folder. Both are now retained in the installed application
-for later **offline update installation and SQL dependency repair**.
+top-level Tools folder. Installation retains all three verified tool bundles in
+`%ProgramData%\FMSC_Updater\MaintenanceTools`, protected against ordinary-user
+modification. The original extracted setup folder can be deleted after successful
+installation; update and repair do not look for it.
 School PCs retain their own read-only, DPAPI-protected SSH authorization; no shared
-GitHub credential is added. Existing older installs without bundled Git must first
-be repaired/upgraded using a newly built complete installer if their Git PATH is
-broken. Do not manually copy a single `git.exe` into the installation.
+GitHub credential is added. An older application that predates this resolver still
+needs a one-time upgrade to gain automatic tool recovery. Do not manually copy a
+single `git.exe` into the installation.
+
+## Preparing tools for local or workflow publishing
+
+Local publishing defaults to the owner's adjacent `../Tools` folder containing
+`MinGit/`, `sqlcmd.exe` and `SqlLocalDB.msi`. The publish target verifies and reuses
+these files without downloading. On first preparation, existing Git/sqlcmd versions
+must match `Installer/ToolCatalog.json`; the MSI must have a valid Microsoft signature.
+The preparer records complete file hashes and refuses later corruption. Keep the
+generated `FMSC.ToolIntegrity.json` files with the cached bundles.
+
+To fill or refresh that cache deliberately, run once from the project folder:
+
+```powershell
+.\Tools\PrepareMaintenanceTools.ps1 -DownloadMissing
+```
+
+`FmscToolsDirectory`, `BundledGitDirectory`, `BundledSqlCmdPath` and `LocalDbMsiPath`
+remain available for custom local paths. Both release workflows use the same
+preparer with `-DownloadMissing` in their own workspace, validate approved Git/sqlcmd
+archive hashes and the Microsoft MSI signature, and bundle the results automatically.
+The download policy, versions and required files are defined in one tool catalog.
 
 **Important:** The GitHub build deliberately excludes school MDF/LDF files. The source repository alone is **not** a ready-to-install fresh database. A complete-installer workflow must first run successfully and upload its artifact; do not assume an installer exists from a passing ordinary CI build.
 
@@ -93,12 +117,17 @@ The app-only ZIP is **not** a fresh-install package. The full-installer workflow
 - The Windows x64 complete installer includes a self-contained .NET 8 application,
   pinned MinGit and OpenSSH, Microsoft's verified go-sqlcmd, and the Microsoft-signed
   SQL Server 2022 LocalDB MSI. Installation provisions LocalDB system-wide.
-- The installed application retains go-sqlcmd and the Microsoft-signed LocalDB MSI
-  under `UpdateSupport/Tools`. Later private update activation and interrupted
-  update recovery can resolve bundled sqlcmd without Windows PATH or a second
-  download. The in-app SQL dependency repair uses the bundled MSI, verifies its
-  Microsoft signature again, and only falls back to Microsoft's download endpoint
-  on older installs without a bundled copy.
+- Installation and subsequent updates reuse matching verified machine-wide tools.
+  A changed version is retained separately, keeping previous versions available
+  for rollback. Every resolution verifies the complete bundle, including Git's DLLs.
+- Missing or corrupt tools are restored from a verified application bundle first;
+  if unavailable, the shared resolver downloads the approved replacement over
+  HTTPS and verifies it before activation. Git can therefore repair itself without
+  using Git. Writing this protected cache may require Windows administrator/UAC
+  approval. A failed download or verification stops the operation safely.
+- The in-app SQL dependency repair uses the retained MSI and verifies its Microsoft
+  signature again. LocalDB is installed only when absent, or when repair is explicitly
+  requested; ordinary application updates do not reinstall the engine.
 - Windows x64, Windows PowerShell 5.1, Windows Installer, administrator/UAC
   approval and a supported OS configuration are still required. These are
   operating-system requirements, not bundled FMSC components. Use the intended
@@ -107,8 +136,8 @@ The app-only ZIP is **not** a fresh-install package. The full-installer workflow
   artifacts. Supplying the owner-approved database, confirming version/schema
   compatibility and school login credentials remain required. Each computer also
   needs its read-only public deploy key approved in FMSC-Updates before online
-  updates work. Internet access is needed to download private updates, but not
-  to install Git or SQL tools.
+  updates work. Normal bundled installation works offline; internet is required
+  for private updates and for replacing tools when no verified local copy survives.
 - A successful workflow package is not a substitute for acceptance on a genuinely
   clean Windows PC. If Windows lacks components required by SQL Server 2022,
   its signed LocalDB MSI may refuse installation; inspect the MSI log rather

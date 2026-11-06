@@ -57,6 +57,10 @@ jobs:
       - name: Compile WinForms smoke fixtures (no interactive UI)
         run: dotnet build Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release
 
+      - name: Verify maintenance tool lifecycle without downloads or SQL
+        shell: pwsh
+        run: .\Tools\TestMaintenanceTools.ps1
+
       - name: Run portable C# regression checks
         run: dotnet run --project Tests/AuditFixChecks/AuditFixChecks.csproj -c Release
 
@@ -86,26 +90,10 @@ jobs:
           & .\Tools\TestUpdateRecovery.ps1
           & .\Tools\TestPublishPrivateUpdate.ps1
 
-      - name: Prepare verified SQL prerequisites for offline updates and repair
+      - name: Prepare verified maintenance tools
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $root = Join-Path $env:GITHUB_WORKSPACE 'out/prerequisites'
-          New-Item -ItemType Directory -Path $root -Force | Out-Null
-          $msi = Join-Path $root 'SqlLocalDB.msi'
-          Invoke-WebRequest -Uri 'https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SqlLocalDB.msi' -OutFile $msi -MaximumRedirection 5
-          if ((Get-Item -LiteralPath $msi).Length -lt 1000000) { throw 'LocalDB MSI is unexpectedly small.' }
-          $sig = Get-AuthenticodeSignature -LiteralPath $msi
-          if ($sig.Status -ne 'Valid' -or $null -eq $sig.SignerCertificate -or
-              $sig.SignerCertificate.Subject -notmatch '(?i)Microsoft Corporation') {
-            throw 'LocalDB MSI must be signed by Microsoft before release.'
-          }
-          & .\Tools\PrepareBundledSqlCmd.ps1 -DestinationFile (Join-Path $root 'sqlcmd.exe')
-
-      - name: Prepare pinned bundled Git and OpenSSH
-        shell: pwsh
-        run: |
-          & .\Tools\PrepareBundledGit.ps1 -DestinationDirectory (Join-Path $env:GITHUB_WORKSPACE 'out/prerequisites/MinGit')
+          & .\Tools\PrepareMaintenanceTools.ps1 -ToolsDirectory (Join-Path $env:GITHUB_WORKSPACE 'out/prerequisites') -DownloadMissing
 
       # The ordinary PortableRelease publish remains subject to its installer/MSI
       # and optional detached-MDF/LDF validation. Only this GitHub Actions
@@ -128,15 +116,25 @@ jobs:
               'UpdateTransport/cmd/git.exe', 'UpdateTransport/usr/bin/ssh.exe',
               'UpdateTransport/COPYING-GIT.txt',
               'UpdateTransport/THIRD_PARTY_NOTICES.txt',
-              'UpdateSupport/Tools/sqlcmd.exe',
-              'UpdateSupport/Tools/SqlLocalDB.msi')) {
+              'UpdateSupport/Tools/SqlCmd/sqlcmd.exe',
+              'UpdateSupport/Tools/LocalDb/SqlLocalDB.msi',
+              'UpdateSupport/MaintenanceTools.ps1',
+              'UpdateSupport/ToolCatalog.json')) {
             if (-not (Test-Path -LiteralPath (Join-Path $root $name) -PathType Leaf)) {
               throw "Missing Windows application output: $name"
             }
           }
+          $toolApp = $root
+          . (Join-Path $toolApp 'UpdateSupport/MaintenanceTools.ps1')
+          foreach ($toolName in @('Git','SqlCmd','LocalDb')) {
+            $spec = Get-FmscToolSpec $toolName
+            $bundle = Join-Path $toolApp $spec.folder
+            if ($toolName -ne 'Git') { $bundle = Join-Path $bundle $toolName }
+            if (-not (Test-FmscTool $bundle $toolName)) { throw "Published maintenance bundle failed integrity verification: $toolName" }
+          }
           foreach ($pair in @(
-            ,@('out/prerequisites/sqlcmd.exe','UpdateSupport/Tools/sqlcmd.exe')
-            ,@('out/prerequisites/SqlLocalDB.msi','UpdateSupport/Tools/SqlLocalDB.msi')
+            ,@('out/prerequisites/sqlcmd.exe','UpdateSupport/Tools/SqlCmd/sqlcmd.exe')
+            ,@('out/prerequisites/SqlLocalDB.msi','UpdateSupport/Tools/LocalDb/SqlLocalDB.msi')
           )) {
             $source = Join-Path $env:GITHUB_WORKSPACE $pair[0]
             $published = Join-Path $root $pair[1]
@@ -150,7 +148,7 @@ jobs:
           $forbidden = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object {
             $rel = [IO.Path]::GetRelativePath($root, $_.FullName).Replace('\', '/')
             $_.Extension.ToLowerInvariant() -in @('.mdf','.ldf','.bak') -or
-            ($_.Extension.ToLowerInvariant() -eq '.msi' -and $rel -cne 'UpdateSupport/Tools/SqlLocalDB.msi')
+            ($_.Extension.ToLowerInvariant() -eq '.msi' -and $rel -cne 'UpdateSupport/Tools/LocalDb/SqlLocalDB.msi')
           })
           if ($forbidden.Count -gt 0) { throw 'Unauthorized database or installer assets in application ZIP.' }
           @(

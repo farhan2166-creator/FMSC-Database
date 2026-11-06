@@ -7,11 +7,12 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows' -or
 }
 $project = Split-Path $PSScriptRoot -Parent
 . (Join-Path $project 'Installer/UpdateRecovery.ps1')
+. (Join-Path $project 'Installer/MaintenanceTools.ps1')
 $tokens=$null; $errors=$null
 $ast=[Management.Automation.Language.Parser]::ParseInput((Get-Content (Join-Path $project 'Installer/core.ps1') -Raw),[ref]$tokens,[ref]$errors)
 if ($errors.Count) { throw 'Installer does not parse.' }
 foreach ($name in @('Convert-ToDbVersion','Invoke-SqlMigration','Invoke-PendingMigrations','New-PreMigrationBackup',
-    'Get-InstallerToolsDirectory','Invoke-PrerequisiteDownload','Resolve-SqlCmd')) {
+    'Resolve-SqlCmd')) {
     $definition=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true)
     Invoke-Expression $definition.Extent.Text
 }
@@ -41,6 +42,7 @@ $endpoint = [regex]::Match(($info -join "`n"), '(?:np:)?(' + [regex]::Escape('\\
 if (-not $endpoint.Success) { throw 'Cannot resolve the disposable runner LocalDB endpoint.' }
 $SqlInstance = 'np:' + $endpoint.Groups[1].Value
 $DatabaseDir = $root; $ReleaseRoot = $root
+$AppSource = Join-Path $root 'application'
 $AppVersion = '1.0.0'
 $ColorDim = 'DarkGray'; $ColorInfo = 'White'; $ColorSuccess = 'Green'
 $script:RecoveryRoot = Join-Path $root 'protected'

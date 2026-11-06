@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <Compile Include="../../Core/MaintenanceTools.cs" Link="MaintenanceTools.cs" />
     <Compile Include="../../Core/Updates/UpdateDeviceKey.cs" Link="UpdateDeviceKey.cs" />
     <Compile Include="../../Core/Updates/UpdateGitReader.cs" Link="UpdateGitReader.cs" />
     <Compile Include="../../Core/Updates/UpdateGitSession.cs" Link="UpdateGitSession.cs" />

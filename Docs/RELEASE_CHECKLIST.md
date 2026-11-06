@@ -68,14 +68,25 @@ Artifact visibility follows this public repository. Include no school database, 
 
 ### Offline dependency verification for current releases
 
-- [ ] Verify `FMSC_SMS/UpdateSupport/Tools/sqlcmd.exe` and
-  `FMSC_SMS/UpdateSupport/Tools/SqlLocalDB.msi` alongside the full installer's
-  top-level `Tools/` folder.
+- [ ] Verify complete `FMSC_SMS/UpdateTransport/`,
+  `FMSC_SMS/UpdateSupport/Tools/SqlCmd/` and
+  `FMSC_SMS/UpdateSupport/Tools/LocalDb/` bundles, each with
+  `FMSC.ToolIntegrity.json`, plus `MaintenanceTools.ps1` and `ToolCatalog.json`
+  in application support and full-installer support.
 - [ ] An application-only private update carries both SQL tools, so future
   update installation and recovery do not depend on tools on Windows PATH.
 - [ ] Confirm the Microsoft signature for LocalDB MSI and pinned go-sqlcmd
   archive digest during packaging.
 - [ ] Exercise bundled SQL dependency repair on a disposable Windows machine,
   never a live school database.
+- [ ] Confirm first installation populates protected
+  `%ProgramData%\FMSC_Updater\MaintenanceTools`; delete the extracted setup folder
+  and verify update checks and SQL repair still work.
+- [ ] Confirm local publishing reuses `../Tools` offline. Release workflows download
+  approved tools themselves and verify the actual published bundle manifests.
+- [ ] Test a corrupt/missing Git bundle, its HTTPS recovery without Git, offline
+  refusal when no valid copy survives, UAC cancellation and unchanged-version reuse.
+- [ ] Confirm a deliberately changed tool version is retained separately and the
+  previous application's tool version remains usable after rollback.
 - [ ] Check actual app/schema versions and migration inventory against the
   approved commit; historical 1.0.0/schema 1 is not the current release version.

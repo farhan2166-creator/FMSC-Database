@@ -28,10 +28,10 @@ string root = Path.Combine(Path.GetTempPath(), "fmsc-enrollment-tests-" + Guid.N
 Directory.CreateDirectory(root);
 try
 {
-    // Executables come from the FMSC install tree, never a system PATH.
-    string installed = Path.Combine(root, "synthetic-app");
-    string gitExe = Path.Combine(installed, "UpdateTransport", "cmd", "git.exe");
-    string sshExe = Path.Combine(installed, "UpdateTransport", "usr", "bin", "ssh.exe");
+    // Resolve inside the verified maintenance bundle, never a system PATH.
+    string installed = Path.Combine(root, "synthetic-maintenance-bundle");
+    string gitExe = Path.Combine(installed, "cmd", "git.exe");
+    string sshExe = Path.Combine(installed, "usr", "bin", "ssh.exe");
     Directory.CreateDirectory(Path.GetDirectoryName(gitExe)!);
     Directory.CreateDirectory(Path.GetDirectoryName(sshExe)!);
     File.WriteAllText(gitExe, "synthetic fixture; never executed");
@@ -44,7 +44,7 @@ try
     File.WriteAllText(sshExe, "synthetic fixture; never executed");
     var transport = UpdateGitSession.ResolveTransport(installed);
     Require(transport.GitExecutable == gitExe && transport.SshExecutable == sshExe,
-        "Updater must select its bundled Git and SSH, not executables on PATH.");
+        "Updater must select Git and SSH from its verified tool root, not executables on PATH.");
 
     string first = Path.Combine(root, "device1");
     string second = Path.Combine(root, "device2");

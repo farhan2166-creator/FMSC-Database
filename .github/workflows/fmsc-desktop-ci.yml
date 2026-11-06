@@ -6,6 +6,11 @@ on:
   pull_request:
     paths:
       - 'Core/Updates/**'
+      - 'Core/MaintenanceTools.cs'
+      - 'Core/SqlDependencyRepair.cs'
+      - 'Installer/**'
+      - 'Tools/*Maintenance*.ps1'
+      - 'Tools/TestOfflineSqlPrerequisites.ps1'
       - 'FMSC_SMS.csproj'
       - 'Tools/PrepareBundledGit.ps1'
       - 'Tools/TestPublishPowerShell.ps1'
@@ -66,6 +71,10 @@ jobs:
 
       - name: Compile native WinForms smoke checks
         run: dotnet build Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release
+
+      - name: Verify maintenance tool lifecycle without downloads or SQL
+        shell: pwsh
+        run: .\Tools\TestMaintenanceTools.ps1
 
       - name: Run focused post-fix Windows control contracts
         # The fixtures are SQL-free and normally complete rapidly; fail fast
@@ -186,11 +195,16 @@ jobs:
             Set-Content -LiteralPath $msi -Value 'Disposable fixture only'
             Set-Content -LiteralPath $sqlCmd -Value 'Disposable fixture only'
             & .\Tools\PrepareBundledGit.ps1 -DestinationDirectory $transport
-            dotnet publish FMSC_SMS.csproj -c Release -r win-x64 --self-contained true --output $application -p:CIAppOnlyBundle=true "-p:BundledGitDirectory=$transport" "-p:LocalDbMsiPath=$msi" "-p:BundledSqlCmdPath=$sqlCmd" -p:PublishSingleFile=false -p:PublishTrimmed=false
+            foreach($pair in @(@('SqlCmd','sqlcmd.exe',$sqlCmd),@('LocalDb','SqlLocalDB.msi',$msi))){
+              $folder=Join-Path $root $pair[0]
+              New-Item -ItemType Directory -Path $folder | Out-Null
+              Copy-Item -LiteralPath $pair[2] -Destination (Join-Path $folder $pair[1])
+            }
+            dotnet publish FMSC_SMS.csproj -c Release -r win-x64 --self-contained true --output $application -p:CIAppOnlyBundle=true "-p:BundledGitDirectory=$transport" "-p:LocalDbMsiPath=$msi" "-p:BundledSqlCmdPath=$sqlCmd" -p:FmscSyntheticPublishFixture=true -p:PublishSingleFile=false -p:PublishTrimmed=false
             if ($LASTEXITCODE -ne 0) { throw 'Bundled updater smoke publish failed.' }
             foreach ($relative in @('UpdateTransport/cmd/git.exe','UpdateTransport/usr/bin/ssh.exe',
                 'UpdateTransport/COPYING-GIT.txt','UpdateTransport/THIRD_PARTY_NOTICES.txt',
-                'UpdateSupport/Tools/sqlcmd.exe','UpdateSupport/Tools/SqlLocalDB.msi')) {
+                'UpdateSupport/Tools/SqlCmd/sqlcmd.exe','UpdateSupport/Tools/LocalDb/SqlLocalDB.msi')) {
               if (-not (Test-Path -LiteralPath (Join-Path $application $relative) -PathType Leaf)) {
                 throw "Published Git/SSH runtime is incomplete: $relative"
               }

@@ -132,7 +132,7 @@ function Set-FmscRecoveryPhase {
 function Install-FmscStableLauncher {
     param([string]$Source, [string]$Root, [string]$ShortcutPath, [string]$Application)
     Initialize-FmscRecoveryStorage $Root
-    foreach ($name in @('UpdateRecovery.ps1','Launch-FMSC.ps1','FMSC.Launcher.exe')) {
+    foreach ($name in @('MaintenanceTools.ps1','ToolCatalog.json','UpdateRecovery.ps1','Launch-FMSC.ps1','FMSC.Launcher.exe')) {
         Write-FmscAtomicFile (Join-Path $Root $name) ([IO.File]::ReadAllBytes((Join-Path $Source "UpdateSupport/$name")))
     }
     $shell = New-Object -ComObject WScript.Shell
@@ -173,7 +173,7 @@ function Initialize-FmscRecoveryTransaction {
     }
     Test-PreparedUpdate -Root $snapshot -Version $Version -Schema $Schema
     $support = Join-Path $snapshot 'application/UpdateSupport'
-    foreach ($name in @('core.ps1','UpdateRecovery.ps1','Launch-FMSC.ps1')) {
+    foreach ($name in @('MaintenanceTools.ps1','ToolCatalog.json','core.ps1','UpdateRecovery.ps1','Launch-FMSC.ps1')) {
         $destination = if ($name -eq 'core.ps1') { 'Recovery.ps1' } else { $name }
         Write-FmscAtomicFile (Join-Path $Root $destination) ([IO.File]::ReadAllBytes((Join-Path $support $name)))
     }

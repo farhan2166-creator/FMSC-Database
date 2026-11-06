@@ -29,6 +29,11 @@ try {
     $prerequisite = Join-Path $scratch 'readability fixture.txt'
     Set-Content -LiteralPath $prerequisite -Value 'Test fixture; not an installer.'
 
+    foreach($pair in @(@('SqlCmd','sqlcmd.exe',$sqlCmd),@('LocalDb','SqlLocalDB.msi',$prerequisite))){
+        $folder=Join-Path $scratch $pair[0]
+        $null=New-Item -ItemType Directory -Path $folder
+        Copy-Item -LiteralPath $pair[2] -Destination (Join-Path $folder $pair[1])
+    }
     # Deliberately omit Windows PowerShell modules from the parent environment.
     # The real MSBuild Exec tasks must supply the correct path to both children.
     $env:PSModulePath = Join-Path $PSHOME 'Modules'
@@ -46,7 +51,7 @@ try {
         "-p:PublishDir=$application/" "-p:ReleaseRoot=$release/" `
         "-p:LocalDbMsiPath=$prerequisite" "-p:DeploymentDatabaseDirectory=$database" `
         "-p:BundledGitDirectory=$transport" "-p:BundledSqlCmdPath=$sqlCmd" `
-        -p:PublishSingleFile=false -p:PublishTrimmed=false 2>&1
+        -p:FmscSyntheticPublishFixture=true -p:PublishSingleFile=false -p:PublishTrimmed=false 2>&1
     $code = $LASTEXITCODE
     if ($code -ne 0) {
         throw "Full PortableRelease publish failed from PowerShell 7:`n$($output -join "`n")"
@@ -67,8 +72,11 @@ try {
         'FMSC_SMS/UpdateTransport/usr/bin/ssh.exe',
         'FMSC_SMS/UpdateTransport/COPYING-GIT.txt',
         'FMSC_SMS/UpdateTransport/THIRD_PARTY_NOTICES.txt',
-        'FMSC_SMS/UpdateSupport/Tools/sqlcmd.exe',
-        'FMSC_SMS/UpdateSupport/Tools/SqlLocalDB.msi',
+        'FMSC_SMS/UpdateSupport/Tools/SqlCmd/sqlcmd.exe',
+        'FMSC_SMS/UpdateSupport/Tools/LocalDb/SqlLocalDB.msi',
+        'FMSC_SMS/UpdateSupport/MaintenanceTools.ps1',
+        'FMSC_SMS/UpdateSupport/ToolCatalog.json',
+        'MaintenanceTools.ps1', 'ToolCatalog.json',
         'UpdateRecovery.ps1', 'core.ps1', 'Install FMSC_SMS.bat', 'FMSC.Setup.exe', 'Tools/SqlLocalDB.msi')) {
         $file = Join-Path $release $relative
         if (-not (Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -eq 0) {
@@ -80,6 +88,10 @@ try {
         ,@('Installer/core.ps1', 'FMSC_SMS/UpdateSupport/core.ps1')
         ,@('Installer/UpdateRecovery.ps1', 'UpdateRecovery.ps1')
         ,@('Installer/UpdateRecovery.ps1', 'FMSC_SMS/UpdateSupport/UpdateRecovery.ps1')
+        ,@('Installer/MaintenanceTools.ps1', 'MaintenanceTools.ps1')
+        ,@('Installer/MaintenanceTools.ps1', 'FMSC_SMS/UpdateSupport/MaintenanceTools.ps1')
+        ,@('Installer/ToolCatalog.json', 'ToolCatalog.json')
+        ,@('Installer/ToolCatalog.json', 'FMSC_SMS/UpdateSupport/ToolCatalog.json')
         ,@('Installer/Launch-FMSC.ps1', 'FMSC_SMS/UpdateSupport/Launch-FMSC.ps1')
     )) {
         $expected = (Get-FileHash -LiteralPath (Join-Path $ProjectDirectory $pair[0]) -Algorithm SHA256).Hash
@@ -87,8 +99,8 @@ try {
         if ($actual -ne $expected) { throw "Published installer asset differs from checked-out source: $($pair[1])" }
     }
     foreach ($pair in @(
-        ,@($sqlCmd, (Join-Path $application 'UpdateSupport/Tools/sqlcmd.exe'))
-        ,@($prerequisite, (Join-Path $application 'UpdateSupport/Tools/SqlLocalDB.msi'))
+        ,@($sqlCmd, (Join-Path $application 'UpdateSupport/Tools/SqlCmd/sqlcmd.exe'))
+        ,@($prerequisite, (Join-Path $application 'UpdateSupport/Tools/LocalDb/SqlLocalDB.msi'))
     )) {
         if ((Get-FileHash -LiteralPath $pair[0] -Algorithm SHA256).Hash -ne
             (Get-FileHash -LiteralPath $pair[1] -Algorithm SHA256).Hash) {

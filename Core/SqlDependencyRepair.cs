@@ -7,8 +7,6 @@ namespace FMSC_SMS.Core;
 /// <summary>Repairs only the SQL runtime. Never runs the FMSC installer or replaces school data.</summary>
 internal static class SqlDependencyRepair
 {
-    internal const string PackageUrl = "https://download.microsoft.com/download/3/8/d/38de7036-2433-4207-8eae-06e247e17b25/SqlLocalDB.msi";
-
     internal static async Task<int> RepairAsync(IProgress<string> progress)
     {
         if (RuntimeInformation.OSArchitecture != Architecture.X64)
@@ -18,20 +16,9 @@ internal static class SqlDependencyRepair
         string package = Path.Combine(folder, "SqlLocalDB.msi");
         try
         {
-            // Fresh installs and later private updates retain a signed LocalDB
-            // MSI. Prefer this offline copy; legacy installations may download.
-            string bundled = Path.Combine(AppContext.BaseDirectory,
-                "UpdateSupport", "Tools", "SqlLocalDB.msi");
-            if (File.Exists(bundled))
-            {
-                progress.Report("Using FMSC's bundled SQL Server LocalDB installer...");
-                File.Copy(bundled, package, overwrite: false);
-            }
-            else
-            {
-                progress.Report("Downloading SQL Server LocalDB from Microsoft...");
-                await DownloadAsync(package);
-            }
+            progress.Report("Checking FMSC's retained SQL repair tools...");
+            var retained = await MaintenanceTools.EnsureAsync("LocalDb");
+            File.Copy(retained.File, package, overwrite: false);
             progress.Report("Verifying the Microsoft package signature...");
             await VerifySignatureAsync(package);
             progress.Report("Installing SQL Server LocalDB. Approve the Windows administrator prompt to continue.");
@@ -60,29 +47,6 @@ internal static class SqlDependencyRepair
                 AppExceptionHandler.LogNonFatal(fallbackException2, "SqlDependencyRepair: UnauthorizedAccessException recovery");
             }
         }
-    }
-
-    internal static async Task DownloadAsync(string destination)
-    {
-        using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        using var response = await client.GetAsync(PackageUrl, HttpCompletionOption.ResponseHeadersRead);
-        response.EnsureSuccessStatusCode();
-        Uri? final = response.RequestMessage?.RequestUri;
-        if (final?.Scheme != "https" || !string.Equals(final.Host, "download.microsoft.com", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("The SQL package download did not come from the approved Microsoft host.");
-        const long limit = 200L * 1024 * 1024;
-        if (response.Content.Headers.ContentLength > limit) throw new InvalidOperationException("The SQL package exceeds the expected download size.");
-        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
-        await using var input = await response.Content.ReadAsStreamAsync(timeout.Token);
-        await using var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true);
-        var buffer = new byte[81920]; long total = 0; int read;
-        while ((read = await input.ReadAsync(buffer, timeout.Token)) > 0)
-        {
-            total += read;
-            if (total > limit) throw new InvalidOperationException("The SQL package exceeds the expected download size.");
-            await output.WriteAsync(buffer.AsMemory(0, read), timeout.Token);
-        }
-        if (total == 0) throw new InvalidOperationException("Microsoft returned an empty SQL package.");
     }
 
     internal static async Task VerifySignatureAsync(string package)

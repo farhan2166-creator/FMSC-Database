@@ -132,11 +132,19 @@ production gate, limited to `FMSC-Updates`; never rewrite the source history.
 - `Tools/UpdatePackages`, `Tools/UpdateDistribution` and their regression
   fixtures: package creation and safe two-version snapshot preparation.
 - Windows Git enrollment/DPAPI tests and existing desktop CI checks.
-- `Tools/PrepareBundledGit.ps1` and release workflows: fetch the exact approved
-  MinGit ZIP from Git for Windows, validate its published SHA-256, smoke-test Git
-  and OpenSSH and carry the complete runtime plus license notices under
-  `UpdateTransport/`. The application uses absolute bundled executable paths
-  and never searches PATH, Git installations or Windows OpenSSH.
+- `Tools/PrepareMaintenanceTools.ps1` and `Installer/ToolCatalog.json`: one approved
+  catalog for Git/OpenSSH, sqlcmd and the LocalDB MSI. Local publishing verifies
+  the owner's cached tools without downloads; release workflows explicitly download
+  missing tools and package complete integrity manifests. Git's full runtime and
+  notices remain under `UpdateTransport/`; SQL bundles are under
+  `UpdateSupport/Tools/SqlCmd/` and `UpdateSupport/Tools/LocalDb/`.
+- `Installer/MaintenanceTools.ps1`: installation retains verified versions under
+  `%ProgramData%\FMSC_Updater\MaintenanceTools`, outside application activation,
+  rollback and transaction cleanup. Update checks use an absolute verified Git/SSH
+  pair from this protected cache. Activation/recovery resolves sqlcmd there too.
+  Missing/corrupt bundles are restored from the application, then approved HTTPS
+  sources if necessary, independently of Git and the original setup folder.
+  Machine-cache repair can require UAC; unchanged tools require no rewrite/download.
 
 **Removed:** owner-only `Tools/UpdateSigning`, RSA signature generation,
 `update-manifest.sig`, pinned publisher public-key resource, recovery backup

@@ -1,21 +1,49 @@
 <Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <FmscToolsDirectory Condition="'$(FmscToolsDirectory)' == ''">$(MSBuildProjectDirectory)/../Tools</FmscToolsDirectory>
+        <BundledGitDirectory Condition="'$(BundledGitDirectory)' == ''">$(FmscToolsDirectory)/MinGit</BundledGitDirectory>
+        <BundledSqlCmdPath Condition="'$(BundledSqlCmdPath)' == ''">$(FmscToolsDirectory)/sqlcmd.exe</BundledSqlCmdPath>
+        <LocalDbMsiPath Condition="'$(LocalDbMsiPath)' == ''">$(FmscToolsDirectory)/SqlLocalDB.msi</LocalDbMsiPath>
+    </PropertyGroup>
+    <Target Name="PrepareMaintenanceInputs" BeforeTargets="PrepareForPublish"
+            Condition="'$(FmscSyntheticPublishFixture)' != 'true'">
+        <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)/Tools/PrepareMaintenanceTools.ps1&quot; -ToolsDirectory &quot;$(FmscToolsDirectory)&quot; -GitDirectory &quot;$(BundledGitDirectory)&quot; -SqlCmdPath &quot;$(BundledSqlCmdPath)&quot; -LocalDbMsiPath &quot;$(LocalDbMsiPath)&quot;"
+              EnvironmentVariables="PSModulePath=$(SystemRoot)\System32\WindowsPowerShell\v1.0\Modules" />
+        <ItemGroup>
+            <_MaintenanceGitFile Include="$(BundledGitDirectory)/**/*" />
+            <_MaintenanceSqlCmdFile Include="$([System.IO.Path]::GetDirectoryName('$(BundledSqlCmdPath)'))/SqlCmd/**/*" />
+            <_MaintenanceLocalDbFile Include="$([System.IO.Path]::GetDirectoryName('$(LocalDbMsiPath)'))/LocalDb/**/*" />
+            <!-- Build may already have assigned content paths. Add the freshly
+                 prepared bundles with explicit publish paths. -->
+            <ContentWithTargetPath Include="@(_MaintenanceGitFile)" CopyToPublishDirectory="Always">
+                <TargetPath>UpdateTransport/%(_MaintenanceGitFile.RecursiveDir)%(_MaintenanceGitFile.Filename)%(_MaintenanceGitFile.Extension)</TargetPath>
+            </ContentWithTargetPath>
+            <ContentWithTargetPath Include="@(_MaintenanceSqlCmdFile)" CopyToPublishDirectory="Always">
+                <TargetPath>UpdateSupport/Tools/SqlCmd/%(_MaintenanceSqlCmdFile.RecursiveDir)%(_MaintenanceSqlCmdFile.Filename)%(_MaintenanceSqlCmdFile.Extension)</TargetPath>
+            </ContentWithTargetPath>
+            <ContentWithTargetPath Include="@(_MaintenanceLocalDbFile)" CopyToPublishDirectory="Always">
+                <TargetPath>UpdateSupport/Tools/LocalDb/%(_MaintenanceLocalDbFile.RecursiveDir)%(_MaintenanceLocalDbFile.Filename)%(_MaintenanceLocalDbFile.Extension)</TargetPath>
+            </ContentWithTargetPath>
+        </ItemGroup>
+    </Target>
+    <ItemGroup>
+        <Content Include="Installer/MaintenanceTools.ps1;Installer/ToolCatalog.json" Link="UpdateSupport/%(Filename)%(Extension)" CopyToPublishDirectory="Always" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(FmscSyntheticPublishFixture)' == 'true'">
+            <Content Include="$([System.IO.Path]::GetDirectoryName('$(BundledSqlCmdPath)'))/SqlCmd/**/*"
+                     Link="UpdateSupport/Tools/SqlCmd/%(RecursiveDir)%(Filename)%(Extension)" CopyToPublishDirectory="Always" />
+            <Content Include="$([System.IO.Path]::GetDirectoryName('$(LocalDbMsiPath)'))/LocalDb/**/*"
+                     Link="UpdateSupport/Tools/LocalDb/%(RecursiveDir)%(Filename)%(Extension)" CopyToPublishDirectory="Always" />
+    </ItemGroup>
     <!-- The complete installer AND every update must carry Git/SSH and their
          supporting DLLs. Local compilation is unaffected; publish fails closed. -->
-    <ItemGroup Condition="'$(BundledGitDirectory)' != ''">
+    <ItemGroup Condition="'$(FmscSyntheticPublishFixture)' == 'true'">
         <Content Include="$(BundledGitDirectory)\**\*"
                  Link="UpdateTransport\%(RecursiveDir)%(Filename)%(Extension)"
                  CopyToPublishDirectory="Always" />
     </ItemGroup>
     <!-- Both full installs and application-only private updates keep the
          offline SQL dependency tools needed by later recovery/repair. -->
-    <ItemGroup Condition="'$(BundledSqlCmdPath)' != ''">
-        <Content Include="$(BundledSqlCmdPath)" Link="UpdateSupport/Tools/sqlcmd.exe"
-                 CopyToPublishDirectory="Always" />
-    </ItemGroup>
-    <ItemGroup Condition="'$(LocalDbMsiPath)' != ''">
-        <Content Include="$(LocalDbMsiPath)" Link="UpdateSupport/Tools/SqlLocalDB.msi"
-                 CopyToPublishDirectory="Always" />
-    </ItemGroup>
     <Target Name="RequireOfflineSqlToolsForPublish" BeforeTargets="PrepareForPublish"
             Condition="'$(FmscLevel2)' != 'true'">
         <Error Condition="'$(BundledSqlCmdPath)' == '' Or !Exists('$(BundledSqlCmdPath)')"
@@ -175,9 +203,6 @@
 		<PropertyGroup>
 			<DeploymentDatabaseDirectory Condition="'$(DeploymentDatabaseDirectory)' == ''">$(MSBuildProjectDirectory)\..\Database</DeploymentDatabaseDirectory>
 			<DeploymentMigrationDirectory Condition="'$(DeploymentMigrationDirectory)' == ''">$(MSBuildProjectDirectory)\Migrations</DeploymentMigrationDirectory>
-			<LocalDbMsiPath Condition="'$(LocalDbMsiPath)' == '' AND Exists('$(MSBuildProjectDirectory)\..\Tools\SqlLocalDB.msi')">$(MSBuildProjectDirectory)\..\Tools\SqlLocalDB.msi</LocalDbMsiPath>
-			<LocalDbMsiPath Condition="'$(LocalDbMsiPath)' == '' AND Exists('$(MSBuildProjectDirectory)\..\LocalDB\SqlLocalDB.msi')">$(MSBuildProjectDirectory)\..\LocalDB\SqlLocalDB.msi</LocalDbMsiPath>
-			<LocalDbMsiPath Condition="'$(LocalDbMsiPath)' == ''">$(MSBuildProjectDirectory)\..\Tools\SqlLocalDB.msi</LocalDbMsiPath>
 			<_InstallerScript>$(MSBuildProjectDirectory)\Installer\core.ps1</_InstallerScript>
 			<_InstallerText>$([System.IO.File]::ReadAllText('$(_InstallerScript)'))</_InstallerText>
 			<!-- [$] escapes the PowerShell variable marker from MSBuild property expansion. -->
@@ -189,8 +214,8 @@
 			<_RequiredDeploymentFile Include="$(MSBuildProjectDirectory)\Installer\Install FMSC_SMS.bat" />
 		</ItemGroup>
 		<Error Condition="'@(_RequiredDeploymentFile)' != '' AND !Exists('%(FullPath)')" Text="Required release asset is missing: %(FullPath). Publishing has been stopped." />
-		<!-- LocalDB must be bundled; sqlcmd can be resolved by the installer. The self-contained publish includes the .NET Desktop Runtime. -->
-		<Error Condition="!Exists('$(LocalDbMsiPath)')" Text="Required LocalDB prerequisite is missing: $(LocalDbMsiPath). Supply LocalDbMsiPath or place SqlLocalDB.msi in ..\Tools or ..\LocalDB." />
+		<!-- Both SQL tools are bundled; .NET is included in the self-contained app. -->
+		<Error Condition="!Exists('$(LocalDbMsiPath)')" Text="Required LocalDB prerequisite is missing: $(LocalDbMsiPath). Supply LocalDbMsiPath or place SqlLocalDB.msi in ..\Tools." />
 		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Installer\ValidateReleaseAssets.ps1&quot; -DatabaseDirectory &quot;$(DeploymentDatabaseDirectory)&quot; -LocalDbMsiPath &quot;$(LocalDbMsiPath)&quot;"
               EnvironmentVariables="PSModulePath=$(SystemRoot)\System32\WindowsPowerShell\v1.0\Modules" />
 	</Target>
@@ -206,12 +231,10 @@
 		<MakeDir Directories="$(ReleaseRoot)Database" Condition="Exists('$(DeploymentDatabaseDirectory)\FMSC_DB.mdf')" />
 		<Copy SourceFiles="$(DeploymentDatabaseDirectory)\FMSC_DB.mdf" DestinationFiles="$(ReleaseRoot)Database\FMSC_DB.mdf" SkipUnchangedFiles="true" Condition="Exists('$(DeploymentDatabaseDirectory)\FMSC_DB.mdf')" />
 		<Copy SourceFiles="$(DeploymentDatabaseDirectory)\FMSC_DB_log.ldf" DestinationFiles="$(ReleaseRoot)Database\FMSC_DB_log.ldf" SkipUnchangedFiles="true" Condition="Exists('$(DeploymentDatabaseDirectory)\FMSC_DB_log.ldf')" />
-		<MakeDir Directories="$(ReleaseRoot)Tools" />
-		<ItemGroup>
-			<_InstallerToolFile Include="$(MSBuildProjectDirectory)\..\Tools\*" />
-		</ItemGroup>
-		<Copy SourceFiles="@(_InstallerToolFile)" DestinationFolder="$(ReleaseRoot)Tools" SkipUnchangedFiles="true" Condition="'@(_InstallerToolFile)' != ''" />
+		<Copy SourceFiles="$(MSBuildProjectDirectory)/Installer/MaintenanceTools.ps1;$(MSBuildProjectDirectory)/Installer/ToolCatalog.json" DestinationFolder="$(ReleaseRoot)" SkipUnchangedFiles="true" />
+        <MakeDir Directories="$(ReleaseRoot)Tools" />
 		<Copy SourceFiles="$(LocalDbMsiPath)" DestinationFiles="$(ReleaseRoot)Tools\SqlLocalDB.msi" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(BundledSqlCmdPath)" DestinationFiles="$(ReleaseRoot)Tools\sqlcmd.exe" SkipUnchangedFiles="true" />
 		<MakeDir Directories="$(ReleaseRoot)Migrations" />
 		<ItemGroup>
 			<MigrationFiles Include="$(DeploymentMigrationDirectory)\*.sql" />
