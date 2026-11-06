@@ -225,7 +225,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         tabs.SelectedIndexChanged+=(_,_)=>operational.Visible=tabs.SelectedTab?.Text=="Settings";
         content.Controls.Add(operational);
         SetContent(content);
-        Disposed+=(_,_)=>{foreach(var page in advancedTabs)if(page.Parent is null)page.Dispose();};
+
         if(!CurrentUser.HasPermission("Communication.Compose"))tabs.SelectedIndex=1;
         ConfigureGuidance();
         foreach(var input in new[]{campus,year,cls,section})input.UserSelectionChanged+=(_,_)=>RecipientFiltersChanged();
