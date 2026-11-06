@@ -28,6 +28,13 @@ try {
             throw "Verified MinGit archive missing component: $file"
         }
     }
+    # Include Git's redistribution license, not merely a web reference.
+    $copying=Join-Path $DestinationDirectory 'COPYING-GIT.txt'
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/git-for-windows/git/$tag/COPYING" -OutFile $copying -MaximumRedirection 5
+    if ((Get-Item -LiteralPath $copying).Length -lt 5000 -or
+        -not (Select-String -LiteralPath $copying -Pattern 'GNU GENERAL PUBLIC LICENSE' -Quiet)) {
+        throw 'Required Git redistribution license could not be verified.'
+    }
     & $git --version
     if ($LASTEXITCODE -ne 0) { throw 'Bundled Git could not run.' }
     & $ssh -V 2>&1 | Out-Null
@@ -38,7 +45,8 @@ try {
         "Distribution: $url"
         "Archive SHA-256: $expected"
         'Source: https://github.com/git-for-windows/git/tree/v2.56.0.windows.4'
-        'Git GPLv2: https://github.com/git-for-windows/git/blob/v2.56.0.windows.4/COPYING'
+        'Bundled license text: COPYING-GIT.txt (GPLv2)'
+        'Upstream license: https://github.com/git-for-windows/git/blob/v2.56.0.windows.4/COPYING'
         'OpenSSH and other included components retain their respective licenses.'
         'See original sources for the corresponding component license notices.'
     ) | Set-Content -LiteralPath (Join-Path $DestinationDirectory 'THIRD_PARTY_NOTICES.txt') -Encoding UTF8
