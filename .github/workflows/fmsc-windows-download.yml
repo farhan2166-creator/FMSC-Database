@@ -134,6 +134,17 @@ jobs:
               throw "Missing Windows application output: $name"
             }
           }
+          foreach ($pair in @(
+            ,@('out/prerequisites/sqlcmd.exe','UpdateSupport/Tools/sqlcmd.exe')
+            ,@('out/prerequisites/SqlLocalDB.msi','UpdateSupport/Tools/SqlLocalDB.msi')
+          )) {
+            $source = Join-Path $env:GITHUB_WORKSPACE $pair[0]
+            $published = Join-Path $root $pair[1]
+            if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne
+                (Get-FileHash -LiteralPath $published -Algorithm SHA256).Hash) {
+              throw "Published SQL prerequisite changed: $($pair[1])"
+            }
+          }
           # Only the signed Microsoft LocalDB dependency MSI may accompany an
           # app-only update. School database files and arbitrary MSIs are forbidden.
           $forbidden = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object {

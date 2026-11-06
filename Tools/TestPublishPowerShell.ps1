@@ -86,6 +86,15 @@ try {
         $actual = (Get-FileHash -LiteralPath (Join-Path $release $pair[1]) -Algorithm SHA256).Hash
         if ($actual -ne $expected) { throw "Published installer asset differs from checked-out source: $($pair[1])" }
     }
+    foreach ($pair in @(
+        ,@($sqlCmd, (Join-Path $application 'UpdateSupport/Tools/sqlcmd.exe'))
+        ,@($prerequisite, (Join-Path $application 'UpdateSupport/Tools/SqlLocalDB.msi'))
+    )) {
+        if ((Get-FileHash -LiteralPath $pair[0] -Algorithm SHA256).Hash -ne
+            (Get-FileHash -LiteralPath $pair[1] -Algorithm SHA256).Hash) {
+            throw "Published offline SQL fixture differs from its input: $($pair[1])"
+        }
+    }
     & (Join-Path $ProjectDirectory 'Tools/TestOfflineSqlPrerequisites.ps1')
     & (Join-Path $ProjectDirectory 'Tools/TestWindowlessLauncher.ps1') -LauncherPath (Join-Path $application 'UpdateSupport/FMSC.Launcher.exe')
     # GUI setup is one native executable copied to both first install and

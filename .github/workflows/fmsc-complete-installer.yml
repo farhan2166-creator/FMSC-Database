@@ -163,6 +163,14 @@ jobs:
             $actual = (Get-FileHash -LiteralPath (Join-Path $root $pair[1]) -Algorithm SHA256).Hash
             if ($actual -ne $expected) { throw "Packaged installer asset differs from checked-out source: $($pair[1])" }
           }
+          foreach ($pair in @(
+            ,@('Tools/sqlcmd.exe','FMSC_SMS/UpdateSupport/Tools/sqlcmd.exe')
+            ,@('Tools/SqlLocalDB.msi','FMSC_SMS/UpdateSupport/Tools/SqlLocalDB.msi')
+          )) {
+            $one=(Get-FileHash -LiteralPath (Join-Path $root $pair[0]) -Algorithm SHA256).Hash
+            $two=(Get-FileHash -LiteralPath (Join-Path $root $pair[1]) -Algorithm SHA256).Hash
+            if ($one -ne $two) { throw "Installed/offline prerequisite mismatch: $($pair[1])" }
+          }
           & (Join-Path $env:GITHUB_WORKSPACE 'Tools/TestInstallerLocalDb.ps1') -InstallerPath (Join-Path $root 'core.ps1')
           & (Join-Path $env:GITHUB_WORKSPACE 'Tools/TestInstallerMigrations.ps1') -InstallerPath (Join-Path $root 'core.ps1')
           $excluded = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $_.Extension.ToLowerInvariant() -in @('.mdf','.ldf','.bak') })
