@@ -37,7 +37,6 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private readonly Label sendHint=new(){AutoEllipsis=true,ForeColor=AppTheme.Text,Text="Preview the message before sending."};
     private readonly List<Control> composeOptions=new();
     private bool composeOptionsExpanded;
-    private bool advancedView; // Historical detail-column policy; the operator view stays concise.
     private int settingsSection;
     private readonly ModernComboBox audience=HumanUi.Combo();
     private int recipientPage,historyPage,contactPage,templatePage;
@@ -164,7 +163,9 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
                 || previewSignature!=Signature() || preview.DataSource is not DataTable reviewed)return;
             await ExecuteAsync(()=>SendReviewedAsync(reviewed));
         };
-        var moreOptions=Button("More Options",()=>{ShowComposeOptions(!composeOptionsExpanded);return Task.CompletedTask;},"Communication.Compose");
+        // Initialize before capturing this control in the local options layout function.
+        ModernButton moreOptions=null!;
+        moreOptions=Button("More Options",()=>{ShowComposeOptions(!composeOptionsExpanded);return Task.CompletedTask;},"Communication.Compose");
         Row(Bar(Button("Preview Messages",async()=>{
             if(audience.SelectedIndex<3)await SelectMatchingContactsAsync();
             await PreviewAsync();
@@ -421,7 +422,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
             foreach(DataGridViewColumn column in grid.Columns)
                 column.Visible=column.Name is not ("ContactId" or "AdmissionId" or "EnrollmentId" or "FamilyId"
                     or "Parameters" or "MessageId" or "CampaignId" or "CreatedBy" or "ApprovedBy" or "ProviderReference")
-                    && (advancedView || everyday.Contains(column.Name));
+                    && everyday.Contains(column.Name);
         }
         SetColumns(recipients,["Include","Student","ContactName","Class","Outstanding"]);
         SetColumns(preview,["ContactName","Destination","Body","Exclusion","EstimatedCost","Currency"]);
