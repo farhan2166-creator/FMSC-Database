@@ -327,6 +327,29 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
             _install.Visible = false;
             _downloadDetails.Text = _download.Enabled ? _method + " · approximately " +
                 (archive.Length / 1048576d).ToString("N1") + " MB" : "No download required";
+            if (_download.Enabled)
+            {
+                string checkedStatus = _status.Text;
+                _status.Text = "Checking previously prepared update against the approved release…";
+                // The manual check already authenticated to the current private
+                // Git feed. Reuse an old stage only if its exact manifest matches
+                // that feed AND every staged file passes the installer handoff.
+                var saved = await Task.Run(() => UpdatePreparedResume.FindVerified(
+                    release, _method, UpdateDeviceKey.StateDirectory), _lifetime.Token);
+                if (IsDisposed || Disposing) return;
+                if (saved is not null)
+                {
+                    _prepared = saved;
+                    _download.Enabled = _download.Visible = false;
+                    _install.Enabled = _install.Visible = true;
+                    _downloadDetails.Text = saved.Method + " · downloaded and verified (reused)";
+                    _status.Text = "Ready to Install" + Environment.NewLine +
+                        "Saved update rechecked against the private repository and all application files. " +
+                        "The update is not installed yet.";
+                }
+                else
+                    _status.Text = checkedStatus;
+            }
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
@@ -342,7 +365,7 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         finally
         {
             if (!IsDisposed && !Disposing)
-            { _check.Enabled = _hasAuthorization; _progress.Visible = false; }
+            { _check.Enabled = _hasAuthorization && _prepared is null; _progress.Visible = false; }
         }
     }
 
@@ -424,7 +447,7 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         finally
         {
             _downloadWatch.Stop();
-            if (!IsDisposed && !Disposing) { _transferTimer.Stop(); _check.Enabled = true; }
+            if (!IsDisposed && !Disposing) { _transferTimer.Stop(); _check.Enabled = _hasAuthorization && _prepared is null; }
         }
     }
 }
