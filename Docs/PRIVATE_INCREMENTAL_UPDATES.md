@@ -446,12 +446,15 @@ After activation, the installer compares the installed application with its sour
 checks the prepared manifest again and runs the existing database compatibility
 check using the installed executable. Only after these checks succeed does it
 remove the fixed `.rollback` application directory. Verification failures retain
-the previous application and downloads for recovery; database recovery backups
-remain available in either case.
+the previous application and downloads for recovery. After successful
+verification, the installer retains the newest two pre-migration backups in
+`C:\ProgramData\FMSC_Database\Backups` and verifies both before deleting
+older files with the installer’s pre-migration naming pattern. If verification
+fails, all backups are retained. Regular school backups are outside this policy.
 
 Successful prepared updates also remove their own `prepared-<guid>` directory
 and hashed chunk-cache directories. The computer's enrollment key, database files
-and database backups are outside this cleanup. Absolute-path checks and link
+and regular database backups are outside this cleanup. Absolute-path checks and link
 refusal limit recursive deletion. A locked file produces a cleanup warning without
 turning a verified activation into a failed installation; the next successful
 installation retries removal of the fixed rollback directory. Older staging

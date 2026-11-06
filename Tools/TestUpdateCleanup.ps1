@@ -4,7 +4,7 @@ $source = Get-Content (Join-Path $PSScriptRoot '../Installer/core.ps1') -Raw
 $tokens = $null; $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseInput($source, [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw 'Installer does not parse.' }
-foreach ($name in @('Remove-VerifiedUpdateDirectory','Complete-VerifiedApplicationUpdate')) {
+foreach ($name in @('Remove-VerifiedUpdateDirectory','Remove-OldPreMigrationBackups','Complete-VerifiedApplicationUpdate')) {
     $definition = $ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name}, $true)
     Invoke-Expression $definition.Extent.Text
 }
@@ -13,9 +13,11 @@ function Write-WarningMessage { param($Message) $script:warnings++ }
 function Test-StagedApplication { param($Source,$Staging) if ($script:badFiles) { throw 'Damaged activated files' } }
 function Test-PreparedUpdate { param($Root,$Version,$Schema,$Application) if ($script:badManifest) { throw 'Damaged manifest' } }
 function Invoke-InstallationDatabaseCheck { param($Application) return $script:verification }
+function Invoke-SqlMaster { param($Query) if ($script:badBackup) { throw 'Invalid backup' } }
 $AppVersion = '1.0.0'; $DatabaseVersion = '1'
 $root = Join-Path ([IO.Path]::GetTempPath()) ('fmsc-cleanup-' + [Guid]::NewGuid().ToString('N'))
 $app = Join-Path $root 'app'; $rollback = "$app.rollback"
+$DatabaseDir = Join-Path $root 'database'
 $state = Join-Path $root 'FMSC/Updates'
 $prepared = Join-Path $state ('prepared-' + [Guid]::NewGuid().ToString('N'))
 $cache = Join-Path $state ('download-cache/' + ('a' * 64))
@@ -49,6 +51,21 @@ try {
     Complete-VerifiedApplicationUpdate $app $app
     if ((Test-Path $rollback) -or -not (Test-Path $app) -or -not (Test-Path $key) -or -not (Test-Path $backup)) {
         throw 'Successful cleanup removed protected data or retained rollback.'
+    }
+    $backupFolder = Join-Path $DatabaseDir 'Backups'
+    New-Item -ItemType Directory -Path $backupFolder | Out-Null
+    $old = Join-Path $backupFolder 'FMSC_DB_BeforeMigration_v1_to_v2_20261101_090000.bak'
+    $recent = Join-Path $backupFolder 'FMSC_DB_BeforeMigration_v2_to_v3_20261102_090000.bak'
+    $latest = Join-Path $backupFolder 'FMSC_DB_BeforeMigration_v2_to_v3_20261102_090000_1.bak'
+    $manual = Join-Path $backupFolder 'manual-school-backup.bak'
+    foreach ($path in @($old,$recent,$latest,$manual)) { Set-Content -LiteralPath $path 'backup fixture' }
+    $script:badBackup = $true
+    Complete-VerifiedApplicationUpdate $app $app
+    if (-not (Test-Path $old)) { throw 'Unverified retained backups allowed pruning.' }
+    $script:badBackup = $false
+    Complete-VerifiedApplicationUpdate $app $app
+    if ((Test-Path $old) -or -not (Test-Path $recent) -or -not (Test-Path $latest) -or -not (Test-Path $manual)) {
+        throw 'Pre-migration backup retention removed the wrong files.'
     }
     $link = Join-Path $root 'linked-rollback'
     New-Item -ItemType Junction -Path $link -Target $app | Out-Null

@@ -26,7 +26,7 @@ function Wait-OriginalFmscExit {
     }
 }
 $AppName = 'FMSC School Management System'
-$AppVersion = '1.0.2'
+$AppVersion = '1.0.3'
 $DatabaseVersion = '3'
 $ReleaseRoot = $PSScriptRoot
 $AppSource      = Join-Path $ReleaseRoot 'FMSC_SMS'
@@ -1128,6 +1128,34 @@ function Remove-VerifiedUpdateDirectory {
     }
     Remove-Item -LiteralPath $full -Recurse -Force -ErrorAction Stop
 }
+function Remove-OldPreMigrationBackups {
+    if (-not $DatabaseDir) { return }
+    $folder = Join-Path $DatabaseDir 'Backups'
+    if (-not (Test-Path -LiteralPath $folder -PathType Container)) { return }
+    for ($item = Get-Item -LiteralPath $folder -Force; $null -ne $item; $item = $item.Parent) {
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw 'Linked backup directory refused.'
+        }
+    }
+    $backups = @(Get-ChildItem -LiteralPath $folder -File -Force | ForEach-Object {
+        if (-not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -and
+            $_.Name -match '^FMSC_DB_BeforeMigration_v[0-9]+_to_v[0-9]+_(?<stamp>[0-9]{8}_[0-9]{6})(?:_(?<sequence>[0-9]+))?\.bak$') {
+            [pscustomobject]@{ Path = $_.FullName; Stamp = $Matches.stamp; Sequence = [long]$Matches.sequence }
+        }
+    } | Sort-Object -Property Stamp, Sequence -Descending)
+    if ($backups.Count -le 2) { return }
+
+    # Verify both retained recovery points before removing any older file.
+    foreach ($backup in ($backups | Select-Object -First 2)) {
+        $sqlPath = $backup.Path.Replace("'", "''")
+        Invoke-SqlMaster -Query "RESTORE VERIFYONLY FROM DISK = N'$sqlPath' WITH CHECKSUM" | Out-Null
+    }
+    foreach ($backup in ($backups | Select-Object -Skip 2)) {
+        Remove-Item -LiteralPath $backup.Path -ErrorAction Stop
+        Write-Log "Removed older pre-migration backup: $($backup.Path)"
+    }
+}
+
 function Complete-VerifiedApplicationUpdate {
     param([string]$ApplicationDirectory, [string]$Source, [string]$Prepared = '')
     # Verification failures keep rollback and downloads for recovery.
@@ -1138,6 +1166,8 @@ function Complete-VerifiedApplicationUpdate {
     $result = Invoke-InstallationDatabaseCheck -Application (Join-Path $ApplicationDirectory 'FMSC_SMS.exe')
     if ($result -notin @(0,10)) { throw "Activated application verification failed (code $result). Recovery files have been kept." }
     if ($script:RecoveryJournal) { Complete-FmscRecoveryTransaction }
+    try { Remove-OldPreMigrationBackups }
+    catch { Write-WarningMessage "Update succeeded; pre-migration backup cleanup is pending: $($_.Exception.Message)" }
     $rollback = "$ApplicationDirectory.rollback"
     try {
         Remove-VerifiedUpdateDirectory -Path $rollback -ExpectedPath $rollback
