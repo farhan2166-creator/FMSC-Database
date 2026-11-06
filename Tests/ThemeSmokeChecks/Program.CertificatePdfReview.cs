@@ -21,13 +21,13 @@ internal static partial class Program
     {
         new("CharacterCertificate", "Character Certificate — SSC, Student", "character-ssc-student",
             "Muhammad Hamza", "Abdul Rehman", "Male",
-            new Dictionary<string, object> { ["ExamTypeDisplay"]="SSC", ["LastExamYear"]=2025, ["RollNumber"]="182734", ["Remarks"]="Excellent" }),
+            new Dictionary<string, object> { ["ExamTypeDisplay"]="S.S.C (Matric)", ["LastExamYear"]=2025, ["RollNumber"]="182734", ["Remarks"]="Excellent" }),
         new("CharacterCertificate", "Character Certificate — HSSC, Student", "character-hssc-student",
             "Ayesha Noor", "Muhammad Ilyas", "Female",
-            new Dictionary<string, object> { ["ExamTypeDisplay"]="HSSC", ["LastExamYear"]=2026, ["RollNumber"]="476290", ["Remarks"]="Very Good" }),
+            new Dictionary<string, object> { ["ExamTypeDisplay"]="H.S.S.C (Intermediate)", ["LastExamYear"]=2026, ["RollNumber"]="476290", ["Remarks"]="Very Good" }),
         new("CharacterCertificate", "Character Certificate — Gender Not Recorded", "character-unspecified-gender",
             "Ali Raza", "Naveed Ahmad", "",
-            new Dictionary<string, object> { ["ExamTypeDisplay"]="SSC", ["RollNumber"]="188206" }),
+            new Dictionary<string, object> { ["ExamTypeDisplay"]="S.S.C (Matric)", ["RollNumber"]="188206" }),
 
         new("DateOfBirthCertificate", "Date of Birth Certificate — Female Student", "date-of-birth-female",
             "Fatima Zahra", "Arshad Khan", "Female",
@@ -82,15 +82,15 @@ internal static partial class Program
 
         new("ProvisionalCertificate", "Provisional Certificate — SSC", "provisional-ssc",
             "Mahnoor Iqbal", "Iqbal Hussain", "Female",
-            new Dictionary<string, object> { ["ExamType"]="SSC", ["ExamTypeLabel"]="SSC (Matric)", ["Grade"]="A+", ["MarksObtained"]=979, ["MarksOutOf"]=1100 },
+            new Dictionary<string, object> { ["ExamType"]="SSC", ["ExamTypeLabel"]="Secondary School Certificate", ["Grade"]="A+", ["MarksObtained"]=979, ["MarksOutOf"]=1100 },
             new[] { "English", "Urdu", "Islamiyat", "Pakistan Studies", "Mathematics", "Physics", "Chemistry", "Biology" }),
         new("ProvisionalCertificate", "Provisional Certificate — HSSC Part I", "provisional-hssc-part-one",
             "Ahmad Raza", "Nisar Ahmad", "Male",
-            new Dictionary<string, object> { ["ExamType"]="HSSC1", ["ExamTypeLabel"]="HSSC Part I", ["Grade"]="A", ["MarksObtained"]=501, ["MarksOutOf"]=550, ["DateOfBirth"]=new DateTime(2008,2,12) },
+            new Dictionary<string, object> { ["ExamType"]="HSSC1", ["ExamTypeLabel"]="Higher Secondary School Certificate Part-I", ["Grade"]="A+", ["MarksObtained"]=501, ["MarksOutOf"]=550, ["DateOfBirth"]=new DateTime(2008,2,12) },
             new[] { "English", "Urdu", "Islamic Education", "Physics", "Chemistry", "Mathematics" }),
         new("ProvisionalCertificate", "Provisional Certificate — HSSC Part II, Extended Subjects", "provisional-hssc-part-two",
             "Zoya Bibi", "Habib Ullah", "Female",
-            new Dictionary<string, object> { ["ExamType"]="HSSC2", ["ExamTypeLabel"]="HSSC Part II", ["Grade"]="B", ["MarksObtained"]=854, ["MarksOutOf"]=1100, ["DateOfBirth"]=new DateTime(2007,10,28) },
+            new Dictionary<string, object> { ["ExamType"]="HSSC2", ["ExamTypeLabel"]="Higher Secondary School Certificate Part-II", ["Grade"]="A", ["MarksObtained"]=854, ["MarksOutOf"]=1100, ["DateOfBirth"]=new DateTime(2007,10,28) },
             new[] { "English", "Urdu", "Islamiyat", "Pakistan Studies", "Mathematics", "Physics", "Chemistry", "Biology", "Computer Science", "Economics", "Statistics", "Civics" }),
 
         new("RegularLecturerCertificate", "Regular Teacher Certificate — Female Teacher", "regular-teacher",
@@ -106,6 +106,60 @@ internal static partial class Program
         new("BankAccountOpeningCertificate", "Bank Account Opening Certificate — Lecturer", "bank-account-lecturer",
             "Rabia Gul", "Sher Mohammad", "Female",
             new Dictionary<string, object> { ["Designation"]="Lecturer", ["BankName"]="Bank of Khyber", ["BranchName"]="Peshawar Cantonment Branch", ["MonthlyIncome"]=92000m, ["Purpose"]="Verification of employment for salary account" })
+    };
+
+    // Mirrors the issued-number contract in dbo.GetNextCertificateNumber and the
+    // per-certificate INSERT triggers in fmsc.dacpac (PREFIX-YYYY-NNNN).
+    private static string CertificateReviewNumber(string template,int year,int serial)
+    {
+        string prefix=template switch
+        {
+            "CharacterCertificate"=>"CC",
+            "DateOfBirthCertificate"=>"DOB",
+            "RegularStudentCertificate"=>"REG",
+            "LeaveCertificate"=>"SLC",
+            "CollegeLeaveCertificate"=>"CLC",
+            "SportsCertificate"=>"SPT",
+            "NoObjectionCertificate"=>"NOC",
+            "ProvisionalCertificate"=>"SPC",
+            "RegularLecturerCertificate" or "BankAccountOpeningCertificate"=>"EMP",
+            _=>throw new ArgumentOutOfRangeException(nameof(template),template,"Unexpected certificate template")
+        };
+        return $"{prefix}-{year:D4}-{serial:D4}";
+    }
+
+    // dbo.GetDateOfBirthCertificatePrintData uses dd{ordinal}, Month, YYYY.
+    private static string CertificateReviewBirthDateWithOrdinal(DateTime date)
+    {
+        string suffix=date.Day switch
+        {
+            1 or 21 or 31=>"st", 2 or 22=>"nd", 3 or 23=>"rd", _=>"th"
+        };
+        return $"{date:dd}{suffix}, {date:MMMM}, {date:yyyy}";
+    }
+
+    // dbo.fn_DateToWords: fn_NumberToWords(day), month, fn_NumberToWords(year).
+    private static string CertificateReviewBirthDateInWords(DateTime date)
+        => $"{CertificateReviewNumberWords(date.Day)} {date:MMMM} {CertificateReviewNumberWords(date.Year)}";
+
+    private static string CertificateReviewNumberWords(int number)
+    {
+        string[] ones={"Zero","One","Two","Three","Four","Five","Six","Seven","Eight","Nine",
+            "Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"};
+        string[] tens={"","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"};
+        if(number<0 || number>9999)throw new ArgumentOutOfRangeException(nameof(number));
+        if(number<20)return ones[number];
+        if(number<100)return tens[number/10]+(number%10==0?"":" "+ones[number%10]);
+        if(number<1000)return ones[number/100]+" Hundred"+(number%100==0?"":" "+CertificateReviewNumberWords(number%100));
+        return ones[number/1000]+" Thousand"+(number%1000==0?"":" "+CertificateReviewNumberWords(number%1000));
+    }
+
+    private static string CertificateReviewQualification(string exam)=>exam switch
+    {
+        "SSC"=>"Secondary School Certificate",
+        "HSSC1"=>"Higher Secondary School Certificate Part-I",
+        "HSSC2"=>"Higher Secondary School Certificate Part-II",
+        _=>throw new ArgumentOutOfRangeException(nameof(exam),exam,"Unknown provisional exam")
     };
 
     private static void CheckCertificatePdfReview()
@@ -209,22 +263,22 @@ internal static partial class Program
             ["RegularLecturerCertificateId"]=index+101, ["BankAccountOpeningCertificateId"]=index+101,
             ["SportsCertificateId"]=index+101, ["StaffId"]=index+101,
             ["AdmissionNumber"]=(1000+index).ToString(CultureInfo.InvariantCulture),
-            ["CertificateNumber"]=$"FMSC/2026/{index+1:0000}",
+            ["CertificateNumber"]=CertificateReviewNumber(sample.Template,issue.Year,index+1),
             ["StudentName"]=sample.Recipient, ["StaffName"]=sample.Recipient,
             ["FatherName"]=sample.Parent, ["Gender"]=sample.Gender,
             ["DateOfBirth"]=born, ["DateOfBirthInFigures"]=born.ToString("dd-MM-yyyy",CultureInfo.InvariantCulture),
             ["DateOfBirthInWords"]=born.ToString("d MMMM yyyy",CultureInfo.GetCultureInfo("en-GB")),
             ["DateOfBirthWords"]=born.ToString("d MMMM yyyy",CultureInfo.GetCultureInfo("en-GB")),
             ["SchoolName"]="Fahim Model School & College",
-            ["InstitutionLine"]="Fahim Model School & College, Peshawar",
+            ["InstitutionLine"]="Fahim Model School & College",
             ["CertificateDate"]=issue, ["DateOfIssue"]=issue, ["DateofIssue"]=issue,
             ["DateofAdmission"]=new DateTime(2020,4,6), ["LeaveDate"]=new DateTime(2026,10,31),
             ["ClassName"]="Class X", ["ClassStudied"]="Class X", ["ClassPromotedTo"]="Class XI",
             ["CopyType"]="Original", ["Remarks"]="Good", ["AcademicRecord"]="Very Good",
-            ["AttendanceRecord"]="Regular", ["ExamTypeDisplay"]="SSC", ["LastExamYear"]=2025,
+            ["AttendanceRecord"]="Regular", ["ExamTypeDisplay"]="S.S.C (Matric)", ["LastExamYear"]=2025,
             ["RollNumber"]="182734", ["SportName"]="Cricket",
             ["Performance"]="Represented the school team in the district sports competition.",
-            ["ExamType"]="SSC", ["ExamTypeLabel"]="SSC (Matric)", ["ExamYear"]=2026,
+            ["ExamType"]="SSC", ["ExamTypeLabel"]="Secondary School Certificate", ["ExamYear"]=2026,
             ["BoardName"]="Board of Intermediate and Secondary Education, Peshawar",
             ["MarksObtained"]=979, ["MarksOutOf"]=1100, ["Grade"]="A+",
             ["SubjectsPassedLine"]="English, Urdu, Islamiyat, Pakistan Studies, Mathematics, Physics, Chemistry and Biology",
@@ -239,9 +293,27 @@ internal static partial class Program
         if(values["DateOfBirth"] is DateTime selectedDate)
         {
             values["DateOfBirthInFigures"]=selectedDate.ToString("dd-MM-yyyy",CultureInfo.InvariantCulture);
-            values["DateOfBirthInWords"]=selectedDate.ToString("d MMMM yyyy",CultureInfo.GetCultureInfo("en-GB"));
-            values["DateOfBirthWords"]=values["DateOfBirthInWords"];
+            values["DateOfBirthInWords"]=CertificateReviewBirthDateWithOrdinal(selectedDate);
+            values["DateOfBirthWords"]=CertificateReviewBirthDateInWords(selectedDate);
         }
+        if(sample.Template=="ProvisionalCertificate")
+        {
+            string exam=(string)values["ExamType"];
+            Check((string)values["ExamTypeLabel"]==CertificateReviewQualification(exam),
+                sample.Title+": printed qualification label matches the SQL print procedure");
+        }
+        if(sample.Template=="CharacterCertificate")
+        {
+            string exam=(string)values["ExamTypeDisplay"];
+            Check(exam is "S.S.C (Matric)" or "H.S.S.C (Intermediate)",
+                sample.Title+": qualification caption matches the SQL print procedure");
+        }
+        Check(System.Text.RegularExpressions.Regex.IsMatch((string)values["CertificateNumber"],
+                @"^[A-Z]{2,3}-[0-9]{4}-[0-9]{4,}$"),
+            sample.Title+": the issued number uses the database's dash-separated prefix/year/sequence format");
+        if(sample.Template=="DateOfBirthCertificate")
+            Check((string)values["DateOfBirthInWords"]==CertificateReviewBirthDateWithOrdinal((DateTime)values["DateOfBirth"]),
+                sample.Title+": DOB wording matches the saved print-data SQL format");
         var row=source.NewRow();
         foreach(DataColumn column in source.Columns)
         {
@@ -269,6 +341,14 @@ internal static partial class Program
             sample.Title+": the displayed certificate contains the correct recipient name");
         Check(html.Contains(sample.Parent,StringComparison.Ordinal),
             sample.Title+": the displayed certificate contains the correct parent name");
+        Check(html.Contains((string)values["CertificateNumber"],StringComparison.Ordinal),
+            sample.Title+": the exported certificate shows the correct issued-number format");
+        if(sample.Template=="CharacterCertificate")
+            Check(html.Contains((string)values["ExamTypeDisplay"],StringComparison.Ordinal),
+                sample.Title+": actual qualification display matches SQL");
+        if(sample.Template=="ProvisionalCertificate")
+            Check(html.Contains((string)values["ExamTypeLabel"],StringComparison.Ordinal),
+                sample.Title+": provisional qualification display matches SQL");
         if(sample.Template is "LeaveCertificate" or "CollegeLeaveCertificate" &&
            sample.Values?.TryGetValue("CopyType",out var copy)==true && Equals(copy,"Duplicate"))
             Check(html.Contains("DUPLICATE COPY",StringComparison.Ordinal),
