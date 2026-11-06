@@ -28,6 +28,22 @@ internal static partial class Program
                 else rows.Columns.Add("RuleId",typeof(Guid));
                 return rows;
             }
+            // Admission preference is evidence, never automatic verification or purpose consent.
+            var noteMethod=typeof(CommunicationCenterPage).GetMethod("GuardianAdmissionPreferenceNote",flags)!;
+            string Note(string contact,string recorded,bool consent)=>
+                (string)noteMethod.Invoke(null,[contact,recorded,consent,new DateTime(2026,11,6)])!;
+            Check(Note("03001234567","+923001234567",true).Contains("agreed to for this number"),
+                "Equivalent Pakistani phone formats correctly recognize an admission WhatsApp preference");
+            Check(Note("03001234568","+923001234567",true).Contains("different or invalid number"),
+                "Consent for one number never follows a changed destination");
+            Check(Note("03001234567","+923001234567",false).Contains("not agreed to"),
+                "A recorded No never becomes consent just because a phone number is present");
+            using(var noteEditor=new CommunicationEditor("Fictional contact",_=>Task.CompletedTask))
+            {
+                noteEditor.Notice(Note("03001234567","+923001234567",true));
+                Check(Descendants(noteEditor).OfType<Label>().Any(label=>label.Text.Contains("Verify current ownership")),
+                    "Admission preference notice is presented as read-only guidance rather than a consent checkbox");
+            }
             var store=new SqlCommunicationStore(()=>{connections++;throw new Exception("UI fixture must not connect to SQL.");},919);
             using var page=new CommunicationCenterPage(store,false,(view,args)=>pending is not null&&view is "History" or "Outbox"?pending.Task:Task.FromResult(Rows(view,args)));
             T Field<T>(string name)=>(T)typeof(CommunicationCenterPage).GetField(name,flags)!.GetValue(page)!;
