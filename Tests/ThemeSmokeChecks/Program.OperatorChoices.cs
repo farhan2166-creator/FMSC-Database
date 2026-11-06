@@ -135,10 +135,10 @@ internal static partial class Program
             var targetYear=PromotionField<LookupBox>("targetYear");
             sourceYear.Bind(years,"AcademicYearId","YearName");sourceYear.SelectedValue=10;
             targetYear.Bind(years,"AcademicYearId","YearName");targetYear.SelectedValue=11;
-            var selected=new DataTable();
-            selected.Columns.Add("Selected",typeof(bool));selected.Columns.Add("Decision");
-            selected.Rows.Add(false,"SKIP");
-            placementType.GetField("data",flags)!.SetValue(promotion,selected);
+            var promotionRows=new DataTable();
+            promotionRows.Columns.Add("Selected",typeof(bool));promotionRows.Columns.Add("Decision");
+            promotionRows.Rows.Add(false,"SKIP");
+            placementType.GetField("data",flags)!.SetValue(promotion,promotionRows);
             placementType.GetField("choicesReady",flags)!.SetValue(promotion,true);
             RefreshPromotion();
             Check(carry.Enabled&&!carry.Checked,

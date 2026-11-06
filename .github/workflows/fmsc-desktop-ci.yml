@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - 'Core/Updates/**'
+      - 'Tests/ThemeSmokeChecks/**'
       - 'Core/MaintenanceTools.cs'
       - 'Core/SqlDependencyRepair.cs'
       - 'Installer/**'
