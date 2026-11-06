@@ -96,8 +96,17 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private void BuildWorkspace()
     {
         channel.Items.AddRange(["Sms","WhatsApp"]);channel.SelectedIndex=1;
-        audience.Items.AddRange(["Campus","Class / Section","Outstanding Fees","Individual Contact","Staff","Manual Contacts"]);
-        audience.SelectedIndex=CurrentUser.HasPermission("Students.View")?0:CurrentUser.HasPermission("Staff.View")?4:5;
+        // Don't offer recipient types the operator cannot inspect.
+        if(CurrentUser.HasPermission("Students.View"))
+        {
+            audience.Items.Add("Campus");
+            audience.Items.Add("Class / Section");
+            if(CurrentUser.HasPermission("Fees.View"))audience.Items.Add("Outstanding Fees");
+            audience.Items.Add("Individual Contact");
+        }
+        if(CurrentUser.HasPermission("Staff.View"))audience.Items.Add("Staff");
+        audience.Items.Add("Manual Contacts");
+        audience.SelectedIndex=0;
         recipientFilter.Items.AddRange(["Student / family / manual","Outstanding","Family","Staff","Manual","Pending"]);recipientFilter.SelectedIndex=CurrentUser.HasPermission("Students.View")?0:CurrentUser.HasPermission("Staff.View")?3:4;
         channel.Width=AppScale.Scale(120);recipientFilter.Width=AppScale.Scale(150);templateChoice.Width=AppScale.Scale(320);
         schedule.ShowCheckBox=true;schedule.Checked=false;schedule.Format=DateTimePickerFormat.Custom;schedule.CustomFormat="dd-MMM-yyyy HH:mm";
@@ -168,7 +177,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         ModernButton moreOptions=null!;
         moreOptions=Button("More Options",()=>{ShowComposeOptions(!composeOptionsExpanded);return Task.CompletedTask;},"Communication.Compose");
         Row(Bar(Button("Preview Messages",async()=>{
-            if(audience.SelectedIndex<3)await SelectMatchingContactsAsync();
+            if(AudienceMode()<3)await SelectMatchingContactsAsync();
             await PreviewAsync();
         },"Communication.Compose","Primary"),sendNow,prepare,Button("New Message",()=>{
             if(HasUnsavedChanges&&!ModernMessageDialog.ConfirmDiscardIfDirty(FindForm(),()=>HasUnsavedChanges,UnsavedChangesMessage))return Task.CompletedTask;
@@ -182,7 +191,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         {if(c is ModernComboBox cb)cb.SelectedIndexChanged+=(_,_)=>InvalidatePreview();else if(c is ModernDatePicker dp)dp.ValueChanged+=(_,_)=>InvalidatePreview();else c.TextChanged+=(_,_)=>InvalidatePreview();}
         void UpdateAudience()
         {
-            int mode=audience.SelectedIndex;
+            int mode=AudienceMode();
             recipientFilter.SelectedIndex=mode switch {2=>1,4=>3,5=>4,_=>0};
             bool individual=mode>=3;
             contactToolbar.Visible=individual;
@@ -220,7 +229,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         audience.SelectedIndexChanged+=(_,_)=>{
             included.Clear();
             search.Text="";
-            if(audience.SelectedIndex>=4 && year.SelectedId!=0)
+            if(AudienceMode()>=4 && year.SelectedId!=0)
                 year.SelectedIndex=0;
             RecipientFiltersChanged();
             InvalidatePreview();
@@ -300,6 +309,15 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         2=>RefreshOperational(),
         _=>RefreshRules()
     };
+    private int AudienceMode()=>Convert.ToString(audience.SelectedItem) switch
+    {
+        "Campus"=>0,
+        "Class / Section"=>1,
+        "Outstanding Fees"=>2,
+        "Individual Contact"=>3,
+        "Staff"=>4,
+        _=>5 // Manual contacts
+    };
     private Guid SelectedTemplate()=>templateChoice.SelectedValue is Guid id?id:throw new ArgumentException("Choose a reviewed template.");
     private MessageChannel SelectedChannel()=>Enum.Parse<MessageChannel>(Convert.ToString(channel.SelectedItem)!);
     private string Signature()=>string.Join("|",templateChoice.SelectedValue,channel.SelectedItem,announcement.Text,string.Join(',',included.Order()),schedule.Checked,schedule.Checked?schedule.Value.ToUniversalTime().ToString("O"):"");
@@ -312,11 +330,11 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
             throw new ArgumentException("This action requires permission to compose messages.");
         int campusId=campus.SelectedId;
         int yearId=composeOptionsExpanded?year.SelectedId:0;
-        int classId=audience.SelectedIndex is 1 or 2?cls.SelectedId:0;
-        int sectionId=audience.SelectedIndex is 1 or 2?section.SelectedId:0;
+        int classId=AudienceMode() is 1 or 2?cls.SelectedId:0;
+        int sectionId=AudienceMode() is 1 or 2?section.SelectedId:0;
         if(campusId==0)
             throw new ArgumentException("Choose a campus before previewing a group message.");
-        if(audience.SelectedIndex==1 && classId==0)
+        if(AudienceMode()==1 && classId==0)
             throw new ArgumentException("Choose a class before previewing a class/section message.");
         if(recipientFilter.SelectedIndex is not (0 or 1))
             throw new ArgumentException("Choose the student or outstanding-balance filter for a school group.");
@@ -347,10 +365,10 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     {
         if(!CurrentUser.HasPermission("Communication.Compose"))return Task.CompletedTask;
         return LoadGridAsync(recipients,()=>ReadAsync("Recipients",recipientPage,search.Text,recipientFilter.SelectedIndex==0?"":Convert.ToString(recipientFilter.SelectedItem)!,
-            SqlCommunicationStore.P("@Campus",audience.SelectedIndex>=4?0:campus.SelectedId),
-            SqlCommunicationStore.P("@Year",audience.SelectedIndex<4&&composeOptionsExpanded?year.SelectedId:0),
-            SqlCommunicationStore.P("@Class",audience.SelectedIndex is 1 or 2?cls.SelectedId:0),
-            SqlCommunicationStore.P("@Section",audience.SelectedIndex is 1 or 2?section.SelectedId:0)),rows=>{
+            SqlCommunicationStore.P("@Campus",AudienceMode()>=4?0:campus.SelectedId),
+            SqlCommunicationStore.P("@Year",AudienceMode()<4&&composeOptionsExpanded?year.SelectedId:0),
+            SqlCommunicationStore.P("@Class",AudienceMode() is 1 or 2?cls.SelectedId:0),
+            SqlCommunicationStore.P("@Section",AudienceMode() is 1 or 2?section.SelectedId:0)),rows=>{
             populating=true;
             try{rows.Columns.Add("Include",typeof(bool));recipients.DataSource=rows;foreach(DataGridViewColumn c in recipients.Columns)c.ReadOnly=c.Name!="Include";
                 recipients.Columns["Include"].DisplayIndex=0;ApplyMessageColumns();ApplyTicks();}
@@ -443,7 +461,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         // Older UI fixture tables contain only identity/version columns.
         if(!row.Table.Columns.Contains("Scope"))return true;
         string scope=Convert.ToString(row["Scope"])??"";
-        return audience.SelectedIndex switch
+        return AudienceMode() switch
         {
             0 or 1 => scope=="Student", // School-group recipients are student-linked contacts.
             2 => scope=="Student" && row.Table.Columns.Contains("Code") &&
@@ -472,7 +490,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         else
             templateChoice.SelectedIndex=!selected.HasValue&&visible.Rows.Count==1?0:-1;
         if(visible.Rows.Count==0)
-            SetStatus(audience.SelectedIndex==2
+            SetStatus(AudienceMode()==2
                 ?"No reviewed outstanding-reminder template is available. An administrator must review one in Settings → Templates."
                 :"No reviewed template matches these recipients. Ask an administrator to review an appropriate template in Settings → Templates.",
                 PageStatusKind.Warning);
