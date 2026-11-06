@@ -20,7 +20,7 @@
 - **Operators:** [User Guide](USER_GUIDE.md), [Help Center](HELP_CENTER.md), [School Operations](SCHOOL_OPERATIONS.md), [Operator Control](OPERATOR_CONTROL.md).
 - **Students:** [Placement Workspace](STUDENT_PLACEMENT_WORKSPACE.md), [Posting Holds](STUDENT_POSTING_HOLDS.md), [Admission Guide](02_ADMISSIONS_AND_LIFECYCLE.md).
 - **Fees:** [Fee Documents](FEE_DOCUMENTS.md), [Family Counter](FAMILY_COUNTER_BILLING.md), [Current Rules](BUSINESS_DECISIONS.md#fees-collection-and-documents).
-- **Certificates:** [Certificate Workflow](CERTIFICATE_WORKFLOW.md).
+- **Certificates:** [Certificate Workflow](CERTIFICATE_WORKFLOW.md), [PDF and Print Review](CERTIFICATE_PDF_REVIEW.md).
 - **Reports:** [PDF Presentation](PDF_REPORT_PRESENTATION.md), [Saved Report Views](SAVED_REPORT_VIEWS.md).
 - **Engineering:** [Architecture](ARCHITECTURE.md), [Development Workflow](DEVELOPMENT_WORKFLOW.md).
 - **Releases:** [Installation](INSTALLATION.md), [Checklist](RELEASE_CHECKLIST.md), [Backup and Recovery](BACKUP_RECOVERY.md), [Private Updates](PRIVATE_INCREMENTAL_UPDATES.md).
