@@ -6,6 +6,23 @@
                  Link="UpdateTransport\%(RecursiveDir)%(Filename)%(Extension)"
                  CopyToPublishDirectory="Always" />
     </ItemGroup>
+    <!-- Both full installs and application-only private updates keep the
+         offline SQL dependency tools needed by later recovery/repair. -->
+    <ItemGroup Condition="'$(BundledSqlCmdPath)' != ''">
+        <Content Include="$(BundledSqlCmdPath)" Link="UpdateSupport/Tools/sqlcmd.exe"
+                 CopyToPublishDirectory="Always" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(LocalDbMsiPath)' != ''">
+        <Content Include="$(LocalDbMsiPath)" Link="UpdateSupport/Tools/SqlLocalDB.msi"
+                 CopyToPublishDirectory="Always" />
+    </ItemGroup>
+    <Target Name="RequireOfflineSqlToolsForPublish" BeforeTargets="PrepareForPublish"
+            Condition="'$(FmscLevel2)' != 'true'">
+        <Error Condition="'$(BundledSqlCmdPath)' == '' Or !Exists('$(BundledSqlCmdPath)')"
+               Text="FMSC publishing requires verified go-sqlcmd. Supply BundledSqlCmdPath." />
+        <Error Condition="'$(LocalDbMsiPath)' == '' Or !Exists('$(LocalDbMsiPath)')"
+               Text="FMSC publishing requires the Microsoft-signed LocalDB MSI. Supply LocalDbMsiPath." />
+    </Target>
     <Target Name="RequireBundledGitForPublish" BeforeTargets="PrepareForPublish"
             Condition="'$(FmscLevel2)' != 'true'">
         <Error Condition="'$(BundledGitDirectory)' == ''"

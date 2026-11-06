@@ -738,37 +738,33 @@ function Invoke-PrerequisiteDownload {
         "$Description downloaded."
 }
 function Resolve-SqlCmd {
-    # sqlcmd is the prerequisite this installer genuinely needs and which no
-    # Windows machine has by default. It used to stop here and tell the operator
-    # to go and install the SQL Server command-line tools themselves. It now
-    # resolves sqlcmd in three steps, cheapest first, and only touches the network
-    # when it has to
-    # 1. sqlcmd.exe already on PATH - a machine that has the SQL tools
-    # 2. <ReleaseRoot>\Tools\sqlcmd.exe - placed there by a release, or by an
-    # earlier run of this installer, which is what makes a fully offline
-    # install possible
-    # 3. download Microsoft's go-sqlcmd: a standalone executable with no ODBC
-    # driver dependency and no administrator requirement, unlike the older
-    # ODBC build which needs the ODBC driver installed as well
-    $OnPath =
-        Get-Command `
-            'sqlcmd.exe' `
-            -ErrorAction SilentlyContinue
-    if ($OnPath) {
-        Write-Success `
-            "sqlcmd found: $($OnPath.Source)"
-        return $OnPath.Source
+    # Prefer the complete, hash-verified tool that ships in the new application.
+    # During a prepared update ReleaseRoot points to protected recovery storage,
+    # NOT to the originally downloaded complete-installer ZIP. The app-local copy
+    # removes a second network download and is retained for later recovery.
+    $BundledCopy = Join-Path $AppSource 'UpdateSupport/Tools/sqlcmd.exe'
+    if (Test-Path -LiteralPath $BundledCopy -PathType Leaf) {
+        Write-Success "sqlcmd found in the bundled application: $BundledCopy"
+        return $BundledCopy
     }
-    $Tools =
-        Get-InstallerToolsDirectory
-    $LocalCopy =
-        Join-Path `
-            $Tools `
-            'sqlcmd.exe'
-    if (Test-Path -LiteralPath $LocalCopy) {
-        Write-Success `
-            "sqlcmd found in the release tools folder: $LocalCopy"
+    # Normal complete installers also have Tools/sqlcmd.exe at their root.
+    $Tools = Get-InstallerToolsDirectory
+    $LocalCopy = Join-Path $Tools 'sqlcmd.exe'
+    if (Test-Path -LiteralPath $LocalCopy -PathType Leaf) {
+        Write-Success "sqlcmd found in the release tools folder: $LocalCopy"
         return $LocalCopy
+    }
+    # Recovery after restart may no longer have its prepared staging folder.
+    $InstalledCopy = Join-Path $AppDir 'UpdateSupport/Tools/sqlcmd.exe'
+    if (Test-Path -LiteralPath $InstalledCopy -PathType Leaf) {
+        Write-Success "sqlcmd found in the installed application: $InstalledCopy"
+        return $InstalledCopy
+    }
+    # Backward compatibility only for older releases missing the bundled copy.
+    $OnPath = Get-Command 'sqlcmd.exe' -ErrorAction SilentlyContinue
+    if ($OnPath) {
+        Write-Success "sqlcmd found on PATH: $($OnPath.Source)"
+        return $OnPath.Source
     }
     $Architecture =
         if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
@@ -1662,7 +1658,7 @@ try {
     }
     Write-Step `
         'Checking sqlcmd...'
-    # Resolve-SqlCmd looks on PATH first, then in the release's Tools folder, and only downloads Microsoft's standalone go-sqlcmd when neither has it.
+    # Resolve-SqlCmd prefers the staged application and release's verified local tools; older packages may fall back to PATH or a pinned download.
     $script:SqlCmdPath =
         Resolve-SqlCmd
     Write-Step `
