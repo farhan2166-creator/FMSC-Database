@@ -132,6 +132,11 @@ production gate, limited to `FMSC-Updates`; never rewrite the source history.
 - `Tools/UpdatePackages`, `Tools/UpdateDistribution` and their regression
   fixtures: package creation and safe two-version snapshot preparation.
 - Windows Git enrollment/DPAPI tests and existing desktop CI checks.
+- `Tools/PrepareBundledGit.ps1` and release workflows: fetch the exact approved
+  MinGit ZIP from Git for Windows, validate its published SHA-256, smoke-test Git
+  and OpenSSH and carry the complete runtime plus license notices under
+  `UpdateTransport/`. The application uses absolute bundled executable paths
+  and never searches PATH, Git installations or Windows OpenSSH.
 
 **Removed:** owner-only `Tools/UpdateSigning`, RSA signature generation,
 `update-manifest.sig`, pinned publisher public-key resource, recovery backup
@@ -142,8 +147,11 @@ The school's **SSH authorization key is separate** and is still required.
 
 1. Test real private Git downloads, revoked deploy keys, network interruption,
    oversized archives, Windows file-lock behavior and constrained disk space.
-2. Bundle reviewed Git/SSH binaries or an approved equivalent with the FMSC
-   installer. The current manual checker needs Git/SSH installed.
+2. The Windows x64 release builds now pin and SHA-256 verify Git for Windows
+   MinGit 2.56.0(4), and include its entire Git/OpenSSH runtime inside both
+   the application-only update and complete installer. Publishing fails when
+   required tools are absent. Validate first-install and private SSH transfer
+   behavior on a clean Windows school/test PC before production rollout.
 3. Complete field acceptance of reconnect/resume under actual network disruption.
    Verified chunk caching, bounded retries, live transfer figures and a determinate
    download bar are implemented and covered by fault-injection tests. Close cancels
@@ -292,8 +300,9 @@ reaching it; no automatic history cleanup is authorized or performed.
   including Python checks, post-fix controls and admission/finance regressions.
 
 **Not production complete:** The handoff is implemented and offline checks pass;
-real activation/migration/recovery acceptance remains unverified. Bundled Git/SSH,
-physical network-disruption and recovery acceptance remain required.
+real activation/migration/recovery acceptance remains unverified. The later
+MinGit bundling change still needs a successful release artifact and clean-PC
+private SSH test; physical network-disruption and recovery acceptance remain required.
 No live installer, database or distribution package was changed in these tests.
 
 ## Local private-distribution acceptance and dialog corrections
@@ -318,9 +327,9 @@ access details and dismissal actions. A focused SQL-free WinForms suite reproduc
 the owned-window close path and tests exactly one inert installer callback.
 
 The owner has approved merging the source after these corrections. Further package
-publication remains owner controlled. Bundled Git/SSH, disrupted-network field acceptance,
-clean-machine acceptance, full transport acceptance and actual migration/recovery
-tests remain production limitations; successful incremental testing does not close them.
+publication remains owner controlled. Bundled Git/SSH on a clean PC, disrupted-network field acceptance,
+full transport acceptance and actual migration/recovery tests remain production
+verification limitations; successful incremental testing does not close them.
 
 ## Download progress and recovery
 

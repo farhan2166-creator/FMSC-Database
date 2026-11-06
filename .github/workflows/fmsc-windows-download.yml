@@ -76,6 +76,8 @@ jobs:
             dotnet run --project $command[0] -c Release -- $command[1]
             if ($LASTEXITCODE -ne 0) { throw "Updater gate failed: $($command[1])" }
           }
+          dotnet run --project Tests/UpdateAuthorizationChecks/UpdateAuthorizationChecks.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Windows Git key/transport checks failed.' }
           & .\Tools\TestPreparedUpdate.ps1
           & .\Tools\TestWindowlessLauncher.ps1
           & .\Tools\TestInstallerMigrations.ps1
@@ -83,13 +85,18 @@ jobs:
           & .\Tools\TestUpdateRecovery.ps1
           & .\Tools\TestPublishPrivateUpdate.ps1
 
+      - name: Prepare pinned bundled Git and OpenSSH
+        shell: pwsh
+        run: |
+          & .\Tools\PrepareBundledGit.ps1 -DestinationDirectory (Join-Path $env:GITHUB_WORKSPACE 'out/prerequisites/MinGit')
+
       # The ordinary PortableRelease publish remains subject to its installer/MSI
       # and optional detached-MDF/LDF validation. Only this GitHub Actions
       # app-only bundle skips those full-installer preparation/copy targets.
       - name: Publish self-contained Windows x64 application
         shell: pwsh
         run: |
-          dotnet publish FMSC_SMS.csproj -c Release -r win-x64 --self-contained true --output out/windows-x64-app -p:CIAppOnlyBundle=true -p:PublishSingleFile=false -p:PublishTrimmed=false
+          dotnet publish FMSC_SMS.csproj -c Release -r win-x64 --self-contained true --output out/windows-x64-app -p:CIAppOnlyBundle=true "-p:BundledGitDirectory=$env:GITHUB_WORKSPACE/out/prerequisites/MinGit" -p:PublishSingleFile=false -p:PublishTrimmed=false
           if ($LASTEXITCODE -ne 0) { throw "Windows publish failed." }
 
       - name: Verify ZIP contents and add build manifest
@@ -100,7 +107,10 @@ jobs:
           $installer = Get-Content -LiteralPath (Join-Path $root 'UpdateSupport/core.ps1') -Raw
           $schema = [regex]::Match($installer, '(?m)^\$DatabaseVersion = ''([0-9]+)''\r?$').Groups[1].Value
           if (-not $schema) { throw 'Required database schema is missing from the bundled installer.' }
-          foreach ($name in @('FMSC_SMS.exe', 'FMSC_SMS.dll', 'FMSC_SMS.deps.json', 'FMSC_SMS.runtimeconfig.json')) {
+          foreach ($name in @('FMSC_SMS.exe', 'FMSC_SMS.dll', 'FMSC_SMS.deps.json', 'FMSC_SMS.runtimeconfig.json',
+              'UpdateTransport/cmd/git.exe', 'UpdateTransport/usr/bin/ssh.exe',
+              'UpdateTransport/COPYING-GIT.txt',
+              'UpdateTransport/THIRD_PARTY_NOTICES.txt')) {
             if (-not (Test-Path -LiteralPath (Join-Path $root $name) -PathType Leaf)) {
               throw "Missing Windows application output: $name"
             }
@@ -118,6 +128,7 @@ jobs:
             'This is NOT a complete installer or a GitHub public Release.'
             'It contains no student records, MDF/LDF, backups or LocalDB MSI.'
             'UpdateSupport contains the existing installer and numbered database migrations.'
+            'UpdateTransport bundles pinned Git, OpenSSH, dependencies and license notices; system Git is not required.'
             'Existing school databases are preserved. Pending migrations run only through the post-exit installer safeguards.'
             'Fresh installations still require the separately validated complete installer and approved database snapshot.'
             'GitHub Actions CI does not run interactive Windows UI, physical printer, or school-database tests.'

@@ -29,6 +29,20 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
 
     private UpdateGitSession(string workspace) => _workspace = workspace;
 
+    // Complete releases bundle Git, OpenSSH, DLLs and their supporting tools.
+    // School machines must not need a separate install or PATH configuration.
+    internal static (string GitExecutable, string SshExecutable) ResolveTransport(string applicationDirectory)
+    {
+        string root = Path.Combine(applicationDirectory, "UpdateTransport");
+        string git = Path.Combine(root, "cmd", "git.exe");
+        string ssh = Path.Combine(root, "usr", "bin", "ssh.exe");
+        if (!File.Exists(git) || !File.Exists(ssh))
+            throw new FileNotFoundException(
+                "The bundled FMSC update tools (Git/SSH) are missing. " +
+                "Repair FMSC using a complete installer; copying git.exe alone is insufficient.");
+        return (git, ssh);
+    }
+
     internal static async Task<UpdateGitSession> OpenAsync(
         CancellationToken cancellationToken = default)
     {
@@ -182,7 +196,8 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         linked.CancelAfter(maximumDuration);
-        var start = new ProcessStartInfo("git.exe")
+        var transport = ResolveTransport(AppContext.BaseDirectory);
+        var start = new ProcessStartInfo(transport.GitExecutable)
         {
             WorkingDirectory = _workspace,
             RedirectStandardInput = input is not null,
@@ -197,8 +212,8 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
         start.Environment["LC_ALL"] = "C";
         start.Environment["GIT_PROGRESS_DELAY"] = "0";
         start.Environment["GIT_SSH_COMMAND"] = isRepoCommand
-            ? GitSsh("../device.pem", "../known_hosts")
-            : GitSsh("device.pem", "known_hosts");
+            ? GitSsh(transport.SshExecutable, "../device.pem", "../known_hosts")
+            : GitSsh(transport.SshExecutable, "device.pem", "known_hosts");
         foreach (string argument in arguments) start.ArgumentList.Add(argument);
         if (input is not null) start.StandardInputEncoding = new UTF8Encoding(false);
         using var process = new Process { StartInfo = start };
@@ -248,8 +263,8 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
         }
     }
 
-    private static string GitSsh(string pem, string knownHosts) =>
-        "ssh -F none -o BatchMode=yes -o IdentitiesOnly=yes " +
+    private static string GitSsh(string sshExecutable, string pem, string knownHosts) =>
+        "\"" + sshExecutable.Replace('\\', '/') + "\" -F none -o BatchMode=yes -o IdentitiesOnly=yes " +
         "-o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 " +
         "-o StrictHostKeyChecking=yes -o PasswordAuthentication=no " +
         "-o UserKnownHostsFile=" + knownHosts + " -i " + pem;

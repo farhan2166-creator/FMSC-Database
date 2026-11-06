@@ -14,6 +14,14 @@ try {
     New-Item -ItemType Directory -Path $scratch -Force | Out-Null
     $database = Join-Path $scratch 'empty database'
     New-Item -ItemType Directory -Path $database | Out-Null
+    # Publish test uses synthetic Git/SSH files only; the real release pipeline
+    # downloads and checksum-verifies the entire upstream MinGit distribution.
+    $transport = Join-Path $scratch 'synthetic MinGit'
+    foreach ($relative in @('cmd/git.exe','usr/bin/ssh.exe','COPYING-GIT.txt','THIRD_PARTY_NOTICES.txt')) {
+        $target = Join-Path $transport $relative
+        New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
+        Set-Content -LiteralPath $target -Value 'Synthetic publish-only fixture; not executable.'
+    }
     $prerequisite = Join-Path $scratch 'readability fixture.txt'
     Set-Content -LiteralPath $prerequisite -Value 'Test fixture; not an installer.'
 
@@ -33,6 +41,7 @@ try {
         -c Release -r win-x64 --self-contained true -p:PublishProfile=PortableRelease `
         "-p:PublishDir=$application/" "-p:ReleaseRoot=$release/" `
         "-p:LocalDbMsiPath=$prerequisite" "-p:DeploymentDatabaseDirectory=$database" `
+        "-p:BundledGitDirectory=$transport" `
         -p:PublishSingleFile=false -p:PublishTrimmed=false 2>&1
     $code = $LASTEXITCODE
     if ($code -ne 0) {
@@ -50,6 +59,10 @@ try {
         'FMSC_SMS/UpdateSupport/core.ps1', 'FMSC_SMS/UpdateSupport/UpdateRecovery.ps1',
         'FMSC_SMS/UpdateSupport/Launch-FMSC.ps1', 'FMSC_SMS/UpdateSupport/FMSC.Launcher.exe',
         'FMSC_SMS/UpdateSupport/FMSC.Setup.exe',
+        'FMSC_SMS/UpdateTransport/cmd/git.exe',
+        'FMSC_SMS/UpdateTransport/usr/bin/ssh.exe',
+        'FMSC_SMS/UpdateTransport/COPYING-GIT.txt',
+        'FMSC_SMS/UpdateTransport/THIRD_PARTY_NOTICES.txt',
         'UpdateRecovery.ps1', 'core.ps1', 'Install FMSC_SMS.bat', 'FMSC.Setup.exe', 'Tools/SqlLocalDB.msi')) {
         $file = Join-Path $release $relative
         if (-not (Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -eq 0) {

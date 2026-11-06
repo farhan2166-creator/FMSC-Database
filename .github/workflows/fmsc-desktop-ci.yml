@@ -3,6 +3,13 @@ name: '09 - CI - Desktop Build and Regression'
 on:
   workflow_dispatch:
   workflow_call:
+  pull_request:
+    paths:
+      - 'Core/Updates/**'
+      - 'FMSC_SMS.csproj'
+      - 'Tools/PrepareBundledGit.ps1'
+      - 'Tools/TestPublishPowerShell.ps1'
+      - '.github/workflows/fmsc-desktop-ci.yml'
   push:
     branches: ['feature/private-incremental-updates']
 
@@ -159,6 +166,32 @@ jobs:
       - name: Verify disposable publish and module isolation
         shell: pwsh
         run: .\Tools\TestPublishPowerShell.ps1 -ProjectDirectory .
+
+      - name: Verify real pinned MinGit and app-only publish integration
+        shell: pwsh
+        timeout-minutes: 8
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP ('fmsc-transport-verify-' + [Guid]::NewGuid().ToString('N'))
+          $transport = Join-Path $root 'MinGit'
+          $application = Join-Path $root 'Application'
+          try {
+            & .\Tools\PrepareBundledGit.ps1 -DestinationDirectory $transport
+            dotnet publish FMSC_SMS.csproj -c Release -r win-x64 --self-contained true --output $application -p:CIAppOnlyBundle=true "-p:BundledGitDirectory=$transport" -p:PublishSingleFile=false -p:PublishTrimmed=false
+            if ($LASTEXITCODE -ne 0) { throw 'Bundled updater smoke publish failed.' }
+            foreach ($relative in @('UpdateTransport/cmd/git.exe','UpdateTransport/usr/bin/ssh.exe',
+                'UpdateTransport/COPYING-GIT.txt','UpdateTransport/THIRD_PARTY_NOTICES.txt')) {
+              if (-not (Test-Path -LiteralPath (Join-Path $application $relative) -PathType Leaf)) {
+                throw "Published Git/SSH runtime is incomplete: $relative"
+              }
+            }
+            & (Join-Path $application 'UpdateTransport/cmd/git.exe') --version
+            if ($LASTEXITCODE -ne 0) { throw 'Published Git could not start.' }
+            & (Join-Path $application 'UpdateTransport/usr/bin/ssh.exe') -V 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Published OpenSSH could not start.' }
+          } finally {
+            if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }
+          }
 
 # Safety boundaries:
 # - No installation, signing or release upload. Publish regression output uses

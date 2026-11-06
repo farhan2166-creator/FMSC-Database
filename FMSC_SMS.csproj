@@ -1,4 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk">
+    <!-- The complete installer AND every update must carry Git/SSH and their
+         supporting DLLs. Local compilation is unaffected; publish fails closed. -->
+    <ItemGroup Condition="'$(BundledGitDirectory)' != ''">
+        <Content Include="$(BundledGitDirectory)\**\*"
+                 Link="UpdateTransport\%(RecursiveDir)%(Filename)%(Extension)"
+                 CopyToPublishDirectory="Always" />
+    </ItemGroup>
+    <Target Name="RequireBundledGitForPublish" BeforeTargets="PrepareForPublish"
+            Condition="'$(FmscLevel2)' != 'true'">
+        <Error Condition="'$(BundledGitDirectory)' == ''"
+               Text="FMSC publishing requires pinned MinGit. Run Tools/PrepareBundledGit.ps1 and set BundledGitDirectory." />
+        <Error Condition="!Exists('$(BundledGitDirectory)\cmd\git.exe')"
+               Text="Bundled update transport is incomplete: cmd/git.exe missing." />
+        <Error Condition="!Exists('$(BundledGitDirectory)\usr\bin\ssh.exe')"
+               Text="Bundled update transport is incomplete: usr/bin/ssh.exe missing." />
+        <Error Condition="!Exists('$(BundledGitDirectory)\COPYING-GIT.txt')"
+               Text="Bundled Git GPLv2 license file is missing." />
+        <Error Condition="!Exists('$(BundledGitDirectory)\THIRD_PARTY_NOTICES.txt')"
+               Text="Bundled update transport notices are missing." />
+    </Target>
     <!-- Schools receive this small GUI binary; no compiler is installed there. -->
     <Target Name="BuildStableUpdateLauncher" BeforeTargets="PrepareForBuild"
             Inputs="$(MSBuildProjectDirectory)/Installer/Launch-FMSC.cs"

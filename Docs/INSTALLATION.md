@@ -8,6 +8,7 @@ The [Complete Windows Installer ZIP](../.github/workflows/fmsc-complete-installe
 
 ```text
 FMSC_SMS/                 Published self-contained app and resources
+  UpdateTransport/         Pinned bundled MinGit (Git, SSH, DLLs, notices)
 Database/                 You provide FMSC_DB.mdf and FMSC_DB_log.ldf for a fresh install
 Tools/                    Signed Microsoft SqlLocalDB.msi and verified sqlcmd.exe
 Migrations/               Empty at first-production schema 1; future numbered upgrades begin at 2.sql
@@ -18,6 +19,15 @@ READ_ME_FIRST.txt         Packaging instructions
 COMMUNICATION_CENTER.md  Optional add-on review, consent and deployment instructions
 SHA256SUMS.txt            Package content hashes
 ```
+
+**Update dependencies:** The approved x64 build packages the complete pinned
+MinGit runtime (Git plus OpenSSH) with the application, alongside the self-contained
+.NET runtime. Windows PATH and a separate Git installation are not required for
+private update checks. The complete installer also packages SQL LocalDB and sqlcmd.
+School PCs retain their own read-only, DPAPI-protected SSH authorization; no shared
+GitHub credential is added. Existing older installs without bundled Git must first
+be repaired/upgraded using a newly built complete installer if their Git PATH is
+broken. Do not manually copy a single `git.exe` into the installation.
 
 **Important:** The GitHub build deliberately excludes school MDF/LDF files. The source repository alone is **not** a ready-to-install fresh database. A complete-installer workflow must first run successfully and upload its artifact; do not assume an installer exists from a passing ordinary CI build.
 
