@@ -1,11 +1,24 @@
 using FMSC_SMS.Core;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
-public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
+public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges, IStudentCertificateWorkspaceEditor
 {
     internal override bool FocusEntryField() => CertificateUi.FocusEntry(student, Grid, leave);
     private const string CertificateTypeName = "College";
     private const int MaxDuplicateIssues = 2;
+    private HumanCard workspaceDetails = null!;
+    private Action<DataRowView?>? workspaceSaved;
+    Action<DataRowView?>? IStudentCertificateWorkspaceEditor.Saved { set => workspaceSaved = value; }
+    HumanCard IStudentCertificateWorkspaceEditor.DetailsCard => workspaceDetails;
+    Label IStudentCertificateWorkspaceEditor.Feedback => StatusLabel;
+    void IStudentCertificateWorkspaceEditor.ConfigureWorkspaceDetails(DataRow selectedStudent, bool editing)
+    {
+        CertificateWorkspaceDetailsDialog.LockStudent(student, selectedStudent);
+        clearButton.Visible = false;
+        printButton.Visible = false;
+        collectButton.Visible = false;
+        issueAgainButton.Visible = false;
+    }
     private readonly StudentPicker student = new();
     private readonly CertificateCollectionFlow copyFlow = new("Leave");
     private string? draftBaseline;
@@ -130,7 +143,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
                 ResetToStart();
             });
         Defer(LoadFieldSuggestions);
-        var details =
+        var details = workspaceDetails =
             HumanUi.Card(
                 UiText.Certificates.Details,
                 "Create for a college student without a certificate. Creation marks the student Left and records the first issue.");
@@ -682,7 +695,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
         {
             if(selectedIssueCollected||!IsLatestSelectedIssue())return;
             try { DatabaseHelper.ExecuteUser("UpdateLeavingCertificateCopy",DatabaseHelper.Int("@CopyId",selectedIssueId),DatabaseHelper.P("@ClassPromotedTo",GetSelectedPromotionClassName()),DatabaseHelper.P("@AcademicRecord",academic.Text),DatabaseHelper.P("@AttendanceRecord",attendance.Text),DatabaseHelper.P("@Remarks",RecordTextPolicy.TitleCase(remarks.Text)),CertificateCollectionFlow.VersionParameter(certificateResults,"LeaveCertificateIssueId",selectedIssueId));
-                int id=selectedIssueId;LoadCertificates(student.SelectedId);SelectSavedCertificate(id);Info("Certificate changes saved. Student status and fees are unchanged."); }
+                int id=selectedIssueId;LoadCertificates(student.SelectedId);SelectSavedCertificate(id);Info("Certificate changes saved. Student status and fees are unchanged."); workspaceSaved?.Invoke(Grid.CurrentRow?.DataBoundItem as DataRowView); }
             catch(Exception ex){Fail(ex);}
             return;
         }
@@ -836,6 +849,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
             if (successMessage is not null)
             {
                 Info(successMessage);
+                workspaceSaved?.Invoke(Grid.CurrentRow?.DataBoundItem as DataRowView);
             }
         }
     }
@@ -1172,6 +1186,57 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
         }
         base.Dispose(disposing);
     }
+
+    /// <summary>Opt-in workspace bridge: use the same selection and saved-copy logic as this editor.</summary>
+    void IStudentCertificateWorkspaceEditor.LoadWorkspaceSelection(DataRow selectedStudent, int recordId, int issueId)
+    {
+        if (IsDisposed || selectedStudent.Table is null ||
+            !selectedStudent.Table.Columns.Contains("AdmissionId") ||
+            CertificateUi.GetInt(selectedStudent, "AdmissionId") <= 0)
+            throw new ArgumentException("A valid selected student is required.", nameof(selectedStudent));
+        student.SetStudent(selectedStudent);
+        StudentChanged();
+        if (recordId > 0)
+        {
+            if (!certificateResults.AsEnumerable().Any(row =>
+                CertificateUi.GetInt(row, "LeaveRecordId") == recordId &&
+                CertificateUi.GetInt(row, "LeaveCertificateIssueId") == issueId))
+                throw new InvalidOperationException("The selected saved certificate is no longer available. Refresh the workspace.");
+            SelectSavedCertificate(issueId);
+        }
+        else
+        {
+            // Leaving a student is a protected lifecycle decision. Keep the
+            // existing leave episode/fee review and its own New actions intact.
+            ApplyWorkflowState();
+        }
+    }
+
+
+    // Workspace action surface: same legacy handlers, same validation/permissions,
+    // no duplicate certificate persistence, rendering or reissue implementation.
+    bool IStudentCertificateWorkspaceEditor.CanPrintFromWorkspace => printButton.Enabled;
+    bool IStudentCertificateWorkspaceEditor.CanCollectFromWorkspace => collectButton.Enabled;
+    bool IStudentCertificateWorkspaceEditor.CanIssueAgainFromWorkspace => issueAgainButton.Enabled;
+
+    void IStudentCertificateWorkspaceEditor.PrintFromWorkspace()
+    {
+        if (!printButton.Enabled) throw new InvalidOperationException("This saved copy cannot be printed in its current state.");
+        PrintSelected();
+    }
+
+    void IStudentCertificateWorkspaceEditor.CollectFromWorkspace()
+    {
+        if (!collectButton.Enabled) throw new InvalidOperationException("This saved copy is not currently eligible for collection.");
+        MarkCollected();
+    }
+
+    Task IStudentCertificateWorkspaceEditor.IssueAgainFromWorkspaceAsync()
+    {
+        if (!issueAgainButton.Enabled) throw new InvalidOperationException("Only the eligible latest collected copy may be issued again.");
+        IssueAgain(); return Task.CompletedTask;
+    }
+
 }
 
 

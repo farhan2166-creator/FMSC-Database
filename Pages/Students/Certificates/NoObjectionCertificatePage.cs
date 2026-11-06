@@ -2,7 +2,7 @@ using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
-public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyPage
+public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyPage, IStudentCertificateWorkspaceEditor
 {
     internal override bool FocusEntryField() => CertificateUi.FocusEntry(student, Grid, certificateDate);
     // Short certificate details can be retyped without a discard warning.
@@ -13,6 +13,21 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
     private bool creatingCertificate;
     private readonly Func<SqlParameter[], Task> writeCertificate;
     private readonly Func<int, DataTable> readCertificates;
+    private HumanCard workspaceDetails = null!;
+    private Action<DataRowView?>? workspaceSaved;
+    Action<DataRowView?>? IStudentCertificateWorkspaceEditor.Saved { set => workspaceSaved = value; }
+    HumanCard IStudentCertificateWorkspaceEditor.DetailsCard => workspaceDetails;
+    Label IStudentCertificateWorkspaceEditor.Feedback => StatusLabel;
+    void IStudentCertificateWorkspaceEditor.ConfigureWorkspaceDetails(DataRow selectedStudent, bool editing)
+    {
+        CertificateWorkspaceDetailsDialog.LockStudent(student, selectedStudent);
+        createCertificateButton.Visible = !editing;
+        updateCertificateButton.Visible = editing;
+        clearButton.Visible = false;
+        printButton.Visible = false;
+        copyFlow.Collect.Visible = false;
+        copyFlow.IssueAgain.Visible = false;
+    }
     private readonly StudentPicker student = new();
     private readonly CertificateCollectionFlow copyFlow = new("NOC");
     private readonly ModernDatePicker certificateDate =
@@ -88,7 +103,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
             () => {
                 ResetToStart();
             });
-        var details =
+        var details = workspaceDetails =
             HumanUi.Card(
                 UiText.Certificates.Details,
                 "Select student and date to create the NOC. Names come from the student record; select a saved row to edit its date.");
@@ -409,6 +424,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
             if (successMessage is not null)
             {
                 Info(successMessage);
+                workspaceSaved?.Invoke(Grid.CurrentRow?.DataBoundItem as DataRowView);
             }
         }
     }
@@ -462,6 +478,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
             if (successMessage is not null)
             {
                 Info(successMessage);
+                workspaceSaved?.Invoke(Grid.CurrentRow?.DataBoundItem as DataRowView);
             }
         }
     }
@@ -580,4 +597,54 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         }
         base.Dispose(disposing);
     }
+
+    /// <summary>Opt-in workspace bridge: use the same selection and saved-copy logic as this editor.</summary>
+    void IStudentCertificateWorkspaceEditor.LoadWorkspaceSelection(DataRow selectedStudent, int recordId, int issueId)
+    {
+        if (IsDisposed || selectedStudent.Table is null ||
+            !selectedStudent.Table.Columns.Contains("AdmissionId") ||
+            CertificateUi.GetInt(selectedStudent, "AdmissionId") <= 0)
+            throw new ArgumentException("A valid selected student is required.", nameof(selectedStudent));
+        student.SetStudent(selectedStudent);
+        StudentChanged();
+        if (recordId > 0)
+        {
+            if (!certificateResults.AsEnumerable().Any(row =>
+                CertificateUi.GetInt(row, "NoObjectionCertificateId") == recordId))
+                throw new InvalidOperationException("The selected saved certificate is no longer available. Refresh the workspace.");
+            SelectSavedCertificate(recordId);
+        }
+        else
+        {
+            // New preparation stays on the selected student; the ordinary New/Clear
+            // action on the old form still keeps its original behavior.
+            ClearCertificateSelection(); ClearCertificateFields(); ApplyWorkflowState();
+        }
+    }
+
+
+    // Workspace action surface: same legacy handlers, same validation/permissions,
+    // no duplicate certificate persistence, rendering or reissue implementation.
+    bool IStudentCertificateWorkspaceEditor.CanPrintFromWorkspace => printButton.Enabled;
+    bool IStudentCertificateWorkspaceEditor.CanCollectFromWorkspace => copyFlow.Collect.Enabled;
+    bool IStudentCertificateWorkspaceEditor.CanIssueAgainFromWorkspace => copyFlow.IssueAgain.Enabled;
+
+    void IStudentCertificateWorkspaceEditor.PrintFromWorkspace()
+    {
+        if (!printButton.Enabled) throw new InvalidOperationException("This saved copy cannot be printed in its current state.");
+        PrintSelected();
+    }
+
+    void IStudentCertificateWorkspaceEditor.CollectFromWorkspace()
+    {
+        if (!copyFlow.Collect.Enabled) throw new InvalidOperationException("This saved copy is not currently eligible for collection.");
+        copyFlow.CollectFromWorkspace();
+    }
+
+    Task IStudentCertificateWorkspaceEditor.IssueAgainFromWorkspaceAsync()
+    {
+        if (!copyFlow.IssueAgain.Enabled) throw new InvalidOperationException("Only the eligible latest collected copy may be issued again.");
+        copyFlow.IssueAgainFromWorkspace(); return Task.CompletedTask;
+    }
+
 }

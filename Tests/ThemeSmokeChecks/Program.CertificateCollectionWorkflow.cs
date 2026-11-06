@@ -31,7 +31,7 @@ internal static partial class Program
                 object?[] args=item.Item1 switch {
                     "LeaveCertificatePage"=>new object?[]{null,false},
                     "SportsCertificatePage" or "NoObjectionCertificatePage" or "ProvisionalCertificatePage"=>new object?[]{false,null,null},
-                    "RegularStudentCertificatePage"=>new object?[]{false,null,null},
+                    "RegularStudentCertificatePage"=>new object?[]{false,null,null,null},
                     "DateOfBirthCertificatePage"=>new object?[]{false,null},
                     "BankAccountOpeningCertificatePage"=>new object?[]{false,null},
                     "RegularLecturerCertificatePage"=>Array.Empty<object?>(),

@@ -702,7 +702,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Students.View"),
                 new(
                     PageTitles.StudentCertificates,
-                    () => new StudentCertificatesPage(
+                    () => StudentCertificatesPage.CreateDashboardView(
                         (factory, module, title) => NavigateTo(factory, module, title)),
                     "Certificates",
                     PageTitles.StudentCertificates,

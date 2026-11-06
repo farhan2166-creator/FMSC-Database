@@ -1,7 +1,7 @@
 using FMSC_SMS.Core;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
-public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChanges
+public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChanges, IStudentCertificateWorkspaceEditor
 {
     internal override bool FocusEntryField() => CertificateUi.FocusEntry(student, Grid, certificateDate);
     private bool reissuing;
@@ -13,6 +13,19 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
     public string BusyMessage=>"Please wait for the certificate reissue to finish.";
     public bool HasUnsavedChanges=>reissue.Blocked;
     public string UnsavedChangesMessage=>"A certificate reissue needs outcome checking. Its recovery record is retained when you leave.";
+    private HumanCard workspaceDetails = null!;
+    private Action<DataRowView?>? workspaceSaved;
+    Action<DataRowView?>? IStudentCertificateWorkspaceEditor.Saved { set => workspaceSaved = value; }
+    HumanCard IStudentCertificateWorkspaceEditor.DetailsCard => workspaceDetails;
+    Label IStudentCertificateWorkspaceEditor.Feedback => StatusLabel;
+    void IStudentCertificateWorkspaceEditor.ConfigureWorkspaceDetails(DataRow selectedStudent, bool editing)
+    {
+        CertificateWorkspaceDetailsDialog.LockStudent(student, selectedStudent);
+        clearButton.Visible = false;
+        printButton.Visible = false;
+        collectButton.Visible = false;
+        issueAgainButton.Visible = false;
+    }
     private readonly StudentPicker student = new();
     private readonly CertificateCollectionFlow copyFlow = new("DOB");
     private readonly ModernTextBox dateOfBirth =
@@ -101,7 +114,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
             () => {
                 ResetToStart();
             });
-        var details =
+        var details = workspaceDetails =
             HumanUi.Card(
                 UiText.Certificates.Details,
                 "Create the student’s certificate. The first issue is recorded automatically.");
@@ -444,7 +457,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
         {
             if(selectedIssueCollected||!IsLatestSelectedIssue())return;
             try { DatabaseHelper.ExecuteUser("UpdateCertificateCopyDate",DatabaseHelper.P("@Kind","DOB"),DatabaseHelper.Int("@CopyId",selectedIssueId),DatabaseHelper.Date("@CertificateDate",certificateDate.Value.Date),CertificateCollectionFlow.VersionParameter(certificateResults,"DateOfBirthCertificateIssueId",selectedIssueId));
-                int id=selectedIssueId;LoadCertificates(student.SelectedId);SelectSavedCertificate(id);Info("Certificate changes saved."); }
+                int id=selectedIssueId;LoadCertificates(student.SelectedId);SelectSavedCertificate(id);Info("Certificate changes saved."); workspaceSaved?.Invoke(Grid.CurrentRow?.DataBoundItem as DataRowView); }
             catch(Exception ex){Fail(ex);}
             return;
         }
@@ -514,6 +527,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
             if (successMessage is not null)
             {
                 Info(successMessage);
+                workspaceSaved?.Invoke(Grid.CurrentRow?.DataBoundItem as DataRowView);
             }
         }
     }
@@ -726,5 +740,57 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
         }
         base.Dispose(disposing);
     }
+
+    /// <summary>Opt-in workspace bridge: use the same selection and saved-copy logic as this editor.</summary>
+    void IStudentCertificateWorkspaceEditor.LoadWorkspaceSelection(DataRow selectedStudent, int recordId, int issueId)
+    {
+        if (IsDisposed || selectedStudent.Table is null ||
+            !selectedStudent.Table.Columns.Contains("AdmissionId") ||
+            CertificateUi.GetInt(selectedStudent, "AdmissionId") <= 0)
+            throw new ArgumentException("A valid selected student is required.", nameof(selectedStudent));
+        reissue.Load();
+        student.SetStudent(selectedStudent);
+        StudentChanged();
+        if (recordId > 0)
+        {
+            if (!certificateResults.AsEnumerable().Any(row =>
+                CertificateUi.GetInt(row, "CertificateRecordId") == recordId &&
+                CertificateUi.GetInt(row, "DateOfBirthCertificateIssueId") == issueId))
+                throw new InvalidOperationException("The selected saved certificate is no longer available. Refresh the workspace.");
+            SelectSavedCertificate(issueId);
+        }
+        else
+        {
+            // New preparation stays on the selected student; the ordinary New/Clear
+            // action on the old form still keeps its original behavior.
+            ClearCertificateSelection(); ClearCertificateFields(); ApplyWorkflowState();
+        }
+    }
+
+
+    // Workspace action surface: same legacy handlers, same validation/permissions,
+    // no duplicate certificate persistence, rendering or reissue implementation.
+    bool IStudentCertificateWorkspaceEditor.CanPrintFromWorkspace => printButton.Enabled;
+    bool IStudentCertificateWorkspaceEditor.CanCollectFromWorkspace => collectButton.Enabled;
+    bool IStudentCertificateWorkspaceEditor.CanIssueAgainFromWorkspace => issueAgainButton.Enabled;
+
+    void IStudentCertificateWorkspaceEditor.PrintFromWorkspace()
+    {
+        if (!printButton.Enabled) throw new InvalidOperationException("This saved copy cannot be printed in its current state.");
+        PrintSelected();
+    }
+
+    void IStudentCertificateWorkspaceEditor.CollectFromWorkspace()
+    {
+        if (!collectButton.Enabled) throw new InvalidOperationException("This saved copy is not currently eligible for collection.");
+        MarkCollected();
+    }
+
+    Task IStudentCertificateWorkspaceEditor.IssueAgainFromWorkspaceAsync()
+    {
+        if (!issueAgainButton.Enabled) throw new InvalidOperationException("Only the eligible latest collected copy may be issued again.");
+        return ReissueCertificateAsync(false);
+    }
+
 }
 

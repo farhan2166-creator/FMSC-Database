@@ -35,7 +35,15 @@ internal static class CertificateRecordOrder
         grid.CurrentCell = selected.Cells.Cast<DataGridViewCell>().Where(cell => cell.Visible)
             .OrderBy(cell => cell.OwningColumn.DisplayIndex).First();
         selected.Selected = true;
-        if (grid.IsHandleCreated) grid.FirstDisplayedScrollingRowIndex = selected.Index;
+        // A workspace editor can bind and select its history with no viewport.
+        // Load the selected copy even when WinForms cannot scroll a row into view.
+        ScrollToRowIfDisplayed(grid, selected.Index);
         loadRow(selected.Index);
+    }
+
+    internal static void ScrollToRowIfDisplayed(DataGridView grid, int rowIndex)
+    {
+        if (grid.IsHandleCreated && grid.DisplayedRowCount(includePartialRow: true) > 0)
+            grid.FirstDisplayedScrollingRowIndex = rowIndex;
     }
 }

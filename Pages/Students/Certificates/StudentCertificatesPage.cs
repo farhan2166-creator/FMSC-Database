@@ -2,6 +2,13 @@ using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class StudentCertificatesPage : V2Page
 {
+    // Owner decision, 6 November 2026: open the workspace from the dashboard.
+    // Set this to false to restore the original certificate cards in both dashboard entry points.
+    private static readonly bool UseStudentCertificatesWorkspace = true;
+
+    internal static Control CreateDashboardView(Action<Func<Control>, string, string> navigate) =>
+        UseStudentCertificatesWorkspace ? new StudentCertificatesWorkspacePage() : new StudentCertificatesPage(navigate);
+
     // UI TUNING: certificate-card glyphs are intentionally larger than toolbar icons because
     // they are the visual identity of each card, not a small decoration beside a command.
     private static Font CertificateCardIconFont =>
@@ -158,5 +165,6 @@ public sealed class StudentCertificatesPage : V2Page
         ModalPageCloseGuard.Attach(dialog,control);
         dialog.ShowDialog(FindForm());
     }
+
 }
 

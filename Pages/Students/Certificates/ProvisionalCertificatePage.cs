@@ -2,7 +2,7 @@ using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
-public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyPage
+public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyPage, IStudentCertificateWorkspaceEditor
 {
     internal override bool FocusEntryField() => CertificateUi.FocusEntry(student, Grid, examType);
     public bool HasUnsavedChanges => HasCertificateEdits;
@@ -12,6 +12,23 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
     private bool creatingCertificate;
     private readonly Func<SqlParameter[], Task> writeCertificate;
     private readonly Func<int, DataTable> readCertificates;
+    private HumanCard workspaceDetails = null!;
+    private TableLayoutPanel workspaceBody = null!;
+    private Action<DataRowView?>? workspaceSaved;
+    Action<DataRowView?>? IStudentCertificateWorkspaceEditor.Saved { set => workspaceSaved = value; }
+    HumanCard IStudentCertificateWorkspaceEditor.DetailsCard => workspaceDetails;
+    Label IStudentCertificateWorkspaceEditor.Feedback => StatusLabel;
+    void IStudentCertificateWorkspaceEditor.ConfigureWorkspaceDetails(DataRow selectedStudent, bool editing)
+    {
+        CertificateWorkspaceDetailsDialog.LockStudent(student, selectedStudent);
+        workspaceBody.AutoScroll = true;
+        createCertificateButton.Visible = !editing;
+        updateCertificateButton.Visible = editing;
+        clearButton.Visible = false;
+        printButton.Visible = false;
+        copyFlow.Collect.Visible = false;
+        copyFlow.IssueAgain.Visible = false;
+    }
     private readonly StudentPicker student = new();
     private readonly ModernTextBox dateOfBirthDisplay = HumanUi.TextBox(false,150);
     private readonly CertificateCollectionFlow copyFlow = new("Provisional");
@@ -161,7 +178,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 BindSubjects();
                 ResetToStart();
             });
-        var details =
+        var details = workspaceDetails =
             HumanUi.Card(
                 UiText.Certificates.Details,
                 "Choose student and exam type/year; enter board results. Names and birth date come from the student record; select a saved row to edit other details.");
@@ -266,7 +283,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         subjectsPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, subjectsList.Height));
         subjectsPanel.Controls.Add(subjectsHeader, 0, 0);
         subjectsPanel.Controls.Add(subjectChoices, 0, 1);
-        var editorBody = new TableLayoutPanel {
+        var editorBody = workspaceBody = new TableLayoutPanel {
             Dock = DockStyle.Fill, AutoScroll = true,
             ColumnCount = 1, RowCount = 2, Margin = Padding.Empty
         };
@@ -328,7 +345,12 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         void ReflowFields()
         {
             int columns = editorBody.ClientSize.Width < AppScale.Scale(1000) ? 3 : 6;
-            if (columns == fieldColumns) return;
+            if (columns == fieldColumns)
+            {
+                fields.Height = fields.RowCount * AppMetrics.FieldRowHeight;
+                editorBody.RowStyles[0].Height = fields.Height;
+                return;
+            }
             fieldColumns = columns;
             fields.SuspendLayout();
             var fieldControls = fields.Controls.Cast<Control>().ToArray();
@@ -389,7 +411,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         bool sizingCards = false;
         void FitCards()
         {
-            if (sizingCards || root.ClientSize.Height <= 0) return;
+            if (sizingCards || root.ClientSize.Height <= 0 || details.Parent != root) return;
             int detailsHeight = details.Header.Height + details.Padding.Vertical + details.Content.Padding.Vertical
                 + fields.Height + subjectAreaHeight + certButtonRow.Height + certButtonRow.Margin.Vertical;
             int recordsHeight = records.Header.Height + records.Padding.Vertical + records.Content.Padding.Vertical
@@ -1030,6 +1052,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             if (successMessage is not null)
             {
                 Info(successMessage);
+                workspaceSaved?.Invoke(Grid.CurrentRow?.DataBoundItem as DataRowView);
             }
         }
     }
@@ -1110,6 +1133,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             if (successMessage is not null)
             {
                 Info(successMessage);
+                workspaceSaved?.Invoke(Grid.CurrentRow?.DataBoundItem as DataRowView);
             }
         }
     }
@@ -1404,4 +1428,55 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         }
         finally { validatingEditor = false; }
     }
+
+    /// <summary>Opt-in workspace bridge: use the same selection and saved-copy logic as this editor.</summary>
+    void IStudentCertificateWorkspaceEditor.LoadWorkspaceSelection(DataRow selectedStudent, int recordId, int issueId)
+    {
+        if (IsDisposed || selectedStudent.Table is null ||
+            !selectedStudent.Table.Columns.Contains("AdmissionId") ||
+            CertificateUi.GetInt(selectedStudent, "AdmissionId") <= 0)
+            throw new ArgumentException("A valid selected student is required.", nameof(selectedStudent));
+        BindSubjects();
+        student.SetStudent(selectedStudent);
+        StudentChanged();
+        if (recordId > 0)
+        {
+            if (!certificateResults.AsEnumerable().Any(row =>
+                CertificateUi.GetInt(row, "ProvisionalCertificateId") == recordId))
+                throw new InvalidOperationException("The selected saved certificate is no longer available. Refresh the workspace.");
+            SelectSavedCertificate(recordId);
+        }
+        else
+        {
+            // New preparation stays on the selected student; the ordinary New/Clear
+            // action on the old form still keeps its original behavior.
+            ClearCertificateSelection(); ClearCertificateFields(); ApplyWorkflowState();
+        }
+    }
+
+
+    // Workspace action surface: same legacy handlers, same validation/permissions,
+    // no duplicate certificate persistence, rendering or reissue implementation.
+    bool IStudentCertificateWorkspaceEditor.CanPrintFromWorkspace => printButton.Enabled;
+    bool IStudentCertificateWorkspaceEditor.CanCollectFromWorkspace => copyFlow.Collect.Enabled;
+    bool IStudentCertificateWorkspaceEditor.CanIssueAgainFromWorkspace => copyFlow.IssueAgain.Enabled;
+
+    void IStudentCertificateWorkspaceEditor.PrintFromWorkspace()
+    {
+        if (!printButton.Enabled) throw new InvalidOperationException("This saved copy cannot be printed in its current state.");
+        PrintSelected();
+    }
+
+    void IStudentCertificateWorkspaceEditor.CollectFromWorkspace()
+    {
+        if (!copyFlow.Collect.Enabled) throw new InvalidOperationException("This saved copy is not currently eligible for collection.");
+        copyFlow.CollectFromWorkspace();
+    }
+
+    Task IStudentCertificateWorkspaceEditor.IssueAgainFromWorkspaceAsync()
+    {
+        if (!copyFlow.IssueAgain.Enabled) throw new InvalidOperationException("Only the eligible latest collected copy may be issued again.");
+        copyFlow.IssueAgainFromWorkspace(); return Task.CompletedTask;
+    }
+
 }
