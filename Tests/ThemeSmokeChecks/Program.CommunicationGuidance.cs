@@ -53,7 +53,7 @@ internal static partial class Program
             Check(tabs.SelectedIndex==1&&Field<ModernTextBox>("announcement").Text=="Preserve this fictional draft","Delayed refresh preserves selected tab and unsaved composition");
             Check(Descendants(tabs.Parent!.Parent!).OfType<ModernButton>().Count(b=>b.ThemeRole=="TabActive")==1,"Busy disable/restore leaves exactly one tab selected");
             tabs.SelectedIndex=1;PumpUntil(()=>!page.IsBusy,"Outbox opens");
-            Check(Status().Contains("No messages")&&Convert.ToString(history.Tag)!.Contains("Create a draft"),"An empty outbox explains how to begin and how to widen filters");
+            Check(Status().Contains("No messages")&&Convert.ToString(history.Tag)!.Contains("Send a message"),"An empty outbox explains how to begin and how to widen filters");
             Check(!Descendants(tabs.TabPages[1]).OfType<ModernButton>().Single(b=>b.Text=="Submit").Enabled,"No campaign-selection action is enabled on an empty outbox");
             Field<ModernTextBox>("historySearch").Text="Fictional search";
             Check(history.DataSource is null,"Changed history filters clear stale campaign selection before another action");
