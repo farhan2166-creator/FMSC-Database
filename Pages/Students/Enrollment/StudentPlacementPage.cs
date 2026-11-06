@@ -28,6 +28,7 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
     private readonly Control pageContent;
     private readonly TableLayoutPanel fields=new(){Dock=DockStyle.Fill,ColumnCount=2,RowCount=2};
     private readonly ModernButton review,retry,studentActions,correction,findUndo;
+    private readonly ModernButton load,suggest,assign,select,clear,undo,historyDates,historyRetry,records,old;
     private DataTable catalog=new(), placements=new(), data=new();
     private bool busy, binding;
     private (Guid Id,string Json,int Year,DateTime Date,string Reason,bool Carry,string Hash)? pending;
@@ -47,22 +48,21 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         for(int i=0;i<2;i++)fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
         fields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldCardHeight(2,false)));
         fields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
-        var load=AddAction("Load Students",async(_,_)=>await Guard(LoadStudents),"Secondary");
-        var suggest=AddAction("Suggest",(_,_)=>Suggest(),"Secondary");SetToolTip(suggest,"Suggest destination placements for the loaded students.");
-        var assign=AddAction("Assign",(_,_)=>AssignHighlighted(),"Secondary");SetToolTip(assign,"Assign a decision and destination to highlighted students.");
-        var select=AddAction("Select All",(_,_)=>SelectRows(true),"Secondary");
-        var clear=AddAction("Clear",(_,_)=>SelectRows(false),"Secondary");SetToolTip(clear,"Clear the ticked student selection.");
+        load=AddAction("Load Students",async(_,_)=>await Guard(LoadStudents),"Secondary");
+        suggest=AddAction("Suggest",(_,_)=>Suggest(),"Secondary");SetToolTip(suggest,"Suggest destination placements for the loaded students.");
+        assign=AddAction("Assign",(_,_)=>AssignHighlighted(),"Secondary");SetToolTip(assign,"Assign a decision and destination to highlighted students.");
+        select=AddAction("Select All",(_,_)=>SelectRows(true),"Secondary");
+        clear=AddAction("Clear",(_,_)=>SelectRows(false),"Secondary");SetToolTip(clear,"Clear the ticked student selection.");
         review=AddAction("Review Promotion",async(_,_)=>await Guard(Process),"Success");
         retry=AddAction("Check / Retry Plan",async(_,_)=>await Guard(Retry),"Warning");
-        var records=AddAction("Refresh History",async(_,_)=>await Guard(LoadHistory),"Secondary");
-        var undo=AddAction("Undo Selected Promotion",async(_,_)=>await Guard(Undo),"Warning");
+        records=AddAction("Refresh History",async(_,_)=>await Guard(LoadHistory),"Secondary");
+        undo=AddAction("Undo Selected Promotion",async(_,_)=>await Guard(Undo),"Warning");
         // SQL requires Students.Administer in addition to Enrollment.Manage for undo.
-        undo.Enabled=CurrentUser.HasPermission("Students.Administer");
         correction=AddAction("History / Dates",(_,_)=>OpenStudentHistory(),"Secondary");
         studentActions=AddAction("Student Actions",(_,_)=>OpenStudentActions(),"Secondary");
         findUndo=AddAction("Undo Promotion",(_,_)=>OpenPlacementHistory(),"Secondary");
         SetToolTip(findUndo,"Find a saved promotion in History and review whether it can be undone.");
-        var old=AddAction("Earlier Promotion History",(_,_)=> {
+        old=AddAction("Earlier Promotion History",(_,_)=> {
             if(!CurrentUser.HasPermission("Reports.View")){Warn("Report access is required.");return;}
             using var dialog=Window("Earlier Promotion History",new PromotionHistoryPage());dialog.ShowDialog(FindForm());
         },"Secondary");
@@ -91,8 +91,8 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         historyRoot.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.ButtonHeight+AppScale.Scale(8)));historyRoot.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         var historyFields=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2};historyFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));historyFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,75));
         historyFields.Controls.Add(HumanUi.Field("Correction Date",historyDate),0,0);historyFields.Controls.Add(HumanUi.Field("Reason for Undoing Promotion",historyReason),1,0);
-        var historyDates=AddAction("Student History / Dates",(_,_)=>OpenStudentHistory(),"Secondary");RelocateFromActions(historyDates);
-        var historyRetry=AddAction("Check / Retry Plan",async(_,_)=>await Guard(Retry),"Warning");RelocateFromActions(historyRetry);historyRetry.Visible=false;
+        historyDates=AddAction("Student History / Dates",(_,_)=>OpenStudentHistory(),"Secondary");RelocateFromActions(historyDates);
+        historyRetry=AddAction("Check / Retry Plan",async(_,_)=>await Guard(Retry),"Warning");RelocateFromActions(historyRetry);historyRetry.Visible=false;
         var historyActions=CenteredActionRow(new Control[]{records,old},new Control[]{historyDates},new Control[]{undo,historyRetry});
         historyRoot.Controls.Add(new Label{Dock=DockStyle.Fill,Text="Review saved movements. To undo an unused promotion, select its record and enter the correction date and reason."},0,0);
         historyRoot.Controls.Add(historyFields,0,1);historyRoot.Controls.Add(historyActions,0,2);historyRoot.Controls.Add(history,0,3);history.Dock=DockStyle.Fill;
@@ -111,6 +111,11 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         SetContent(pageContent);
         if(!ViewingHistory)ConfigureTask();
         WirePlacementChoices();
+        students.SelectionChanged += (_, _) => RefreshActionAvailability();
+        history.SelectionChanged += (_, _) => RefreshActionAvailability();
+        reason.TextChanged += (_, _) => RefreshActionAvailability();
+        historyReason.TextChanged += (_, _) => RefreshActionAvailability();
+        RefreshActionAvailability();
         Disposed+=(_,_)=>{
             unusedContent.Dispose();
             foreach(var control in PlanChoices.Cast<Control>().Concat(new Control[]{effective,reason,historyReason,historyDate,fees,carry,students,history}))
@@ -166,7 +171,6 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         foreach(var wrapper in oldFields)wrapper.Dispose();
         carry.Visible=Annual;
         SetToolTip(targetCampus,"Leave blank to keep each student's current campus.");SetToolTip(targetClass,"Leave blank to keep each student's current class.");
-        fees.Enabled=!Annual && CurrentUser.HasPermission("Fees.Adjust");carry.Enabled=Annual && CurrentUser.HasPermission("Fees.Adjust");targetClass.Enabled=!Annual;
         review.Text="Review";SetToolTip(review,Annual?"Review the annual promotion plan before processing.":operation==1?"Review the transfer plan before processing.":"Review the placement correction before processing.");
         correction.Visible=operation==2;findUndo.Visible=operation==2;studentActions.Visible=operation!=1;retry.Visible=pending is not null;
         studentActions.Text=Annual?"Return / Completion":"Student Actions";
@@ -181,24 +185,72 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         if(busy)return;busy=true;pageContent.Enabled=false;
         try{await work();}catch(Exception ex){Fail(ex);}finally{
             busy=false;
-            if(!IsDisposed){pageContent.Enabled=true;SetPendingControls(pageContent);if(!ViewingHistory){fees.Enabled=pending is null && !Annual && CurrentUser.HasPermission("Fees.Adjust");carry.Enabled=pending is null && Annual && CurrentUser.HasPermission("Fees.Adjust");targetClass.Enabled=pending is null && !Annual;}}
-        }
-    }
-    private void SetPendingControls(Control parent)
-    {
-        foreach(Control child in parent.Controls){
-            if(child is ModernButton button){
-                button.Enabled=(pending is null || button.Text=="Check / Retry Plan") &&
-                    (button.Text!="Undo Selected Promotion" || CurrentUser.HasPermission("Students.Administer"));
-                if(button.Text=="Check / Retry Plan")button.Visible=pending is not null;
-                continue;
+            if (!IsDisposed)
+            {
+                pageContent.Enabled = true;
+                RefreshActionAvailability();
             }
-            if(ReferenceEquals(child,fees)){child.Enabled=pending is null && !Annual && CurrentUser.HasPermission("Fees.Adjust");continue;}
-            if(ReferenceEquals(child,carry)){child.Enabled=pending is null && Annual && CurrentUser.HasPermission("Fees.Adjust");continue;}
-            if(child is LookupBox || child is ModernComboBox || child is ModernDatePicker || child is ModernTextBox || child is DataGridView || child is CheckBox){child.Enabled=pending is null;continue;}
-            SetPendingControls(child);
         }
     }
+
+    private void RefreshActionAvailability()
+    {
+        if (busy || binding || Disposing || IsDisposed) return;
+        bool editable = pending is null;
+        bool canAdminister = CurrentUser.HasPermission("Students.Administer");
+        if (ViewingHistory)
+        {
+            var movement = SelectedStudent();
+            bool canUndo = editable && canAdminister && movement is not null
+                && Convert.ToString(movement["Action"]) is ("PROMOTE" or "HOLD")
+                && movement.Row.IsNull("UndoneBy");
+            history.Enabled = records.Enabled = old.Enabled = editable;
+            historyDates.Enabled = editable && canAdminister && movement is not null;
+            historyReason.Enabled = historyDate.Enabled = canUndo;
+            undo.Enabled = canUndo && !string.IsNullOrWhiteSpace(historyReason.Text);
+            historyRetry.Visible = historyRetry.Enabled = !editable;
+            return;
+        }
+
+        bool hasSource = editable && choicesReady && sourceYear.SelectedId > 0;
+        bool hasStudents = hasSource && data.Rows.Count > 0;
+        bool hasDestination = hasStudents && targetYear.SelectedId > 0;
+        bool canAdjustFees = CurrentUser.HasPermission("Fees.Adjust");
+
+        sourceYear.Enabled = editable && choicesReady && HasChoices(sourceYear);
+        sourceCampus.Enabled = hasSource && HasChoices(sourceCampus);
+        sourceClass.Enabled = hasSource && HasChoices(sourceClass);
+        sourceSection.Enabled = hasSource && HasChoices(sourceSection);
+        load.Enabled = hasSource;
+        students.Enabled = hasStudents;
+        targetYear.Enabled = Annual && hasStudents && HasChoices(targetYear);
+        targetCampus.Enabled = hasDestination && HasChoices(targetCampus);
+        targetClass.Enabled = !Annual && hasDestination && HasChoices(targetClass);
+        effective.Enabled = reason.Enabled = hasDestination;
+        fees.Enabled = !Annual && hasDestination && canAdjustFees;
+        carry.Enabled = Annual && hasDestination && canAdjustFees;
+
+        suggest.Enabled = hasDestination;
+        assign.Enabled = hasDestination && students.SelectedRows.Count > 0;
+        select.Enabled = clear.Enabled = hasStudents;
+        bool hasStudent = hasStudents && SelectedStudent() is not null;
+        studentActions.Enabled = hasStudent && (canAdminister || !Annual && CurrentUser.HasPermission("Enrollment.Manage"));
+        correction.Enabled = hasStudent && canAdminister;
+        findUndo.Enabled = editable;
+        retry.Visible = retry.Enabled = !editable;
+
+        var selected = SelectedPlanRows();
+        review.Enabled = hasDestination && !string.IsNullOrWhiteSpace(reason.Text)
+            && selected.Length > 0 && selected.All(row => Id(row, "Destination") > 0);
+    }
+
+    // Bound lookups have a leading blank choice.
+    private static bool HasChoices(LookupBox lookup) => lookup.Items.Count > 1;
+
+    private DataRow[] SelectedPlanRows() => data.Columns.Contains("Selected")
+        ? data.AsEnumerable().Where(row => Convert.ToBoolean(row["Selected"]) && Convert.ToString(row["Decision"]) != "SKIP").ToArray()
+        : Array.Empty<DataRow>();
+
     private async Task Initialize()
     {
         if(ViewingHistory){await LoadHistory();SetStatus("Select a movement to review its history or promotion correction.");return;}
@@ -219,7 +271,6 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
                 """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),
                 DatabaseHelper.Bit("@IncludeInactive",Annual || operation==2));
             BindPlacementChoices();
-            fees.Enabled=!Annual && CurrentUser.HasPermission("Fees.Adjust");carry.Enabled=Annual && CurrentUser.HasPermission("Fees.Adjust");targetClass.Enabled=!Annual;
             SetStatus("Choose a source year. Blank campus, class and section include all active placements. Load students to begin.");
         }finally{binding=false;}
     }
@@ -273,6 +324,7 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
     {
         if(pending is not null)return;
         students.DataSource=null;data=new();totals.Text="Selection changed. Load students again.";
+        RefreshActionAvailability();
     }
     private async Task LoadStudents()
     {
@@ -331,6 +383,14 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
         panel.Controls.Add(HumanUi.Field("Decision",decision));panel.Controls.Add(HumanUi.Field("Destination Placement",lookup));
         using var dialog=Window("Assign Highlighted Students",panel);dialog.ClientSize=new Size(AppScale.Scale(700),AppScale.Scale(240));
         var apply=new ModernButton{Text="Assign",DialogResult=DialogResult.OK};panel.Controls.Add(HumanUi.DialogButtons(apply));dialog.AcceptButton=apply;
+        void RefreshAssign()
+        {
+            string? action = Convert.ToString(decision.SelectedValue);
+            apply.Enabled = action is "HOLD" or "SKIP" || lookup.SelectedId > 0;
+        }
+        lookup.SelectedIndexChanged += (_, _) => RefreshAssign();
+        decision.SelectedIndexChanged += (_, _) => RefreshAssign();
+        RefreshAssign();
         if(dialog.ShowDialog(FindForm())!=DialogResult.OK)return;
         string selectedDecision=Convert.ToString(decision.SelectedValue)!;
         if(selectedDecision!="HOLD" && selectedDecision!="SKIP" && lookup.SelectedId<=0){Warn("Choose a destination placement.");return;}
@@ -341,19 +401,20 @@ public sealed partial class StudentPlacementPage : V2Page, IBusyPage
     private void UpdateTotals()
     {
         if(!data.Columns.Contains("Selected"))return;
-        var chosen=data.AsEnumerable().Where(r=>Convert.ToBoolean(r["Selected"]) && Convert.ToString(r["Decision"])!="SKIP").ToArray();
+        var chosen = SelectedPlanRows();
         string destinations=string.Join(" · ",chosen.GroupBy(r=>Convert.ToInt32(r["Destination"])).Select(group=>{
             var placement=placements.AsEnumerable().FirstOrDefault(p=>Convert.ToInt32(p["ClassSectionId"])==group.Key);
             return $"{(placement is null?"Unassigned":placement["Display"])}: {group.Count():N0}";
         }));
         totals.Text=$"{chosen.Length:N0} to process · {data.Rows.Count-chosen.Length:N0} skipped · {chosen.Count(r=>Convert.ToInt32(r["Destination"])==0):N0} missing destinations. Highlight rows to assign groups.\n{destinations}";
         SetToolTip(totals,totals.Text);
+        RefreshActionAvailability();
     }
     private async Task Process()
     {
         if(pending is not null){await Retry();return;}
         students.EndEdit();
-        var selected=data.AsEnumerable().Where(r=>Convert.ToBoolean(r["Selected"]) && Convert.ToString(r["Decision"])!="SKIP").ToArray();
+        var selected = SelectedPlanRows();
         if(selected.Length==0)throw new InvalidOperationException("Select students to process.");
         if(targetYear.SelectedId<=0 || reason.Text.Trim().Length==0)throw new InvalidOperationException("Choose the destination year and enter a reason.");
         if(selected.Any(r=>Convert.ToInt32(r["Destination"])<=0))throw new InvalidOperationException("Choose a destination for every selected student. Final-class students can repeat or be skipped for departure review.");

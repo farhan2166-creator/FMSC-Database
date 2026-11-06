@@ -55,12 +55,15 @@ internal static partial class Program
                 Check(!historyGrid.Columns.Cast<DataGridViewColumn>().Any(column=>column.Visible && column.DataPropertyName is "RequestId" or "ItemId" or "UndoneBy"),"History retains recovery fields in its data without exposing request IDs as user-facing columns.");
                 var selected=(DataRowView)typeof(StudentPlacementPage).GetMethod("SelectedStudent",flags)!.Invoke(page,null)!;
                 Check(Convert.ToString(selected["StudentName"])=="Fictional History Student","History actions use the selected history student.");
+                Check(!Field<ModernButton>(page,"undo").Enabled,"History undo requires a reason for the selected promotion.");
                 Field<ModernTextBox>(page,"historyReason").Text="Fictional undo explanation";
+                Check(Field<ModernButton>(page,"undo").Enabled,"A recorded promotion and reason unlock undo review.");
             }
             else
             {
                 Check(content.Contains(Field<LookupBox>(page,"sourceYear")) && content.Contains(grid),"Planning pages retain source fields and a student plan.");
                 Check(Field<LookupBox>(page,"sourceYear").PointToScreen(Point.Empty).X<Field<LookupBox>(page,"targetCampus").PointToScreen(Point.Empty).X,"Source fields stay on the left and destinations on the right.");
+                Check(!Field<ModernButton>(page,"load").Enabled && !Field<ModernButton>(page,"review").Enabled && !Field<LookupBox>(page,"targetCampus").Enabled,"Empty planning pages gate loading, review and destination selection.");
                 Check(!grid.ReadOnly && grid.Columns["Current"].ReadOnly,"Decisions are editable while current placements remain read-only.");
                 var choices=(DataView)((DataGridViewComboBoxColumn)grid.Columns["Decision"]).DataSource!;
                 string[] expected=task switch{StudentPlacementTask.AnnualPromotion=>new[]{"PROMOTE","HOLD","SKIP"},StudentPlacementTask.Transfer=>new[]{"MOVE","SKIP"},_=>new[]{"CORRECT","SKIP"}};
@@ -91,12 +94,12 @@ internal static partial class Program
                 Field<ModernTextBox>(page,"reason").Text="Fictional reviewed placement change";
             }
             typeof(StudentPlacementPage).GetField("pending",flags)!.SetValue(page,(Guid.NewGuid(),"[]",9,DateTime.Today,"Pending",false,"hash"));
-            typeof(StudentPlacementPage).GetMethod("SetPendingControls",flags)!.Invoke(page,new object[]{content});
+            typeof(StudentPlacementPage).GetMethod("RefreshActionAvailability",flags)!.Invoke(page,null);
             Check(page.IsBusy,"An unconfirmed outcome keeps the shell navigation lock on every page.");
             Check(Descendants(content).OfType<ModernButton>().Any(button=>button.Text=="Check / Retry Plan" && button.Visible && button.Enabled),"Every page retains its recovery action for an uncertain outcome.");
             Check(task==StudentPlacementTask.History?!Field<ModernTextBox>(page,"historyReason").Enabled:!Field<LookupBox>(page,"sourceYear").Enabled,"Unconfirmed plans lock their submitted details.");
             destination=null;Call(page,"OpenPlacementHistory");Check(destination is null,"Contextual navigation cannot abandon an unconfirmed result.");
-            typeof(StudentPlacementPage).GetField("pending",flags)!.SetValue(page,null);typeof(StudentPlacementPage).GetMethod("SetPendingControls",flags)!.Invoke(page,new object[]{content});
+            typeof(StudentPlacementPage).GetField("pending",flags)!.SetValue(page,null);typeof(StudentPlacementPage).GetMethod("RefreshActionAvailability",flags)!.Invoke(page,null);
             window.ClientSize=new Size(900,700);Application.DoEvents();Check((task==StudentPlacementTask.History?Field<DataGridView>(page,"history"):grid).Height>=100,"Every page retains a usable grid at a compact window size.");
             window.ClientSize=new Size(1600,850);Application.DoEvents();string output=Path.GetFullPath(task==StudentPlacementTask.AnnualPromotion?"artifacts/placement-workspace.png":$"artifacts/placement-page-{task}.png");Directory.CreateDirectory(Path.GetDirectoryName(output)!);using var bitmap=new Bitmap(window.ClientSize.Width,window.ClientSize.Height);window.DrawToBitmap(bitmap,window.ClientRectangle);bitmap.Save(output);
         }
@@ -112,7 +115,7 @@ internal static partial class Program
             if(task==StudentPlacementTask.History)
                 Check(!Descendants(content).OfType<ModernButton>().Single(b=>b.Text=="Undo Selected Promotion").Enabled,
                     "Undo promotion requires Students.Administer as well as Enrollment.Manage");
-            typeof(StudentPlacementPage).GetMethod("SetPendingControls",flags)!.Invoke(restricted,new object[]{content});
+            typeof(StudentPlacementPage).GetMethod("RefreshActionAvailability",flags)!.Invoke(restricted,null);
             if(task==StudentPlacementTask.History)
                 Check(!Descendants(content).OfType<ModernButton>().Single(b=>b.Text=="Undo Selected Promotion").Enabled,
                     "Refreshing placement controls cannot reenable an unauthorized undo");

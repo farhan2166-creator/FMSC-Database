@@ -50,6 +50,7 @@ internal static partial class Program
             var targetCampus = Field<LookupBox>("targetCampus"); var targetClass = Field<LookupBox>("targetClass");
             sourceYear.SelectedValue = 9;
             Check(Options(sourceCampus).SequenceEqual(new[]{1,2}) && Options(sourceClass).SequenceEqual(new[]{10}), task+": source choices come from actual placements in the selected year");
+            Check(Field<ModernButton>("load").Enabled && !Field<ModernButton>("review").Enabled && !targetCampus.Enabled, task+": source selection unlocks loading only");
             sourceCampus.SelectedValue = 1; sourceClass.SelectedValue = 10;
             Check(Options(sourceSection).SequenceEqual(new[]{1,2}), task+": source sections exclude globally defined/unpopulated sections but retain historical sources");
             Check(Options(targetCampus).SequenceEqual(new[]{1,2}), task+": unconfigured destination campuses are excluded");
@@ -67,6 +68,13 @@ internal static partial class Program
             data.Columns.Add("StudentName"); data.Columns.Add("Current");
             data.Rows[0]["StudentName"]="Fictional student"; data.Rows[0]["Current"]="A / One / 1";
             Set("data",data); Field<DataGridView>("students").DataSource=data; Call("Suggest");
+            var review = Field<ModernButton>("review");
+            Check(targetCampus.Enabled && !review.Enabled, task+": loaded rows unlock destinations while review still requires a reason");
+            Field<ModernTextBox>("reason").Text = "Placement test";
+            Check(review.Enabled, task+": a reason and assigned student unlock review");
+            Call("SelectRows",false);
+            Check(!review.Enabled, task+": clearing the processing selection disables review again");
+            Call("SelectRows",true);
             using (var choices = (DataTable)Call("DestinationChoices",data.Rows[0],data.Rows[0]["Decision"])!)
                 Check(choices.AsEnumerable().Select(row=>Convert.ToInt32(row["ClassSectionId"])).SequenceEqual(new[]{201,203}), task+": destination sections include configured empty sections, never another campus/class");
             Check(Convert.ToInt32(data.Rows[0]["Destination"]) == 201, task+": suggestion keeps the same section when its destination assignment exists");

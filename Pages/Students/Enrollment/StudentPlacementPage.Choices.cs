@@ -45,7 +45,7 @@ public sealed partial class StudentPlacementPage
     private void WithChoiceBinding(Action action)
     {
         bool previous = binding; binding = true;
-        try { action(); } finally { binding = previous; }
+        try { action(); } finally { binding = previous; RefreshActionAvailability(); }
     }
     private void BindPlacementChoices()
     {
@@ -58,6 +58,7 @@ public sealed partial class StudentPlacementPage
             ((DataGridViewComboBoxColumn)students.Columns["Destination"]).DataSource = WithEmptyDestination(placements.Clone());
         });
         choicesReady = true;
+        RefreshActionAvailability();
     }
     private async Task RefreshSourceContext(bool chooseNextYear)
     {
@@ -159,10 +160,13 @@ public sealed partial class StudentPlacementPage
         if (gridRow.DataBoundItem is not DataRowView view) return;
         bool previous = binding; binding = true;
         try {
-            var allowed = DestinationChoices(view.Row, Convert.ToString(view["Decision"])!);
+            string decision = Convert.ToString(view["Decision"])!;
+            var allowed = DestinationChoices(view.Row, decision);
             int selected = Id(view.Row,"Destination");
             if (!allowed.AsEnumerable().Any(row => Id(row,"ClassSectionId") == selected)) view["Destination"] = 0;
-            ((DataGridViewComboBoxCell)gridRow.Cells["Destination"]).DataSource = WithEmptyDestination(allowed);
+            var cell = (DataGridViewComboBoxCell)gridRow.Cells["Destination"];
+            cell.ReadOnly = decision is "HOLD" or "SKIP" || allowed.Rows.Count == 0;
+            cell.DataSource = WithEmptyDestination(allowed);
         } finally { binding = previous; }
     }
     private void RefreshDestinationCells()
