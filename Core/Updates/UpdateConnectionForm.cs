@@ -165,6 +165,14 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         RefreshAuthorization();
     }
 
+    // Keep the download option completely out of the layout until checking the
+    // already-prepared package has finished. Enabled=false alone still paints
+    // a disabled button for a moment.
+    private void SetDownloadActionVisible(bool available)
+    {
+        _download.Enabled = _download.Visible = available;
+    }
+
     private static ModernButton Button(string text, int width, string role) => new() {
         Text = text, ThemeRole = role, Width = AppScale.S(width), Height = AppMetrics.ButtonHeight,
         Margin = new Padding(AppScale.S(4), 0, AppScale.S(4), 0) };
@@ -287,11 +295,11 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         SetContentSize(_authorizationPanel.Visible);
         _check.Enabled = false;
         _generate.Enabled = false;
-        _download.Enabled = false;
+        SetDownloadActionVisible(false);
         _download.Text = "Download Update";
         _release = null;
         _prepared = null;
-        _install.Enabled = false;
+        _install.Enabled = _install.Visible = false;
         _status.Text = "Checking the private update repository without interrupting FMSC...";
         _progress.Visible = true;
         _progress.Style = ProgressBarStyle.Marquee;
@@ -322,12 +330,14 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
                     (archive.Length / 1048576d).ToString("N1") + " MB." :
                  "Update available — " + _method + ", approximately " + (archive.Length / 1048576d).ToString("N1") + " MB.");
             if (_method == UpdateDownloadChoice.RequiresDatabaseInstaller) _method = UpdateDownloadChoice.Full;
-            _download.Enabled = _method is UpdateDownloadChoice.Full or UpdateDownloadChoice.Incremental;
-            _download.Visible = _download.Enabled;
+            bool canDownload = _method is UpdateDownloadChoice.Full or UpdateDownloadChoice.Incremental;
+            // An authorized release is not yet a final download decision:
+            // first revalidate any saved stage before displaying either action.
+            SetDownloadActionVisible(false);
             _install.Visible = false;
-            _downloadDetails.Text = _download.Enabled ? _method + " · approximately " +
+            _downloadDetails.Text = canDownload ? _method + " · approximately " +
                 (archive.Length / 1048576d).ToString("N1") + " MB" : "No download required";
-            if (_download.Enabled)
+            if (canDownload)
             {
                 string checkedStatus = _status.Text;
                 _status.Text = "Checking previously prepared update against the approved release…";
@@ -348,7 +358,10 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
                         "The update is not installed yet.";
                 }
                 else
+                {
                     _status.Text = checkedStatus;
+                    SetDownloadActionVisible(true);
+                }
             }
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
