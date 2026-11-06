@@ -35,8 +35,11 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private readonly ModernButton prepare=new(){Text="Create Draft",ThemeRole="Primary",Enabled=false};
     private readonly ModernButton sendNow=new(){Text="Send Now",ThemeRole="Primary",Enabled=false};
     private readonly Label sendHint=new(){AutoEllipsis=true,ForeColor=AppTheme.Text,Text="Preview the message before sending."};
-    private readonly List<Control> advancedControls=new();
-    private bool advancedView;
+    private readonly List<Control> composeOptions=new();
+    private bool composeOptionsExpanded;
+    private bool advancedView; // Historical detail-column policy; the operator view stays concise.
+    private int settingsSection;
+    private readonly ModernComboBox audience=HumanUi.Combo();
     private int recipientPage,historyPage,contactPage,templatePage;
     private Guid requestId=Guid.NewGuid();private DateTime? requestDue;private string previewSignature="",savedSignature="";
     private bool populating;
@@ -93,6 +96,8 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private void BuildWorkspace()
     {
         channel.Items.AddRange(["Sms","WhatsApp"]);channel.SelectedIndex=1;
+        audience.Items.AddRange(["Campus","Class / Section","Outstanding Fees","Individual Contact"]);
+        audience.SelectedIndex=0;
         recipientFilter.Items.AddRange(["Student / family / manual","Outstanding","Family","Staff","Manual","Pending"]);recipientFilter.SelectedIndex=CurrentUser.HasPermission("Students.View")?0:CurrentUser.HasPermission("Staff.View")?3:4;
         channel.Width=AppScale.Scale(120);recipientFilter.Width=AppScale.Scale(150);templateChoice.Width=AppScale.Scale(320);
         schedule.ShowCheckBox=true;schedule.Checked=false;schedule.Format=DateTimePickerFormat.Custom;schedule.CustomFormat="dd-MMM-yyyy HH:mm";
@@ -109,22 +114,24 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         messageFields.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         var channelField=HumanUi.Field("Channel",channel);
         var scheduleField=HumanUi.Field("Send after (optional)",schedule);
-        advancedControls.AddRange([channelField,scheduleField,prepare]);
+        composeOptions.AddRange([channelField,scheduleField,prepare]);
         messageFields.Controls.Add(channelField,0,0);
         messageFields.Controls.Add(HumanUi.Field("Message template",templateChoice),1,0);
         messageFields.Controls.Add(scheduleField,2,0);
         var filters=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=1};
         foreach(var item in new[]{("Campus",campus),("Academic year",year),("Class",cls),("Section",section)}){filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));filters.Controls.Add(HumanUi.Field(item.Item1,item.Item2),filters.Controls.Count,0);}
-        advancedControls.Add(filters.GetControlFromPosition(1,0)!);
+        composeOptions.Add(filters.GetControlFromPosition(1,0)!);
+        Row(HumanUi.Field("Send to",audience),72);
         Row(filters,78);
         search.PlaceholderText="Contact or student name";search.Width=220;
         var findContacts=Button("Find Contacts",async()=>{recipientPage=0;await RefreshRecipients();},"Communication.Compose");
         search.KeyDown+=(_,e)=>{if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;findContacts.PerformClick();}};
-        Row(Bar([recipientFilter,search,findContacts,
+        var contactToolbar=Bar([recipientFilter,search,findContacts,
             ..Paging(recipients,()=>recipientPage,value=>recipientPage=value,RefreshRecipients,"Communication.Compose"),
-            Button("Select Matching Contacts",SelectMatchingContactsAsync,"Communication.Bulk"),
-            Button("Clear Selection",()=>{included.Clear();InvalidatePreview();ApplyTicks();return Task.CompletedTask;},"Communication.Compose")]),0);
-        Row(selection,44);Row(recipients,220);
+            Button("Clear Selection",()=>{included.Clear();InvalidatePreview();ApplyTicks();return Task.CompletedTask;},"Communication.Compose")]);
+        Row(contactToolbar,0);
+        int selectionRow=root.RowCount;Row(selection,44);
+        int recipientsRow=root.RowCount;Row(recipients,220);
         Row(messageFields,80);
         var noticeField=HumanUi.Field("Notice text",announcement);
         int noticeRow=root.RowCount;
@@ -157,68 +164,65 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
                 || previewSignature!=Signature() || preview.DataSource is not DataTable reviewed)return;
             await ExecuteAsync(()=>SendReviewedAsync(reviewed));
         };
-        Row(Bar(Button("Preview Messages",PreviewAsync,"Communication.Compose","Primary"),sendNow,prepare,Button("New Message",()=>{
+        var moreOptions=Button("More Options",()=>{ShowComposeOptions(!composeOptionsExpanded);return Task.CompletedTask;},"Communication.Compose");
+        Row(Bar(Button("Preview Messages",async()=>{
+            if(audience.SelectedIndex!=3)await SelectMatchingContactsAsync();
+            await PreviewAsync();
+        },"Communication.Compose","Primary"),sendNow,prepare,Button("New Message",()=>{
             if(HasUnsavedChanges&&!ModernMessageDialog.ConfirmDiscardIfDirty(FindForm(),()=>HasUnsavedChanges,UnsavedChangesMessage))return Task.CompletedTask;
             ResetComposition();return Task.CompletedTask;
-        },"Communication.Compose")),60);
+        },"Communication.Compose"),moreOptions),60);
         Row(sendHint,42);
         Row(preview,260);compose.Controls.Add(root);
         compose.Resize+=(_,_)=>root.Width=Math.Max(AppScale.Scale(760),compose.ClientSize.Width-SystemInformation.VerticalScrollBarWidth);
         root.Width=AppScale.Scale(900);
         foreach(Control c in new Control[]{channel,templateChoice,announcement,schedule})
         {if(c is ModernComboBox cb)cb.SelectedIndexChanged+=(_,_)=>InvalidatePreview();else if(c is ModernDatePicker dp)dp.ValueChanged+=(_,_)=>InvalidatePreview();else c.TextChanged+=(_,_)=>InvalidatePreview();}
-        tabs.TabPages.Add(Tab("Send Message",compose));
-        tabs.TabPages.Add(Tab("History",BuildHistory()));
-        tabs.TabPages.Add(Tab("Contacts / Consent",BuildContacts()));
-        tabs.TabPages.Add(Tab("Templates",ListHost(templates,Bar([Button("Refresh",RefreshTemplates),Button("New Version / Review",EditTemplate,"Communication.Configure"),Button("Revoke Selected",async()=>{var row=Selected(templates)??throw new ArgumentException("Select a template first.");if(!ModernMessageDialog.Confirm(FindForm(),"Revoke this template? Unsubmitted messages will be suppressed; past messages remain in history.","Revoke Template"))return;await store.CallAsync("RevokeTemplate",lifetime.Token,SqlCommunicationStore.P("@Id",row["TemplateId"]));await AfterSavedAsync(RefreshTemplates,"Template revoked. Unsubmitted messages using it are blocked; past messages stay in History.");},"Communication.Configure",selectedGrid:templates),..Paging(templates,()=>templatePage,value=>templatePage=value,RefreshTemplates)]))));
-        tabs.TabPages.Add(Tab("Automation Rules",ListHost(rules,Bar(Button("Refresh",RefreshRules,"Communication.Configure"),Button("New / Edit Rule",EditRule,"Communication.Configure"),Button("Evaluate Committed Events",EvaluateRules,"Communication.Configure")))));
-        var gateway=new Panel{Dock=DockStyle.Fill,AutoScroll=true};gateway.Controls.Add(Bar(Button("Sending Mode / Limits",EditSettings,"Communication.Configure"),Button("Secure Gateway Credentials",EditGateway,"Communication.Configure")));
-        tabs.TabPages.Add(Tab("Gateway Settings",gateway));
-        var advancedTabs=tabs.TabPages.Cast<TabPage>().Skip(2).ToArray();
-        var advancedToggle=new ModernButton{Text="Advanced Settings",AutoSize=true,Height=AppMetrics.ButtonHeight};
-        void SetAdvanced(bool show)
+        void UpdateAudience()
         {
-            advancedView=show;
-            if(show)tabs.TabPages.AddRange(advancedTabs);
-            else
+            int mode=audience.SelectedIndex;
+            recipientFilter.SelectedIndex=mode==2?1:0;
+            bool individual=mode==3;
+            contactToolbar.Visible=individual;
+            selection.Visible=individual;
+            recipients.Visible=individual;
+            root.RowStyles[selectionRow].Height=individual?AppScale.Scale(44):0;
+            root.RowStyles[recipientsRow].Height=individual?AppScale.Scale(220):0;
+            Control[] scopeFields=Enumerable.Range(0,4).Select(i=>filters.GetControlFromPosition(i,0)!).ToArray();
+            bool[] show=[true,composeOptionsExpanded,mode is 1 or 2,mode is 1 or 2];
+            int count=show.Count(value=>value);
+            for(int i=0;i<4;i++)
             {
-                if(tabs.SelectedIndex>=2)tabs.SelectedIndex=0;
-                foreach(var page in advancedTabs)tabs.TabPages.Remove(page);
-                schedule.Checked=false;
-                channel.SelectedItem="WhatsApp";
-                if(year.SelectedId!=0)
-                {
-                    year.SelectedIndex=0;
-                    RecipientFiltersChanged();
-                }
-                historyState.SelectedIndex=0;
+                scopeFields[i].Visible=show[i];
+                filters.ColumnStyles[i].Width=show[i]?100f/count:0f;
             }
-            foreach(var control in advancedControls)control.Visible=show;
-            operational.Visible=show;
+        }
+        void ShowComposeOptions(bool show)
+        {
+            composeOptionsExpanded=show;
+            foreach(var option in composeOptions)option.Visible=show;
             messageFields.ColumnStyles[0].Width=show?20:0;
             messageFields.ColumnStyles[1].Width=show?45:100;
             messageFields.ColumnStyles[2].Width=show?35:0;
-            for(int column=0;column<4;column++)
-                filters.ColumnStyles[column].Width=show?25:column==1?0:100f/3;
-            ApplyMessageColumns();
-            advancedToggle.Text=show?"Back to Simple View":"Advanced Settings";
+            moreOptions.Text=show?"Fewer Options":"More Options";
+            UpdateAudience();
         }
-        advancedToggle.Click+=(_,_)=>{
-            if(IsBusy)return;
-            if(advancedView && HasUnsavedChanges && (schedule.Checked || SelectedChannel()!=MessageChannel.WhatsApp || year.SelectedId!=0))
-            {
-                SetStatus("Finish the advanced draft or choose New Message before returning to Simple View.");
-                return;
-            }
-            SetAdvanced(!advancedView);
+        audience.SelectedIndexChanged+=(_,_)=>{
+            included.Clear();
+            search.Text="";
+            InvalidatePreview();
+            UpdateAudience();
         };
-        SetAdvanced(false);
+        ShowComposeOptions(false);
+        tabs.TabPages.Add(Tab("Send Message",compose));
+        tabs.TabPages.Add(Tab("History",BuildHistory()));
+        if(CurrentUser.HasPermission("Communication.Configure"))
+            tabs.TabPages.Add(Tab("Settings",BuildSettingsWorkspace()));
         tabs.Enabled=false;TabStrip.Apply(tabs,AppTheme.Primary);
-        var sample=new ModernButton{Text="Try a Sample",AutoSize=true,Height=AppMetrics.ButtonHeight};
-        sample.Click+=async(_,_)=>{if(!IsBusy)await ExecuteAsync(TrySampleAsync);};
         var content=new Panel{Dock=DockStyle.Fill};
         content.Controls.Add(TabStrip.CreateHost(tabs));
-        content.Controls.Add(Bar(sample,advancedToggle));
+        operational.Visible=false;
+        tabs.SelectedIndexChanged+=(_,_)=>operational.Visible=tabs.SelectedTab?.Text=="Settings";
         content.Controls.Add(operational);
         SetContent(content);
         Disposed+=(_,_)=>{foreach(var page in advancedTabs)if(page.Parent is null)page.Dispose();};
@@ -227,6 +231,53 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         foreach(var input in new[]{campus,year,cls,section})input.UserSelectionChanged+=(_,_)=>RecipientFiltersChanged();
         recipientFilter.SelectedIndexChanged+=(_,_)=>RecipientFiltersChanged();search.TextChanged+=(_,_)=>RecipientFiltersChanged();
     }
+    private Control BuildSettingsWorkspace()
+    {
+        // The daily operator never sees the full module's administration workspaces.
+        // Administrators can still reach contacts, templates and gateway settings here.
+        var pages=new Control[3];
+        pages[0]=BuildContacts();
+        pages[1]=ListHost(templates,Bar([
+            Button("Refresh",RefreshTemplates,"Communication.Configure"),
+            Button("New Version / Review",EditTemplate,"Communication.Configure"),
+            Button("Revoke Selected",async()=>{
+                var row=Selected(templates)??throw new ArgumentException("Select a template first.");
+                if(!ModernMessageDialog.Confirm(FindForm(),"Revoke this template? Unsubmitted messages will be suppressed; past messages remain in history.","Revoke Template"))return;
+                await store.CallAsync("RevokeTemplate",lifetime.Token,SqlCommunicationStore.P("@Id",row["TemplateId"]));
+                await AfterSavedAsync(RefreshTemplates,"Template revoked. Unsubmitted messages using it are blocked; past messages stay in History.");
+            },"Communication.Configure",selectedGrid:templates),
+            ..Paging(templates,()=>templatePage,value=>templatePage=value,RefreshTemplates,"Communication.Configure")
+        ]));
+        var gateway=new Panel{Dock=DockStyle.Fill,AutoScroll=true};
+        gateway.Controls.Add(Bar(
+            Button("Sending Mode / Limits",EditSettings,"Communication.Configure"),
+            Button("Secure Gateway Credentials",EditGateway,"Communication.Configure")));
+        pages[2]=gateway;
+        var host=new Panel{Dock=DockStyle.Fill};
+        foreach(var page in pages)
+        {
+            page.Dock=DockStyle.Fill;
+            page.Visible=false;
+            host.Controls.Add(page);
+        }
+        pages[0].Visible=true;
+        var navigation=Bar(
+            Button("Contacts & Consent",async()=>{settingsSection=0;ShowSection();await LoadSettingsSection();},"Communication.Configure"),
+            Button("Templates",async()=>{settingsSection=1;ShowSection();await LoadSettingsSection();},"Communication.Configure"),
+            Button("Sending Setup",async()=>{settingsSection=2;ShowSection();await LoadSettingsSection();},"Communication.Configure"));
+        host.Controls.Add(navigation);
+        return host;
+        void ShowSection()
+        {
+            for(int i=0;i<pages.Length;i++)pages[i].Visible=i==settingsSection;
+        }
+    }
+    private Task LoadSettingsSection()=>settingsSection switch
+    {
+        0=>RefreshContacts(),
+        1=>RefreshTemplates(),
+        _=>RefreshOperational()
+    };
     private Guid SelectedTemplate()=>templateChoice.SelectedValue is Guid id?id:throw new ArgumentException("Choose a reviewed template.");
     private MessageChannel SelectedChannel()=>Enum.Parse<MessageChannel>(Convert.ToString(channel.SelectedItem)!);
     private string Signature()=>string.Join("|",templateChoice.SelectedValue,channel.SelectedItem,announcement.Text,string.Join(',',included.Order()),schedule.Checked,schedule.Checked?schedule.Value.ToUniversalTime().ToString("O"):"");
