@@ -223,17 +223,20 @@ try {
     $tool=Get-ChildItem -LiteralPath $unzip -Filter sqlcmd.exe -File -Recurse | Select-Object -First 1
     if (-not $tool) { throw 'Verified sqlcmd download does not contain executable.' }
     Copy-Item -LiteralPath $tool.FullName -Destination $sqlcmd
+    $transport = Join-Path $root 'MinGit'
+    & (Join-Path $project 'Tools/PrepareBundledGit.ps1') -DestinationDirectory $transport
     & dotnet restore (Join-Path $project 'FMSC_SMS.sln')
     NativeOk 'dotnet restore'
     $arguments=@('publish',(Join-Path $project 'FMSC_SMS.csproj'),'-c','Release','-r','win-x64',
         '--self-contained','true','-p:PublishProfile=PortableRelease',
         "-p:PublishDir=$app/","-p:ReleaseRoot=$release/",
-        "-p:LocalDbMsiPath=$localMsi",
+        "-p:LocalDbMsiPath=$localMsi","-p:BundledGitDirectory=$transport",
         "-p:DeploymentDatabaseDirectory=$(Join-Path $root 'empty-source')",
         '-p:PublishSingleFile=false','-p:PublishTrimmed=false')
     & dotnet @arguments
     NativeOk 'Full PortableRelease publish'
-    foreach ($file in @('FMSC_SMS/FMSC_SMS.exe','FMSC_SMS/UpdateSupport/FMSC.Setup.exe','core.ps1','Install FMSC_SMS.bat','FMSC.Setup.exe',
+    foreach ($file in @('FMSC_SMS/FMSC_SMS.exe','FMSC_SMS/UpdateSupport/FMSC.Setup.exe',
+        'FMSC_SMS/UpdateTransport/cmd/git.exe','FMSC_SMS/UpdateTransport/usr/bin/ssh.exe','core.ps1','Install FMSC_SMS.bat','FMSC.Setup.exe',
         'Tools/SqlLocalDB.msi','Tools/sqlcmd.exe')) {
         if (-not (Test-Path -LiteralPath (Join-Path $release $file) -PathType Leaf)) {
             throw "Real installer asset missing: $file"
