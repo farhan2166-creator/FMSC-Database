@@ -71,6 +71,20 @@ internal static partial class Program
         using (var dialog = new UpdateConnectionForm(() => (true, "ssh-rsa fixture")))
         {
             parent.Show(); dialog.Show(parent); Application.DoEvents();
+            var downloadAction = Find(dialog, "Download Update");
+            var installAction = Find(dialog, "Install Update");
+            var setDownloadVisible = typeof(UpdateConnectionForm).GetMethod(
+                "SetDownloadActionVisible", fields)!;
+            Check(!downloadAction.Visible && !downloadAction.Enabled && !installAction.Visible,
+                "Before a check resolves, neither download nor installation can be offered");
+            setDownloadVisible.Invoke(dialog, new object[] { true });
+            Application.DoEvents();
+            Check(downloadAction.Visible && downloadAction.Enabled && !installAction.Visible,
+                "Download is available only after a final no-cache decision");
+            setDownloadVisible.Invoke(dialog, new object[] { false });
+            Application.DoEvents();
+            Check(!downloadAction.Visible && !downloadAction.Enabled,
+                "Checking a previously downloaded release hides the action rather than flashing a disabled button");
             var transfer = new UpdateDownloadProgress(UpdateDownloadPhase.Downloading, 10 * 1048576, 20 * 1048576,
                 2 * 1048576, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5), 2, 3, 1, 0, "Downloading part 2 of 3");
             dialog.ApplyDownloadProgress(transfer); Application.DoEvents();
