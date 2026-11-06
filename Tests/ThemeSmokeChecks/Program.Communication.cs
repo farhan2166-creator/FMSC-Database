@@ -20,6 +20,26 @@ internal static partial class Program
                 var commands=(List<NavigationCommand>)typeof(MainDashboardForm).GetField("navigationCommands",flags)!.GetValue(shell)!;
                 Check(commands.Count(c=>c.Caption=="Communication Center")== (access.Allowed?1:0),"Communication navigation uses explicit permission and preserves Administrator authority without expanding Accountant access");
             }
+            CurrentUser.SignIn(920,"Scoped communication fixture","Operator",false,
+                ["Communication.View","Communication.Compose","Staff.View"]);
+            using(var staffPage=new CommunicationCenterPage(
+                new SqlCommunicationStore(()=>throw new Exception("Scoped UI must not connect to SQL."),920),false))
+            {
+                var modes=((ModernComboBox)typeof(CommunicationCenterPage).GetField("audience",flags)!.GetValue(staffPage)!)
+                    .Items.Cast<object>().Select(Convert.ToString).ToArray();
+                Check(modes.SequenceEqual(["Staff","Manual Contacts"]),
+                    "A staff-only operator is not offered student, campus or financial recipient types");
+            }
+            CurrentUser.SignIn(921,"Scoped communication fixture","Operator",false,
+                ["Communication.View","Communication.Compose","Students.View"]);
+            using(var studentPage=new CommunicationCenterPage(
+                new SqlCommunicationStore(()=>throw new Exception("Scoped UI must not connect to SQL."),921),false))
+            {
+                var modes=((ModernComboBox)typeof(CommunicationCenterPage).GetField("audience",flags)!.GetValue(studentPage)!)
+                    .Items.Cast<object>().Select(Convert.ToString).ToArray();
+                Check(modes.Contains("Campus") && !modes.Contains("Outstanding Fees"),
+                    "Fee reminders are not offered to a student-only operator without Fees.View");
+            }
             CurrentUser.SignIn(919,"Communication fixture","Administrator",false,Array.Empty<string>());
             int connections=0;var store=new SqlCommunicationStore(()=>{connections++;throw new Exception("Native control fixture must not connect to SQL.");},919);
             using var page=new CommunicationCenterPage(store,false);
