@@ -22,6 +22,10 @@ internal sealed class AboutForm : ApplicationWindowForm
         string build = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             ?? assembly.GetName().Version?.ToString() ?? "Unavailable";
         string version = build.Split('+')[0];
+        string buildMetadata = build.Length > version.Length ? build[(version.Length + 1)..] : "";
+        string displayBuild = buildMetadata.Length > 12 && buildMetadata.All(Uri.IsHexDigit)
+            ? $"{version}+{buildMetadata[..12]}"
+            : build;
         var rows = new[] {
             ("Application version", version),
             ("Build", build),
@@ -42,29 +46,29 @@ internal sealed class AboutForm : ApplicationWindowForm
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + UiDesignSystem.Spacing.Md));
         var card = HumanUi.Card("FMSC", "School Management System", AppTheme.Primary);
         var information = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = rows.Length,
-            AutoScroll = true, BackColor = AppTheme.Surface, Margin = Padding.Empty
+            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = rows.Length + 1,
+            BackColor = AppTheme.Surface, Margin = Padding.Empty
         };
-        information.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, AppScale.S(200)));
+        int columnGap = UiDesignSystem.Spacing.Lg;
+        int labelWidth = rows.Max(row => AppMetrics.TextWidth(row.Item1, Font, columnGap + AppScale.S(16)));
+        information.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, labelWidth));
         information.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        int rowHeight = AppMetrics.TextHeight(Font) + UiDesignSystem.Spacing.Md;
         for (int i = 0; i < rows.Length; i++)
         {
-            information.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            information.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
             information.Controls.Add(new Label {
-                Text = rows[i].Item1, AutoSize = true, Dock = DockStyle.Fill,
-                ForeColor = AppTheme.MutedText, Margin = new Padding(0, 0, UiDesignSystem.Spacing.Md, UiDesignSystem.Spacing.Md)
+                Text = rows[i].Item1, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = AppTheme.MutedText, Margin = new Padding(0, 0, columnGap, 0)
             }, 0, i);
             var value = new Label {
-                Text = rows[i].Item2, AutoSize = true, Dock = DockStyle.Fill,
-                ForeColor = AppTheme.Text, UseMnemonic = false, Margin = new Padding(0, 0, 0, UiDesignSystem.Spacing.Md)
+                Text = rows[i].Item1 == "Build" ? displayBuild : rows[i].Item2,
+                AutoEllipsis = true, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = AppTheme.Text, UseMnemonic = false, Margin = Padding.Empty
             };
             information.Controls.Add(value, 1, i);
         }
-        information.SizeChanged += (_, _) => {
-            int width = Math.Max(1, information.ClientSize.Width - AppScale.S(200) - SystemInformation.VerticalScrollBarWidth);
-            foreach (var value in information.Controls.OfType<Label>().Where(label => information.GetColumn(label) == 1))
-                value.MaximumSize = new Size(width, 0);
-        };
+        information.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         card.Content.Controls.Add(information);
         root.Controls.Add(card, 0, 0);
         var feedback = new Label {
@@ -76,10 +80,10 @@ internal sealed class AboutForm : ApplicationWindowForm
         root.Controls.Add(feedback, 0, 1);
         var close = new ModernButton {
             Text = UiText.Actions.Close, ThemeRole = "Primary", DialogResult = DialogResult.OK,
-            Width = AppScale.S(100), Height = AppMetrics.ButtonHeight, Margin = Padding.Empty
+            Width = AppScale.S(130), Height = AppMetrics.ButtonHeight, Margin = Padding.Empty
         };
         var copy = new ModernButton {
-            Text = "Copy details", ThemeRole = "Secondary", Width = AppScale.S(150), Height = AppMetrics.ButtonHeight,
+            Text = "Copy details", ThemeRole = "Secondary", Width = AppScale.S(130), Height = AppMetrics.ButtonHeight,
             Margin = new Padding(0, 0, UiDesignSystem.Spacing.Sm, 0)
         };
         copy.Click += (_, _) => {
