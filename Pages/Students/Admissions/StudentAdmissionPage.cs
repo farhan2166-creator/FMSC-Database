@@ -3716,6 +3716,11 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     private async Task OpenCurrentStudentSetupAsync()
     {
         if (currentAdmissionId <= 0 || IsBusy || IsPendingRegistration || !CurrentUser.HasPermission("Students.Administer")) return;
+        if (!AdmissionWorkflowActions.CanActivateLegacy(_workspaceStudentStatus))
+        {
+            SetStatus("Only active students can complete legacy setup. Use Re-Admit for a returning student.");
+            return;
+        }
         if (HasUnsavedChanges) { SetStatus("Save personal-detail changes before reviewing activation."); return; }
         if (!legacySetupPending || studentPostingHeld) { SetStatus("This student is not awaiting activation. Use Placement History or Lift Hold / Resume."); return; }
         int admissionId = currentAdmissionId;

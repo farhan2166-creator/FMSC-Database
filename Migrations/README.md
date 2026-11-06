@@ -5,7 +5,11 @@ The schema-1 baseline contains the complete original production schema.
 Application **1.0.1** requires schema **2**. Migration `2.sql` removes the
 generic audit trail. Fee Change History continues to show stored fee-rate
 versions and posted charges. The pre-migration backup retains the legacy audit
-entries. Future migrations start at **3.sql**.
+entries.
+
+Application **1.0.2** requires schema **3**. Migration `3.sql` reserves
+legacy activation for active students and clears the legacy setup flag when
+a former student is successfully readmitted. Future migrations start at **4.sql**.
 
 Disposable tests publish the complete schema-only baseline directly at version 1. Old development migrations are retired and must never be replayed on baseline 1. See [the baseline decision](../Docs/FIRST_RELEASE_BASELINE.md).
 

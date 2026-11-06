@@ -26,7 +26,11 @@ var transferOnly=State(admin:false);Check(transferOnly.Transfer&&!transferOnly.H
 var adminOnly=State(enroll:false);Check(adminOnly.History&&adminOnly.Hold&&!adminOnly.Transfer,"Student administrators do not gain transfer permission implicitly");
 Check(State("active").Hold&&State("LEFT").Readmit,"Status casing cannot create misleading alternatives");
 foreach(var status in new[]{"Left","Withdrawn","Inactive"})
+{
     Check(State(status).Readmit,$"{status} is an eligible former-student state");
+    var legacyFormer=State(status,legacy:true);
+    Check(legacyFormer.Readmit && !legacyFormer.Setup,$"{status} must use readmission even with legacy setup pending");
+}
 foreach(var status in new[]{"Active","Pending","Cancelled","Promoted"})
     Check(!State(status).Readmit,$"{status} cannot be readmitted");
 Check(!State("Left",official:false).Readmit,"An unofficial or cancelled registration cannot use readmission");
