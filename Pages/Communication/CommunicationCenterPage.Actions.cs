@@ -109,6 +109,27 @@ public sealed partial class CommunicationCenterPage
         await AfterSavedAsync(RefreshHistory,result);
     }
 
+    private sealed record StatusFilter(string State,string Label)
+    {
+        public override string ToString()=>Label;
+    }
+    private static string FriendlyDeliveryState(string state)=>state switch
+    {
+        "Draft"=>"Draft",
+        "AwaitingApproval"=>"Awaiting approval",
+        "Scheduled"=>"Scheduled",
+        "Queued"=>"Pending send",
+        "Submitting"=>"Submitting",
+        "Accepted"=>"Accepted by provider",
+        "Sent"=>"Sent (provider reported)",
+        "Delivered"=>"Delivered",
+        "Read"=>"Read",
+        "Failed"=>"Failed",
+        "Rejected"=>"Rejected",
+        "DeliveryUnknown"=>"Needs provider review",
+        "Cancelled"=>"Cancelled",
+        _=>state
+    };
     private static DataRow? Selected(DataGridView grid)=>(grid.CurrentRow?.DataBoundItem as DataRowView)?.Row;
     private Control BuildHistory()
     {
@@ -140,7 +161,10 @@ public sealed partial class CommunicationCenterPage
             await AfterSavedAsync(RefreshHistory,action switch {"Submit"=>"Campaign submitted. Review its current state: approval, schedule, mode, master pause and dispatcher availability still govern sending. No delivery is implied.","Approve"=>"Campaign approval recorded. Review the schedule and dispatcher before sending.","Pause"=>"Campaign paused. Already submitted provider messages cannot be recalled.","Resume"=>"Campaign resumed. Eligible unsent work will follow its schedule and sending safeguards.",_=>"Campaign cancelled for unsent work. Already submitted provider messages and history are preserved."});
         }
         historySearch.PlaceholderText="Student or recipient name";historySearch.Width=220;
-        historyState.Items.Add("All states");historyState.Items.AddRange(Enum.GetNames<DeliveryState>());historyState.SelectedIndex=0;
+        historyState.Items.Add("All statuses");
+        foreach(string state in Enum.GetNames<DeliveryState>())
+            historyState.Items.Add(new StatusFilter(state,FriendlyDeliveryState(state)));
+        historyState.SelectedIndex=0;
         var toolbar=Bar([historySearch,historyState,Button("Search",async()=>{historyPage=0;await RefreshHistory();}),
             Button("Refresh",RefreshHistory),..Paging(history,()=>historyPage,value=>historyPage=value,RefreshHistory),
             Button("Submit",()=>Transition("Submit"),"Communication.Send","Primary",history,
