@@ -204,9 +204,9 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         }
         void ShowComposeOptions(bool show)
         {
-            if(!show && schedule.Checked)
+            if(!show && (schedule.Checked || SelectedChannel()!=MessageChannel.WhatsApp || year.SelectedId!=0))
             {
-                SetStatus("Clear the scheduled send time before hiding More Options.",PageStatusKind.Warning);
+                SetStatus("Clear the scheduled time and academic-year filter, and choose WhatsApp before hiding More Options. This prevents hidden sending settings.",PageStatusKind.Warning);
                 return;
             }
             composeOptionsExpanded=show;
@@ -220,6 +220,8 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         audience.SelectedIndexChanged+=(_,_)=>{
             included.Clear();
             search.Text="";
+            if(audience.SelectedIndex>=4 && year.SelectedId!=0)
+                year.SelectedIndex=0;
             RecipientFiltersChanged();
             InvalidatePreview();
             UpdateAudience();
