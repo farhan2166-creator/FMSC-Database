@@ -7,13 +7,6 @@ public sealed class ReportsHomePage : V2Page
 {
     /* The report page is handed over as a FACTORY, not as a built page. */
     private readonly Action<Func<Control>, string, string> _navigate;
-    private readonly List<(
-        Control Category,
-        string CategoryText,
-        TableLayoutPanel Grid,
-        List<(Control Card, string SearchText)> Reports)> _categories = new();
-    private ModernTextBox? _searchBox;
-    private Label? _resultCount;
     public ReportsHomePage(Action<Control, string, string> navigate)
         : this(BuildPageBeforeNavigating(navigate))
     {
@@ -43,8 +36,9 @@ public sealed class ReportsHomePage : V2Page
             Padding = new Padding(AppMetrics.PagePadding, AppMetrics.SpacingSm, AppMetrics.PagePadding, AppMetrics.PagePadding)
         };
         var root = new TableLayoutPanel {
-            Dock = DockStyle.Fill,
-            AutoSize = false,
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             ColumnCount = 1,
             RowCount = 0,
             Margin = new Padding(0),
@@ -54,8 +48,6 @@ public sealed class ReportsHomePage : V2Page
         root.ColumnStyles.Add(
             new ColumnStyle(SizeType.Percent, 100f));
         bool hasReports = false;
-        var toolbar = BuildReportToolbar();
-        scroll.Controls.Add(toolbar);
         if (CurrentUser.HasPermission("Reports.View"))
         {
             AddCategory(
@@ -136,82 +128,11 @@ public sealed class ReportsHomePage : V2Page
             AddCategoryRow(root, BuildEmptyState());
         }
         scroll.Controls.Add(root);
-        toolbar.BringToFront();
-        scroll.Resize += (_, _) => {
-            root.Width = Math.Max(
-                600,
-                scroll.ClientSize.Width -
-                scroll.Padding.Left -
-                scroll.Padding.Right);
-        };
-        root.Width = Math.Max(
-            600,
-            scroll.ClientSize.Width -
-            scroll.Padding.Left -
-            scroll.Padding.Right);
-        ApplyReportSearch();
         SetContent(scroll);
-    }
-    private Control BuildReportToolbar()
-    {
-        var bar = new Panel {
-            Dock = DockStyle.Top,
-            Height = AppMetrics.PageActionBarHeight,
-            Padding = new Padding(0, 0, 0, AppMetrics.SpacingSm),
-            BackColor = AppTheme.PageBackground
-        };
-        _searchBox = HumanUi.TextBox(false, 200);
-        WorkspaceState.Remember(_searchBox, "ReportsHome:Search");
-        _searchBox.PlaceholderText = "Search reports...";
-        _searchBox.Dock = DockStyle.Left;
-        _searchBox.Width = Math.Max(280, AppMetrics.TextWidth("Search reports...", AppTheme.NormalFont, 44));
-        _resultCount = new Label {
-            Dock = DockStyle.Right,
-            AutoSize = false,
-            Width = AppScale.Scale(150, AppScale.ControlSizeScale),
-            TextAlign = ContentAlignment.MiddleRight,
-            Font = AppTheme.NormalFont,
-            ForeColor = AppTheme.MutedText
-        };
-        _searchBox.TextChanged += (_, _) => ApplyReportSearch();
-        bar.Controls.Add(_resultCount);
-        bar.Controls.Add(_searchBox);
-        return bar;
-    }
-    private void ApplyReportSearch()
-    {
-        string query = (_searchBox?.Text ?? string.Empty).Trim().ToLowerInvariant();
-        int visible = 0;
-        foreach (var (category, categoryText, grid, reports) in _categories)
-        {
-            var matches = reports
-                .Where(report =>
-                    query.Length == 0 ||
-                    categoryText.Contains(query, StringComparison.Ordinal) ||
-                    report.SearchText.Contains(query, StringComparison.Ordinal))
-                .ToArray();
-            category.Visible = matches.Length > 0;
-            visible += matches.Length;
-            LayoutReportCards(grid, matches.Select(match => match.Card).ToArray());
-        }
-        if (_resultCount != null)
-            _resultCount.Text = $"{visible} report{(visible == 1 ? "" : "s")}";
     }
     private void AddCategory(TableLayoutPanel root, string title, string description, Color accent, ReportDefinition[] reports)
     {
-        var category = BuildCategory(
-            title,
-            description,
-            accent,
-            reports,
-            out TableLayoutPanel grid,
-            out List<(Control Card, string SearchText)> reportCards);
-        _categories.Add((
-            category,
-            (title + " " + description).ToLowerInvariant(),
-            grid,
-            reportCards));
-        AddCategoryRow(root, category);
+        AddCategoryRow(root, BuildCategory(title, description, accent, reports));
     }
     private static void AddCategoryRow(TableLayoutPanel root, Control control)
     {
@@ -225,9 +146,7 @@ public sealed class ReportsHomePage : V2Page
         string title,
         string description,
         Color accent,
-        ReportDefinition[] reports,
-        out TableLayoutPanel reportGrid,
-        out List<(Control Card, string SearchText)> reportCards)
+        ReportDefinition[] reports)
     {
         int headerHeight =
             Math.Max(
@@ -268,8 +187,7 @@ public sealed class ReportsHomePage : V2Page
             new RowStyle(SizeType.AutoSize));
         content.Controls.Add(
             BuildCategoryHeader(title, description, accent, reports.Length), 0, 0);
-        reportGrid = BuildReportGrid(reports, accent, out reportCards);
-        content.Controls.Add(reportGrid, 0, 1);
+        content.Controls.Add(BuildReportGrid(reports, accent), 0, 1);
         category.Controls.Add(content);
         return category;
     }
@@ -324,7 +242,7 @@ public sealed class ReportsHomePage : V2Page
             0,
             0);
         var countLabel = new Label {
-            Text = $"{reportCount} Reports",
+            Text = $"{reportCount} {(reportCount == 1 ? "Report" : "Reports")}",
             AutoSize = true,
             Font = AppTheme.NormalFont,
             ForeColor = accent,
@@ -355,8 +273,7 @@ public sealed class ReportsHomePage : V2Page
     }
     private TableLayoutPanel BuildReportGrid(
         ReportDefinition[] reports,
-        Color accent,
-        out List<(Control Card, string SearchText)> reportCards)
+        Color accent)
     {
         int columns =
             GetColumnCount(reports.Length);
@@ -389,44 +306,11 @@ public sealed class ReportsHomePage : V2Page
             grid.RowStyles.Add(
                 new RowStyle(SizeType.Absolute, cardHeight));
         }
-        reportCards = new List<(Control Card, string SearchText)>();
         for (int i = 0; i < reports.Length; i++)
         {
-            int row = i / columns;
-            int column = i % columns;
-            Control card = BuildReportCard(reports[i], accent);
-            reportCards.Add((
-                card,
-                (reports[i].Title + " " + reports[i].Description + " " + reports[i].Module)
-                    .ToLowerInvariant()));
-            grid.Controls.Add(card, column, row);
+            grid.Controls.Add(BuildReportCard(reports[i], accent), i % columns, i / columns);
         }
         return grid;
-    }
-    private static void LayoutReportCards(TableLayoutPanel grid, Control[] cards)
-    {
-        int columns = GetColumnCount(Math.Max(1, cards.Length));
-        int rows = Math.Max(1, (int)Math.Ceiling(cards.Length / (double)columns));
-        int cardHeight = AppScale.Scale(112, AppScale.ControlSizeScale);
-        grid.SuspendLayout();
-        try
-        {
-            grid.Controls.Clear();
-            grid.ColumnStyles.Clear();
-            grid.RowStyles.Clear();
-            grid.ColumnCount = columns;
-            grid.RowCount = rows;
-            for (int column = 0; column < columns; column++)
-                grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / columns));
-            for (int row = 0; row < rows; row++)
-                grid.RowStyles.Add(new RowStyle(SizeType.Absolute, cardHeight));
-            for (int index = 0; index < cards.Length; index++)
-                grid.Controls.Add(cards[index], index % columns, index / columns);
-        }
-        finally
-        {
-            grid.ResumeLayout(true);
-        }
     }
     private static int GetColumnCount(int reportCount)
     {
