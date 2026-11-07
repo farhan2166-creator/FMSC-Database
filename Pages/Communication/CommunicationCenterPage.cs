@@ -296,7 +296,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         }
         pages[0].Visible=true;
         var navigation=Bar(
-            Button("Contacts & Consent",async()=>{settingsSection=0;ShowSection();await LoadSettingsSection();},"Communication.Configure"),
+            Button("Contacts",async()=>{settingsSection=0;ShowSection();await LoadSettingsSection();},"Communication.Configure"),
             Button("Templates",async()=>{settingsSection=1;ShowSection();await LoadSettingsSection();},"Communication.Configure"),
             Button("Sending Setup",async()=>{settingsSection=2;ShowSection();await LoadSettingsSection();},"Communication.Configure"),
             Button("Existing Automations",async()=>{settingsSection=3;ShowSection();await LoadSettingsSection();},"Communication.Configure"));
