@@ -143,11 +143,47 @@ try {
     Remove-VerifiedUpdateDirectory $rollback $rollback
     Remove-FmscCompletedSnapshot
     Require ((Read-FmscRecoveryJournal $script:RecoveryRoot).Phase -eq 'Completed' -and -not (Test-Path $snapshot)) 'Interrupted cleanup did not converge to Completed.'
+    # A failed pre-activation migration at the original schema is terminal:
+    # no SQL is executed, and the previous application is left untouched.
+    foreach ($directory in @($app,$stage,$rollback)) { Remove-VerifiedUpdateDirectory $directory $directory }
+    $null = New-Item -ItemType Directory -Path $app
+    Set-Content -LiteralPath (Join-Path $app 'FMSC_SMS.exe') -Value 'old baseline - must survive'
+    $script:RecoveryJournal = Read-FmscRecoveryJournal $script:RecoveryRoot
+    $script:RecoveryJournal.Phase = 'Migrating'
+    $script:RecoveryJournal.BeforeSchema = 5
+    $script:RecoveryJournal.LastSchema = 0
+    $script:RecoveryJournal.Backup = Join-Path $script:fixture 'verified-pre-migration.bak'
+    Set-Content -LiteralPath $script:RecoveryJournal.Backup -Value 'inert backup fixture'
+    $script:RecoveryJournal.BackupSha256 = (Get-FileHash -LiteralPath $script:RecoveryJournal.Backup -Algorithm SHA256).Hash
+    Save-FmscRecoveryJournal $script:RecoveryRoot $script:RecoveryJournal
+    Refuse { Complete-FmscAbortedTransaction -ObservedSchema 6 -ApplicationDirectory $app -RollbackDirectory $rollback }
+    Require ((Read-FmscRecoveryJournal $script:RecoveryRoot).Phase -eq 'Migrating') 'Advanced schema must preserve active recovery.'
+    $script:RecoveryJournal.LastSchema = 6
+    Save-FmscRecoveryJournal $script:RecoveryRoot $script:RecoveryJournal
+    Refuse { Complete-FmscAbortedTransaction -ObservedSchema 5 -ApplicationDirectory $app -RollbackDirectory $rollback }
+    $script:RecoveryJournal.LastSchema = 0
+    Save-FmscRecoveryJournal $script:RecoveryRoot $script:RecoveryJournal
+    $null = New-Item -ItemType Directory -Path $rollback
+    Refuse { Complete-FmscAbortedTransaction -ObservedSchema 5 -ApplicationDirectory $app -RollbackDirectory $rollback }
+    Remove-VerifiedUpdateDirectory $rollback $rollback
+    Move-Item -LiteralPath (Join-Path $app 'FMSC_SMS.exe') -Destination (Join-Path $app 'missing.exe')
+    Refuse { Complete-FmscAbortedTransaction -ObservedSchema 5 -ApplicationDirectory $app -RollbackDirectory $rollback }
+    Move-Item -LiteralPath (Join-Path $app 'missing.exe') -Destination (Join-Path $app 'FMSC_SMS.exe')
+    Complete-FmscAbortedTransaction -ObservedSchema 5 -ApplicationDirectory $app -RollbackDirectory $rollback
+    Require ((Read-FmscRecoveryJournal $script:RecoveryRoot).Phase -eq 'Aborted') 'Safe abort was not durably committed.'
+    Require ((Get-Content -LiteralPath (Join-Path $app 'FMSC_SMS.exe') -Raw).Contains('old baseline')) 'Safe abort changed the previous application.'
+    Require (Test-Path -LiteralPath $script:RecoveryJournal.Backup) 'Safe abort deleted its verified backup.'
+    Refuse { Complete-FmscAbortedTransaction -ObservedSchema 5 -ApplicationDirectory $app -RollbackDirectory $rollback }
+    # An Aborted journal is terminal; a subsequent approved update may start.
+    $previousTransaction = $script:RecoveryJournal.Transaction
+    $script:RecoveryJournal = Initialize-FmscRecoveryTransaction $prepared $script:RecoveryRoot $version $schema $sid
+    Require ($script:RecoveryJournal.Transaction -ne $previousTransaction -and
+        $script:RecoveryJournal.Phase -eq 'Prepared') 'Terminal abort incorrectly blocked the next update.'
     # Fail closed when protection is weakened, rather than elevating mutable scripts.
     & icacls.exe $script:RecoveryRoot /grant '*S-1-5-32-545:(M)' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Cannot weaken fixture ACL for refusal test.' }
     Refuse { Read-FmscRecoveryJournal $script:RecoveryRoot }
-    Write-Output 'PASS: actual child-process termination before/after activation renames and during cleanup; verified forward recovery, baseline preservation, durable journal, malformed state, pending-update refusal, identity/version and storage permission guards. No SQL or live installation.'
+    Write-Output 'PASS: interrupted activation and cleanup, safe baseline abort, partial-schema/rollback/missing-application refusal, no retry, next-update acceptance, identity and storage permission guards. No SQL or live installation.'
 } finally {
     $absolute = [IO.Path]::GetFullPath($script:fixture)
     if (-not $absolute.StartsWith([IO.Path]::GetTempPath(),[StringComparison]::OrdinalIgnoreCase) -or
