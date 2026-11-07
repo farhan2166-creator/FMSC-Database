@@ -215,8 +215,8 @@ internal static class CommunicationSqlChecks
                 report.Check(suppressed.Contains("Opted out")
                     && Sql.Count("SELECT COUNT(*) FROM comm.Contact WHERE AdmissionId=@Id;",Sql.P("@Id",schoolStudent))==1,
                     "An explicit later messaging opt-out stays effective and cannot be bypassed by re-linking a saved Admission Yes.");
-                // Keep the shared fixture focused on its original student/contact.
-                Sql.Query("DELETE comm.Contact WHERE ContactId=@Id;",Sql.P("@Id",linkedContact));
+                // Keep the linked contact as historical evidence. Queued message
+                // snapshots reference it even after cancellation; never delete it.
             }
             finally {template=originalTemplate;}
         });
