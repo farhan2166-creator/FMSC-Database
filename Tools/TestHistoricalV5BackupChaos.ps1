@@ -132,7 +132,7 @@ try {
         AssertFixtureFiles $target
         $sourceVersion = Version $target
         Write-Host "Detected ORIGINAL detached database schema: $sourceVersion" -ForegroundColor Cyan
-        Require ($sourceVersion -ge 1 -and $sourceVersion -le 6) "Unsupported source schema $sourceVersion: requires an independently reviewed migration path (1-6 supported)."
+        Require ($sourceVersion -ge 1 -and $sourceVersion -le 6) "Unsupported source schema ${sourceVersion}: requires an independently reviewed migration path (1-6 supported)."
         $historical = Join-Path $root ("verified-v$sourceVersion-from-detached-files.bak")
         Sql master ("BACKUP DATABASE [$target] TO DISK=N'" + (Q $historical) + "' WITH INIT, CHECKSUM;")
         Sql master ("RESTORE VERIFYONLY FROM DISK=N'" + (Q $historical) + "' WITH CHECKSUM;")
