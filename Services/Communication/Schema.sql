@@ -154,6 +154,13 @@ BEGIN
  IF @Agreed=0 OR @Recorded IS NULL RETURN 0;
  DECLARE @Digits nvarchar(30)=REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
   LTRIM(RTRIM(@Recorded)),N'+',N''),N' ',N''),N'-',N''),N'(',N''),N')',N'');
+ -- Non-Pakistan contacts must use an explicit E.164 country prefix.
+ IF LEFT(LTRIM(@Recorded),1)=N'+' AND LEFT(@Digits,2)<>N'92'
+ BEGIN
+  IF LEN(@Digits) NOT BETWEEN 8 AND 15 OR @Digits NOT LIKE N'[1-9]%'
+   OR @Digits LIKE N'%[^0-9]%' RETURN 0;
+  RETURN CASE WHEN @Destination=CONCAT(N'+',@Digits) THEN 1 ELSE 0 END;
+ END;
  IF LEFT(@Digits,4)=N'0092' AND LEN(@Digits)=14 SET @Digits=SUBSTRING(@Digits,5,10);
  ELSE IF LEFT(@Digits,2)=N'92' AND LEN(@Digits)=12 SET @Digits=SUBSTRING(@Digits,3,10);
  ELSE IF LEFT(@Digits,1)=N'0' AND LEN(@Digits)=11 SET @Digits=SUBSTRING(@Digits,2,10);
