@@ -165,6 +165,47 @@ internal static class CommunicationSqlChecks
                     !linked.Rows[0].Field<bool>("OptedOut"),
                     "One Admission Yes provides an eligible SMS, WhatsApp, fee and announcement contact without another consent checklist.");
                 Guid linkedContact=linked.Rows[0].Field<Guid>("ContactId");
+                await store.CallAsync("SyncAdmissionContacts");
+                report.Check(Sql.Count("SELECT COUNT(*) FROM comm.Contact WHERE OwnerKind='Student' AND AdmissionId=@Id;",
+                    Sql.P("@Id",schoolStudent))==1,
+                    "Repeated student recipient discovery is idempotent and never adds a second linked contact.");
+
+                Guid manualContact=Guid.NewGuid();
+                await store.CallAsync("SaveContact",default,
+                    SqlCommunicationStore.P("@Id",manualContact),
+                    SqlCommunicationStore.P("@Kind","Manual"),
+                    SqlCommunicationStore.P("@Name","Fictional manual recipient"),
+                    SqlCommunicationStore.P("@Phone","+923001234568"),
+                    SqlCommunicationStore.P("@Language","en"),
+                    SqlCommunicationStore.P("@Channel","Sms"),
+                    SqlCommunicationStore.P("@Verified",true),
+                    SqlCommunicationStore.P("@Sms",true),
+                    SqlCommunicationStore.P("@WhatsApp",true),
+                    SqlCommunicationStore.P("@Financial",false),
+                    SqlCommunicationStore.P("@Announcements",true),
+                    SqlCommunicationStore.P("@OptOut",false),
+                    SqlCommunicationStore.P("@Source","Fictional manual fixture consent"));
+                async Task<DataTable> ScopedRecipients(string filter,int campusId=0,int classId=0)=>
+                    await store.CallAsync("Read",default,
+                        SqlCommunicationStore.P("@View","Recipients"),
+                        SqlCommunicationStore.P("@Filter",filter),
+                        SqlCommunicationStore.P("@Campus",campusId),
+                        SqlCommunicationStore.P("@Class",classId));
+                var campusStudents=await ScopedRecipients("Student",f.Campus,f.Class6);
+                report.Check(campusStudents.AsEnumerable().Any(row=>row.Field<Guid>("ContactId")==linkedContact)
+                        && campusStudents.AsEnumerable().All(row=>row.Field<string>("OwnerKind")=="Student")
+                        && campusStudents.AsEnumerable().All(row=>row.Field<string>("Class")=="Class 6"),
+                    "Campus and class recipient selection returns student-linked contacts only.");
+                var wrongClass=await ScopedRecipients("Student",f.Campus,f.Class7);
+                report.Check(wrongClass.AsEnumerable().All(row=>row.Field<Guid>("ContactId")!=linkedContact),
+                    "Class selection never includes a guardian from another class.");
+                var allStudents=await ScopedRecipients("Student");
+                report.Check(allStudents.AsEnumerable().All(row=>row.Field<string>("OwnerKind")=="Student")
+                    && allStudents.AsEnumerable().All(row=>row.Field<Guid>("ContactId")!=manualContact),
+                    "Student group selection excludes manual contacts even without a campus filter.");
+                var outstandingStudents=await ScopedRecipients("Outstanding",f.Campus);
+                report.Check(outstandingStudents.AsEnumerable().All(row=>row.Field<string>("OwnerKind")=="Student"),
+                    "Outstanding-fee group searches exclude family and manual contacts.");
                 template=Guid.NewGuid();
                 await Template("school_all_messages","Financial","{{student}} — school fee notice.",
                     mapping:"synthetic-approved-provider-name");
