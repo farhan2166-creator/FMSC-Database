@@ -229,6 +229,66 @@ try {
     Require ((Read-FmscRecoveryJournal $script:RecoveryRoot).Phase -eq 'Aborted' -and
         $script:connectionChecks -eq 3 -and $script:identityChecks -eq 3 -and
         $script:backupChecks -eq 2) 'Safe abort did not gate SQL identity, schema and backup integrity.'
+    # Inject a deterministic failure at the first SQL execution boundary after
+    # the pre-migration backup has been verified and journaled. This injection
+    # exists in TEST CODE ONLY, never in the production updater or published app.
+    $migrationFunction = $ast.Find({
+        param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and
+        $n.Name -eq 'Invoke-PendingMigrations'
+    }, $true)
+    if (-not $migrationFunction) { throw 'Production migration orchestrator is missing.' }
+    Invoke-Expression $migrationFunction.Extent.Text
+    $migrationFixture = Join-Path $script:fixture 'inert-migrations'
+    $null = New-Item -ItemType Directory -Path $migrationFixture
+    foreach ($migrationNumber in @(6,7)) {
+        Set-Content -LiteralPath (Join-Path $migrationFixture "$migrationNumber.sql") -Value '-- inert fixture; never executed'
+    }
+    $script:faultBackup = Join-Path $script:fixture 'inert-pre-migration-backup.bak'
+    $script:faultEvents = [Collections.Generic.List[string]]::new()
+    $script:syntheticSchema = 5
+    $script:RecoveryJournal.Phase = 'Prepared'
+    $script:RecoveryJournal.Backup = ''
+    $script:RecoveryJournal.BackupSha256 = ''
+    $script:RecoveryJournal.BeforeSchema = 0
+    $script:RecoveryJournal.LastSchema = 0
+    Save-FmscRecoveryJournal $script:RecoveryRoot $script:RecoveryJournal
+    $previousAppHash = (Get-FileHash -LiteralPath (Join-Path $app 'FMSC_SMS.exe') -Algorithm SHA256).Hash
+    function New-PreMigrationBackup {
+        param($FromVersion, $ToVersion)
+        if ("$FromVersion->$ToVersion" -ne '5->7') { throw 'Unexpected fixture backup version.' }
+        $script:faultEvents.Add('backup-created')
+        [IO.File]::WriteAllText($script:faultBackup, 'FAKE BACKUP ONLY -- TEST FILE, NOT SQL SERVER DATA')
+        $hash = (Get-FileHash -LiteralPath $script:faultBackup -Algorithm SHA256).Hash
+        if (-not $hash) { throw 'Fixture backup hash verification failed.' }
+        $script:faultEvents.Add('backup-verified')
+        return $script:faultBackup
+    }
+    function Invoke-SqlMigration {
+        param($FilePath, $VersionBefore, $ExpectedVersion)
+        if ($ExpectedVersion -ne 6 -or $VersionBefore -ne 5) {
+            throw 'Fault injection was not reached at migration 6.'
+        }
+        $script:faultEvents.Add('fault-before-sql-6')
+        throw 'INJECTED_FAILURE_BEFORE_SQL_MIGRATION_6'
+    }
+    $faultMessage = ''
+    try { Invoke-PendingMigrations -Directory $migrationFixture -RequiredVersion 7 }
+    catch { $faultMessage = $_.Exception.Message }
+    Require ($faultMessage -like '*INJECTED_FAILURE_BEFORE_SQL_MIGRATION_6*') 'Expected test-only failure was not raised.'
+    $failedRecord = Read-FmscRecoveryJournal $script:RecoveryRoot
+    Require ($failedRecord.Phase -eq 'Migrating' -and $failedRecord.BeforeSchema -eq 5 -and
+        $failedRecord.Schema -eq 7 -and $failedRecord.LastSchema -eq 0 -and
+        $script:syntheticSchema -eq 5) 'Injected failure modified the simulated database or did not journal the baseline.'
+    Require ((Get-FileHash -LiteralPath $failedRecord.Backup -Algorithm SHA256).Hash -eq
+        $failedRecord.BackupSha256) 'Injected failure did not preserve the verified backup.'
+    Require (($script:faultEvents -join ',') -eq 'backup-created,backup-verified,fault-before-sql-6') 'The failure was not injected at the required boundary.'
+    $script:RecoveryJournal = $failedRecord
+    Invoke-FmscSafeUpdateAbort
+    Require ((Read-FmscRecoveryJournal $script:RecoveryRoot).Phase -eq 'Aborted') 'Injected failure was not safely aborted.'
+    Require ((Get-FileHash -LiteralPath (Join-Path $app 'FMSC_SMS.exe') -Algorithm SHA256).Hash -eq
+        $previousAppHash -and $script:syntheticSchema -eq 5) 'Fault-recovery test changed the app or schema.'
+    Refuse { Complete-FmscAbortedTransaction -ObservedSchema 5 -ApplicationDirectory $app -RollbackDirectory $rollback }
+    Write-Output 'PASS: fault injected AFTER verified backup and BEFORE migration 6; verified baseline 5 -> 7 recorded; no SQL applied, old app unchanged, recovery Aborted, no repeat.'
     # An Aborted journal is terminal; a subsequent approved update may start.
     $previousTransaction = $script:RecoveryJournal.Transaction
     $script:RecoveryJournal = Initialize-FmscRecoveryTransaction $prepared $script:RecoveryRoot $version $schema $sid
@@ -238,7 +298,7 @@ try {
     & icacls.exe $script:RecoveryRoot /grant '*S-1-5-32-545:(M)' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Cannot weaken fixture ACL for refusal test.' }
     Refuse { Read-FmscRecoveryJournal $script:RecoveryRoot }
-    Write-Output 'PASS: interrupted activation and cleanup, safe baseline abort, partial-schema/backup-integrity/rollback/missing-application refusal, no retry, next-update acceptance, identity and storage permission guards. No SQL or live installation.'
+    Write-Output 'PASS: interrupted activation and cleanup, pre-migration fault injection, safe baseline abort, partial-schema/backup-integrity/rollback/missing-application refusal, no retry, next-update acceptance, identity and storage permission guards. No SQL or live installation.'
 } finally {
     $absolute = [IO.Path]::GetFullPath($script:fixture)
     if (-not $absolute.StartsWith([IO.Path]::GetTempPath(),[StringComparison]::OrdinalIgnoreCase) -or
