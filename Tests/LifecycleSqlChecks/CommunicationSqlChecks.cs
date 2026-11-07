@@ -106,6 +106,17 @@ internal static class CommunicationSqlChecks
                     "A later Yes for a different guardian phone cannot authorize the old communication destination.");
                 Sql.Query("""
                     UPDATE dbo.StudentGuardianCommunication
+                    SET Phone=N'+44 7700 900123',RecordedUtc=SYSUTCDATETIME()
+                    WHERE AdmissionId=@Id;
+                    """,Sql.P("@Id",student));
+                report.Check(Convert.ToInt32(Sql.Scalar(
+                    "SELECT comm.GuardianWhatsAppAllowed(@AdmissionId,@Destination);",
+                    Sql.P("@AdmissionId",student),Sql.P("@Destination","+447700900123")))==1,
+                    "Explicit international E.164 guardian numbers remain usable when the verified destination matches.");
+                report.Check((await WhatsAppReason()).Contains("number changed"),
+                    "International consent for another number never authorizes the previous Pakistan destination.");
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication
                     SET Phone=N'00923001234567',RecordedUtc=SYSUTCDATETIME()
                     WHERE AdmissionId=@Id;
                     """,Sql.P("@Id",student));
