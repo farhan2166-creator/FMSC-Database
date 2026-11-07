@@ -48,7 +48,14 @@ function Stage([string]$Name) { $script:stage=$Name; Write-Host "ACCEPTANCE STAG
 function NativeOk([string]$Name) { if ($LASTEXITCODE -ne 0) { throw "$Name exited with code $LASTEXITCODE" } }
 function Sql([string]$Db, [string]$Query) {
     $result=@(& $script:sqlcmd -S $script:instance -E -d $Db -b -l 30 -t 60 -h -1 -W -Q $Query 2>&1)
-    NativeOk "SQL verification on $Db"
+    if ($LASTEXITCODE -ne 0) {
+        # Only SQL error messages from approved synthetic fixture jobs. Exclude
+        # arbitrary query output that might contain SQL rows or application data.
+        $errors=@($result | ForEach-Object { $_.ToString() } |
+            Where-Object { $_ -match '(?i)^(sqlcmd:|msg [0-9]+|level [0-9]+|error |fatal |.*error:)' } |
+            Select-Object -Last 5)
+        throw "SQL verification on $Db exited with code $LASTEXITCODE. $($errors -join ' | ')"
+    }
     return $result
 }
 function LocalDbExe {
