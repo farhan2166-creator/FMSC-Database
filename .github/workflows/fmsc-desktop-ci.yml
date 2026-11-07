@@ -60,6 +60,10 @@ jobs:
       - name: Validate two-version checked distribution snapshots and retirement
         run: dotnet run --project Tools/UpdateDistribution/UpdateDistribution.csproj -c Release -- --self-test
 
+      - name: Verify Sandbox publication gate accepts only current trusted SHA (offline)
+        shell: pwsh
+        run: .\Tools\TestSandboxPublicationGate.ps1
+
       - name: Refuse unintended private publication triggers without network access
         shell: pwsh
         run: .\Tools\TestPublishPrivateUpdate.ps1
