@@ -560,7 +560,7 @@ FOR ATTACH;";
     }
 
     internal static Task<DataSet> SaveAdmissionWithGuardianAsync(string procedure, SqlParameter[] parameters,
-        int admissionId, string email, string phone, bool consent)
+        int admissionId, string email, string phone, bool? consent)
     {
         int actor = CurrentUser.UserId;
         return QueryUserSetCoreAsync(procedure, 120, CancellationToken.None, WithCurrentUser(parameters),
@@ -577,20 +577,23 @@ FOR ATTACH;";
 
                 using var preference = new SqlCommand("""
                     UPDATE dbo.StudentGuardianCommunication WITH (UPDLOCK, HOLDLOCK)
-                    SET Email=@Email, Phone=@Phone, WhatsAppConsent=@Consent,
-                        SchoolCommunicationConsent=@Consent,
+                    SET Email=@Email, Phone=@Phone, WhatsAppConsent=COALESCE(@Consent,WhatsAppConsent),
+                        SchoolCommunicationConsent=COALESCE(@Consent,SchoolCommunicationConsent),
                         RecordedUtc=SYSUTCDATETIME(), RecordedBy=@UserId
                     WHERE AdmissionId=@Id AND EXISTS (
-                        SELECT @Email,@Phone,@Consent,@Consent
+                        SELECT @Email,@Phone,COALESCE(@Consent,WhatsAppConsent),
+                               COALESCE(@Consent,SchoolCommunicationConsent)
                         EXCEPT SELECT Email,Phone,WhatsAppConsent,SchoolCommunicationConsent
                     );
                     IF NOT EXISTS (SELECT 1 FROM dbo.StudentGuardianCommunication WITH (UPDLOCK,HOLDLOCK) WHERE AdmissionId=@Id)
                         INSERT dbo.StudentGuardianCommunication (AdmissionId, Email, Phone, WhatsAppConsent,
                             SchoolCommunicationConsent,RecordedUtc,RecordedBy)
-                        VALUES (@Id,@Email,@Phone,@Consent,@Consent,SYSUTCDATETIME(),@UserId);
+                        VALUES (@Id,@Email,@Phone,ISNULL(@Consent,0),@Consent,SYSUTCDATETIME(),@UserId);
                     """, connection, transaction);
                 preference.Parameters.AddRange([Int("@Id", id), P("@Email", email.Length == 0 ? null : email),
-                    P("@Phone", phone.Length == 0 ? null : phone), Bit("@Consent", consent), Int("@UserId", actor)]);
+                    P("@Phone", phone.Length == 0 ? null : phone),
+                    new SqlParameter("@Consent",SqlDbType.Bit){Value=consent is bool agreed?agreed:DBNull.Value},
+                    Int("@UserId", actor)]);
                 await preference.ExecuteNonQueryAsync(token).ConfigureAwait(false);
             });
     }
