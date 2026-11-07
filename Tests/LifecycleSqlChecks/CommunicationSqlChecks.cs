@@ -82,8 +82,8 @@ internal static class CommunicationSqlChecks
                     SET WhatsAppConsent=0,RecordedUtc=SYSUTCDATETIME(),RecordedBy=@Actor
                     WHERE AdmissionId=@Id;
                     """,Sql.P("@Id",student),Sql.P("@Actor",f.Admin));
-                report.Check((await WhatsAppReason()).Contains("withdrawn"),
-                    "Admission WhatsApp withdrawal immediately blocks new previews.");
+                report.Check((await WhatsAppReason()).Contains("declined"),
+                    "Admission WhatsApp withdrawal immediately blocks new previews under the unified consent exclusion.");
                 await report.Refused("Admission withdrawal prevents new campaign preparation",
                     ()=>store.CreateAsync(Guid.NewGuid(),template,MessageChannel.WhatsApp,[contact],
                         "Fresh after withdrawal",new DateTime(2026,1,1)),51001);
