@@ -60,6 +60,9 @@ BEGIN
  IF @School IS NULL
   RETURN CASE WHEN @Channel=''WhatsApp'' AND comm.GuardianWhatsAppAllowed(@AdmissionId,@Destination)=0 THEN 0 ELSE 1 END;
  IF @School=0 RETURN 0;
+ -- Unified Admission consent is bound to the saved guardian destination, even
+ -- if the legacy WhatsApp preference was never explicitly recorded.
+ IF comm.NormalizeSchoolPhone(@RecordedPhone)<>@Destination RETURN 0;
  RETURN CASE WHEN comm.GuardianWhatsAppAllowed(@AdmissionId,@Destination)=1 THEN 2 ELSE 0 END;
 END;';
 
