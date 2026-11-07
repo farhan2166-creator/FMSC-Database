@@ -2887,16 +2887,17 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                         row["AlternateContactNumber"])
                       ?? string.Empty;
             guardianEmail.Text = guardian.Rows.Count == 0 ? "" : Convert.ToString(guardian.Rows[0]["Email"]) ?? "";
-            guardianConsent.SelectedIndex = guardian.Rows.Count > 0 &&
-                guardian.Rows[0]["SchoolCommunicationConsent"] is not DBNull &&
-                Convert.ToBoolean(guardian.Rows[0]["SchoolCommunicationConsent"]) &&
-                string.Equals(Convert.ToString(guardian.Rows[0]["Phone"]),contact.Text.Trim(),StringComparison.Ordinal) ? 1 : 0;
-            // An old WhatsApp-only Yes is not a new all-message Yes or an
-            // implicit No. Preserve its original scope until the user changes
-            // the new choice on Admission.
+            // Older records may contain WhatsApp-only permission. Leave the
+            // new broader choice unanswered until a guardian explicitly selects
+            // Yes or No; an unrelated admission edit must not expand or erase it.
             legacyWhatsappChoiceUnanswered = guardian.Rows.Count > 0 &&
                 guardian.Rows[0]["SchoolCommunicationConsent"] is DBNull &&
                 Convert.ToBoolean(guardian.Rows[0]["WhatsAppConsent"]);
+            guardianConsent.SelectedIndex = legacyWhatsappChoiceUnanswered ? -1 :
+                guardian.Rows.Count > 0 &&
+                guardian.Rows[0]["SchoolCommunicationConsent"] is not DBNull &&
+                Convert.ToBoolean(guardian.Rows[0]["SchoolCommunicationConsent"]) &&
+                string.Equals(Convert.ToString(guardian.Rows[0]["Phone"]),contact.Text.Trim(),StringComparison.Ordinal) ? 1 : 0;
             schoolConsentChoiceChanged = false;
             address.Text =
                 row["Address"] == DBNull.Value
@@ -4547,7 +4548,7 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
     private Task<DataSet> SaveWithGuardianAsync(string procedure, int admissionId, params Microsoft.Data.SqlClient.SqlParameter[] parameters) =>
         DatabaseHelper.SaveAdmissionWithGuardianAsync(procedure, parameters, admissionId, guardianEmail.Text.Trim(),
             contact.Text.Trim(),
-            legacyWhatsappChoiceUnanswered && !schoolConsentChoiceChanged && guardianConsent.SelectedIndex == 0
+            legacyWhatsappChoiceUnanswered && !schoolConsentChoiceChanged && guardianConsent.SelectedIndex != 1
                 ? (bool?)null : guardianConsent.SelectedIndex == 1);
     /// <summary>Validates the optional 13-digit B-Form/CRC or CNIC identity number, with or without dashes.</summary>
     private static bool IsValidOptionalBFormOrCnic(string? text)
