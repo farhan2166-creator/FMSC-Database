@@ -19,6 +19,26 @@ $tokens = $null; $errors = $null
 $source = Get-Content (Join-Path $project 'Installer/core.ps1') -Raw
 $ast = [Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$errors)
 if ($errors.Count) { throw 'Installer does not parse.' }
+$abortFunction = $ast.Find({
+    param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and
+    $n.Name -eq 'Invoke-FmscSafeUpdateAbort'
+}, $true)
+if (-not $abortFunction) { throw 'Safe recovery handler is missing.' }
+$abortSource = $abortFunction.Extent.Text
+foreach ($requiredCall in @('Get-InstalledApplicationVersion','Compare-ApplicationVersion',
+    'Initialize-FmscRecoveryConnection','Assert-FmscRecoveryDatabaseIdentity',
+    'Get-DatabaseVersion','Confirm-FmscRecoveryBackup','Complete-FmscAbortedTransaction')) {
+    if ($abortSource -notmatch [regex]::Escape($requiredCall)) {
+        throw "Recovery must verify $requiredCall before abandoning an update."
+    }
+}
+if ($abortSource -match 'Invoke-SqlMigration|Enable-StagedApplication|RESTORE DATABASE') {
+    throw 'A safe abort must not migrate, activate or restore a database.'
+}
+$launcher = Get-Content (Join-Path $project 'Installer/Launch-FMSC.ps1') -Raw
+if ($launcher -notmatch [regex]::Escape("Phase -notin @('Completed','Aborted')")) {
+    throw 'The launcher must not restart a verified Aborted transaction.'
+}
 $version = [regex]::Match($source, '(?m)^\$AppVersion = ''([^'']+)''').Groups[1].Value
 $schema = [int][regex]::Match($source, '(?m)^\$DatabaseVersion = ''([0-9]+)''').Groups[1].Value
 foreach ($name in @('Enable-StagedApplication','Remove-VerifiedUpdateDirectory','Copy-ApplicationFiles','Get-ApplicationFileManifest','Test-StagedApplication','Test-PreparedUpdate')) {
