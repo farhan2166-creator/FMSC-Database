@@ -324,7 +324,7 @@ DBCC CHECKDB WITH NO_INFOMSGS;
             $checks.Add("Attached copied sandbox schema-$FixtureSchema MDF/LDF, verified declared version and passed DBCC CHECKDB")
         } finally {
             if ($fixtureProbeName) {
-                Sql 'master' "IF DB_ID(N'$fixtureProbeName') IS NOT NULL BEGIN ALTER DATABASE [$fixtureProbeName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$fixtureProbeName]; END;" | Out-Null
+                Sql 'master' "IF DB_ID(N'$fixtureProbeName') IS NOT NULL BEGIN ALTER DATABASE [$fixtureProbeName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; EXEC sys.sp_detach_db @dbname=N'$fixtureProbeName'; END;" | Out-Null
                 $fixtureProbeName=''
             }
         }
@@ -502,7 +502,7 @@ catch {
 finally {
     try {
         if ($fixtureProbeName) {
-            Sql 'master' "IF DB_ID(N'$fixtureProbeName') IS NOT NULL BEGIN ALTER DATABASE [$fixtureProbeName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$fixtureProbeName]; END;" | Out-Null
+            Sql 'master' "IF DB_ID(N'$fixtureProbeName') IS NOT NULL BEGIN ALTER DATABASE [$fixtureProbeName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; EXEC sys.sp_detach_db @dbname=N'$fixtureProbeName'; END;" | Out-Null
         }
         if ($ownedDatabase) {
             if ($Level3 -and $ownedTheme) { Assert-Level3Database }
