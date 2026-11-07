@@ -545,7 +545,13 @@ BEGIN
   FROM comm.Contact C CROSS APPLY comm.ValuesFor(C.ContactId,N'',NULL) V
   WHERE (C.OwnerKind<>'Family' OR C.FamilyId IS NOT NULL) AND (@Campus=0 OR V.CampusId=@Campus) AND (@Year=0 OR V.AcademicYearId=@Year) AND (@Class=0 OR V.ClassId=@Class) AND (@Section=0 OR V.SectionId=@Section)
    AND (C.ContactName LIKE N'%'+@Search+N'%' OR V.student LIKE N'%'+@Search+N'%')
-   AND (@Filter='' AND C.OwnerKind<>'Staff' OR @Filter='Outstanding' AND comm.Balance(V.AdmissionId)>0 OR @Filter='Staff' AND C.OwnerKind='Staff' OR @Filter='Family' AND C.OwnerKind='Family' OR @Filter='Manual' AND C.OwnerKind='Manual' OR @Filter='Pending' AND V.StudentStatus=N'Pending')
+   AND (@Filter='' AND C.OwnerKind<>'Staff'
+    OR @Filter='Student' AND C.OwnerKind='Student'
+    OR @Filter='Outstanding' AND C.OwnerKind='Student' AND comm.Balance(V.AdmissionId)>0
+    OR @Filter='Staff' AND C.OwnerKind='Staff'
+    OR @Filter='Family' AND C.OwnerKind='Family'
+    OR @Filter='Manual' AND C.OwnerKind='Manual'
+    OR @Filter='Pending' AND V.StudentStatus=N'Pending')
   ORDER BY C.ContactName,C.ContactId OFFSET @Page*100 ROWS FETCH NEXT 100 ROWS ONLY;
  END
  ELSE IF @View='Operational' SELECT Mode,Paused,Currency,MaxBatch,HourLimit,DayLimit FROM comm.Settings;
