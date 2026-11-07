@@ -19,6 +19,14 @@ Migration `5.sql` adds storage for the optional guardian email and WhatsApp
 choice on the admission form. Existing admissions start with no recorded
 choice.
 
+Migration `6.sql` strengthens the already-installed optional Communication Center,
+when present, by enforcing admission WhatsApp withdrawals and changed numbers
+at both preview and provider-claim time for student-linked contacts. If the optional
+module is absent, migration 6 records the new base schema version without
+installing or enabling it. Existing contacts, messages, approvals, and history
+are preserved. The migration requires version 5 and refuses partial module
+installations rather than silently skipping an unsafe change.
+
 Disposable tests publish the complete schema-only baseline directly at version 1. Old development migrations are retired and must never be replayed on baseline 1. See [the baseline decision](../Docs/FIRST_RELEASE_BASELINE.md).
 
 # Apply migrations without the installer
