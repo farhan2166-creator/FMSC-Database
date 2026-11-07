@@ -16,7 +16,7 @@ $project=[IO.Path]::GetFullPath($ProjectDirectory)
 . (Join-Path $project 'Installer/MaintenanceTools.ps1')
 $expectedSchema=[regex]::Match((Get-Content -LiteralPath (Join-Path $project 'Installer/core.ps1') -Raw), '\$DatabaseVersion\s*=\s*''([0-9]+)''').Groups[1].Value
 if (-not $expectedSchema) { throw 'Cannot determine the installer schema contract.' }
-$root=Join-Path $env:RUNNER_TEMP 'fmsc-disposable-installer'
+$root=Join-Path $(if ($FixtureRoot) { $env:LOCALAPPDATA } else { $env:RUNNER_TEMP }) 'fmsc-disposable-installer'
 $evidence=Join-Path $env:RUNNER_TEMP 'fmsc-install-evidence'
 $release=Join-Path $root 'release'
 $app=Join-Path $release 'FMSC_SMS'
@@ -329,6 +329,8 @@ try {
             Sql 'master' "CREATE DATABASE [$fixtureProbeName] ON (FILENAME=N'$escapedMdf'),(FILENAME=N'$escapedLdf') FOR ATTACH;" | Out-Null
             $actual=@(Sql $fixtureProbeName 'SET NOCOUNT ON; SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;')
             if (($actual -join '').Trim() -ne [string]$FixtureSchema) { throw 'Private SQL file schema version does not match its manifest.' }
+            $readonly=@(Sql 'master' "SET NOCOUNT ON; SELECT is_read_only FROM sys.databases WHERE name=N'$fixtureProbeName';")
+            if (($readonly -join '').Trim() -ne '0') { throw 'Disposable SQL fixture copy unexpectedly attached read-only.' }
             Sql $fixtureProbeName @'
 SET NOCOUNT ON;
 IF EXISTS(SELECT 1 FROM dbo.Students) OR EXISTS(SELECT 1 FROM dbo.Users)
@@ -355,7 +357,9 @@ DBCC CHECKDB WITH NO_INFOMSGS;
             Sql $templateDb @'
 SET NOCOUNT ON;
 DECLARE @scope uniqueidentifier=NEWID();
-IF NOT EXISTS(SELECT 1 FROM sys.extended_properties WHERE class=0 AND name=N'FMSC_QuickRegistrationScope')
+IF EXISTS(SELECT 1 FROM sys.extended_properties WHERE class=0 AND name=N'FMSC_QuickRegistrationScope')
+    EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@scope;
+ELSE
     EXEC sys.sp_addextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@scope;
 IF NOT EXISTS(SELECT 1 FROM sys.extended_properties WHERE class=0 AND name=N'FMSC_QuickRegistrationScope'
     AND SQL_VARIANT_PROPERTY(value,'BaseType')='uniqueidentifier'
