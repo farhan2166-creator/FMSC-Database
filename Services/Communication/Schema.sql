@@ -169,6 +169,90 @@ BEGIN
  RETURN CASE WHEN @Destination=CONCAT(N'+92',@Digits) THEN 1 ELSE 0 END;
 END;
 GO
+-- New broad consent is authoritative for school SMS and WhatsApp messages.
+-- 0 = declined or number mismatched; 1 = legacy contact rules; 2 = admission Yes.
+-- Legacy WhatsApp-only choices cannot silently become broad school consent.
+CREATE FUNCTION comm.SchoolCommunicationState(@AdmissionId int,@Destination varchar(16),@Channel varchar(10)) RETURNS tinyint AS
+BEGIN
+ DECLARE @School bit;
+ SELECT @School=SchoolCommunicationConsent FROM dbo.StudentGuardianCommunication
+ WHERE AdmissionId=@AdmissionId;
+ IF @School IS NULL
+  RETURN CASE WHEN @Channel='WhatsApp' AND comm.GuardianWhatsAppAllowed(@AdmissionId,@Destination)=0 THEN 0 ELSE 1 END;
+ IF @School=0 RETURN 0;
+ RETURN CASE WHEN comm.GuardianWhatsAppAllowed(@AdmissionId,@Destination)=1 THEN 2 ELSE 0 END;
+END;
+GO
+-- Only explicitly written +E.164 or unambiguous Pakistani mobile numbers are linked.
+CREATE FUNCTION comm.NormalizeSchoolPhone(@Raw nvarchar(30)) RETURNS varchar(16) AS
+BEGIN
+ IF @Raw IS NULL OR LEN(LTRIM(RTRIM(@Raw)))=0 RETURN NULL;
+ DECLARE @Text nvarchar(30)=LTRIM(RTRIM(@Raw));
+ IF @Text LIKE N'%[^+0-9 ()-]%' OR CHARINDEX(N'+',@Text)>1
+  OR LEN(@Text)-LEN(REPLACE(@Text,N'+',N''))>1 RETURN NULL;
+ DECLARE @Digits nvarchar(30)=REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+  @Text,N'+',N''),N' ',N''),N'-',N''),N'(',N''),N')',N'');
+ IF @Digits LIKE N'%[^0-9]%' RETURN NULL;
+ IF LEFT(@Text,1)=N'+' AND LEFT(@Digits,2)<>N'92'
+ BEGIN
+  IF LEN(@Digits) NOT BETWEEN 8 AND 15 OR @Digits NOT LIKE N'[1-9]%' RETURN NULL;
+  RETURN CONVERT(varchar(16),N'+'+@Digits);
+ END;
+ IF LEFT(@Digits,4)=N'0092' AND LEN(@Digits)=14 SET @Digits=SUBSTRING(@Digits,5,10);
+ ELSE IF LEFT(@Digits,2)=N'92' AND LEN(@Digits)=12 SET @Digits=SUBSTRING(@Digits,3,10);
+ ELSE IF LEFT(@Digits,2)=N'03' AND LEN(@Digits)=11 SET @Digits=SUBSTRING(@Digits,2,10);
+ ELSE RETURN NULL;
+ IF LEN(@Digits)<>10 OR @Digits NOT LIKE N'3[0-6]%'
+  OR @Digits LIKE N'%[^0-9]%' RETURN NULL;
+ RETURN CONVERT(varchar(16),N'+92'+@Digits);
+END;
+GO
+-- Explicit recipient discovery can link the consent already recorded in Admission.
+-- This only creates/updates contact records; it NEVER composes or sends messages.
+-- Existing inbound opt-outs always win over a previously recorded Admission Yes.
+CREATE PROCEDURE comm.SyncAdmissionContacts @Actor int AS
+BEGIN
+ SET NOCOUNT ON; SET XACT_ABORT ON;
+ EXEC dbo.RequirePermission @Actor,N'Communication.Compose';
+ EXEC dbo.RequirePermission @Actor,N'Students.View';
+ DECLARE @Eligible TABLE(AdmissionId int NOT NULL PRIMARY KEY,Destination varchar(16) NOT NULL,
+  ContactName nvarchar(150) NOT NULL,RecordedUtc datetime2 NOT NULL);
+ INSERT @Eligible(AdmissionId,Destination,ContactName,RecordedUtc)
+ SELECT G.AdmissionId,P.Destination,
+  LEFT(COALESCE(NULLIF(LTRIM(RTRIM(S.GuardianName)),N''),LEFT(S.StudentName,135)+N' guardian'),150),
+  G.RecordedUtc
+ FROM dbo.StudentGuardianCommunication G
+ JOIN dbo.Students S ON S.AdmissionId=G.AdmissionId
+ CROSS APPLY(SELECT comm.NormalizeSchoolPhone(G.Phone) Destination) P
+ WHERE G.SchoolCommunicationConsent=1 AND P.Destination IS NOT NULL;
+ BEGIN TRANSACTION;
+ DECLARE @Linked TABLE(ContactId uniqueidentifier PRIMARY KEY);
+ UPDATE C SET Verified=1,SmsConsent=1,WhatsAppConsent=1,FinancialConsent=1,
+  AnnouncementConsent=1,ConsentSource=N'Admission school communication agreement',
+  ConsentUtc=E.RecordedUtc,UpdatedBy=@Actor
+ OUTPUT inserted.ContactId INTO @Linked(ContactId)
+ FROM comm.Contact C JOIN @Eligible E ON C.OwnerKind='Student'
+   AND C.AdmissionId=E.AdmissionId AND C.Destination=E.Destination
+ WHERE C.OptedOut=0 AND (C.Verified=0 OR C.SmsConsent=0 OR C.WhatsAppConsent=0
+   OR C.FinancialConsent=0 OR C.AnnouncementConsent=0);
+ INSERT comm.Contact(ContactId,OwnerKind,AdmissionId,FamilyId,OriginalFamilyId,StaffId,
+  ContactName,Destination,Language,PreferredChannel,Verified,SmsConsent,WhatsAppConsent,
+  FinancialConsent,AnnouncementConsent,OptedOut,ConsentSource,ConsentUtc,UpdatedBy)
+ OUTPUT inserted.ContactId INTO @Linked(ContactId)
+ SELECT NEWID(),'Student',E.AdmissionId,NULL,NULL,NULL,E.ContactName,E.Destination,
+  'en','WhatsApp',1,1,1,1,1,0,N'Admission school communication agreement',
+  E.RecordedUtc,@Actor
+ FROM @Eligible E
+ WHERE NOT EXISTS(SELECT 1 FROM comm.Contact C WITH(UPDLOCK,HOLDLOCK)
+    WHERE C.OwnerKind='Student' AND C.AdmissionId=E.AdmissionId AND C.Destination=E.Destination)
+ AND NOT EXISTS(SELECT 1 FROM comm.Contact C WITH(UPDLOCK,HOLDLOCK)
+    WHERE C.OwnerKind='Student' AND C.AdmissionId=E.AdmissionId AND C.OptedOut=1);
+ INSERT comm.Audit(Actor,Operation,EntityId,Detail)
+ SELECT @Actor,'AdmissionConsentLinked',L.ContactId,N'Contact eligibility linked from saved Admission Yes'
+ FROM @Linked L;
+ COMMIT;
+END;
+GO
 CREATE PROCEDURE comm.Preview @Actor int,@TemplateId uniqueidentifier,@Channel varchar(10),@ContactIds nvarchar(max),@Announcement nvarchar(1000)=N'',@PaymentId int=NULL AS
 BEGIN
  SET NOCOUNT ON; EXEC dbo.RequirePermission @Actor,N'Communication.Compose';
@@ -185,13 +269,18 @@ BEGIN
  comm.Segments(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId)) Segments,
  CASE WHEN S.Mode<>'Live' THEN 0 WHEN @Channel='Sms' THEN S.SmsUnitCost*comm.Segments(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId)) ELSE S.WhatsAppUnitCost END EstimatedCost,S.Currency,
  CASE WHEN DATALENGTH(Rendered.Parameters)>8000 THEN N'Personalized provider parameters exceed the supported size; shorten the template' WHEN DATALENGTH(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId))>4000 THEN N'Personalized message exceeds 2000 characters; shorten the template' WHEN C.OwnerKind='Family' AND C.FamilyId IS NULL THEN N'Family link retired; select a current family contact' WHEN T.Approved=0 THEN N'Template requires approval' WHEN C.OwnerKind<>T.Scope THEN N'Contact context does not match template'
- WHEN C.Language<>T.Language THEN N'Template language does not match contact' WHEN C.Verified=0 THEN N'Unverified contact'
- WHEN C.OptedOut=1 THEN N'Opted out' WHEN @Channel='Sms' AND C.SmsConsent=0 THEN N'No SMS consent'
- WHEN @Channel='WhatsApp' AND C.WhatsAppConsent=0 THEN N'No WhatsApp consent'
- WHEN @Channel='WhatsApp' AND C.OwnerKind='Student' AND comm.GuardianWhatsAppAllowed(C.AdmissionId,C.Destination)=0
- THEN N'Admission WhatsApp consent withdrawn or guardian number changed'
- WHEN @Category='Financial' AND C.FinancialConsent=0 THEN N'Financial messages not consented'
- WHEN @Category='Announcement' AND C.AnnouncementConsent=0 THEN N'Announcements not consented'
+ WHEN C.Language<>T.Language THEN N'Template language does not match contact' WHEN C.Verified=0 AND NOT (C.OwnerKind='Student'
+ AND comm.SchoolCommunicationState(C.AdmissionId,C.Destination,@Channel)=2) THEN N'Unverified contact'
+ WHEN C.OptedOut=1 THEN N'Opted out' WHEN @Channel='Sms' AND C.SmsConsent=0 AND NOT (C.OwnerKind='Student'
+ AND comm.SchoolCommunicationState(C.AdmissionId,C.Destination,@Channel)=2) THEN N'No SMS consent'
+ WHEN C.OwnerKind='Student' AND comm.SchoolCommunicationState(C.AdmissionId,C.Destination,@Channel)=0
+ THEN N'School messages declined or guardian number changed'
+ WHEN @Channel='WhatsApp' AND C.WhatsAppConsent=0 AND NOT (C.OwnerKind='Student'
+  AND comm.SchoolCommunicationState(C.AdmissionId,C.Destination,@Channel)=2) THEN N'No WhatsApp consent'
+ WHEN @Category='Financial' AND C.FinancialConsent=0 AND NOT (C.OwnerKind='Student'
+ AND comm.SchoolCommunicationState(C.AdmissionId,C.Destination,@Channel)=2) THEN N'Financial messages not consented'
+ WHEN @Category='Announcement' AND C.AnnouncementConsent=0 AND NOT (C.OwnerKind='Student'
+ AND comm.SchoolCommunicationState(C.AdmissionId,C.Destination,@Channel)=2) THEN N'Announcements not consented'
  WHEN @Channel='WhatsApp' AND LEN(T.ProviderTemplate)=0 THEN N'WhatsApp template mapping missing'
  WHEN T.Body LIKE N'%{{receipt}}%' AND @PaymentId IS NULL THEN N'A verified payment event is required for this receipt template'
  WHEN T.Code='admission_completed' AND NOT EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=C.AdmissionId AND Status=N'Active' AND AdmissionNumber IS NOT NULL) THEN N'Admission is not complete'
@@ -349,9 +438,13 @@ BEGIN
  UPDATE M SET State='Cancelled',LastCode='CONTACT_OR_BALANCE_CHANGED',UpdatedUtc=@Now
  FROM comm.Message M JOIN comm.Campaign P ON P.CampaignId=M.CampaignId JOIN comm.Contact C ON C.ContactId=M.ContactId JOIN comm.Template T ON T.TemplateId=P.TemplateId
  WHERE P.DispatchActor=@Actor AND (@OnlyCampaign IS NULL OR P.CampaignId=@OnlyCampaign) AND M.State IN('Queued','Scheduled') AND (
- (C.OwnerKind='Family' AND C.FamilyId IS NULL) OR T.Approved=0 OR C.Verified=0 OR C.OptedOut=1 OR C.Destination<>M.Destination OR (P.Channel='Sms' AND C.SmsConsent=0) OR (P.Channel='WhatsApp' AND C.WhatsAppConsent=0) OR
-  (P.Channel='WhatsApp' AND C.OwnerKind='Student' AND comm.GuardianWhatsAppAllowed(C.AdmissionId,M.Destination)=0) OR
- (T.Category='Financial' AND C.FinancialConsent=0) OR (T.Category='Announcement' AND C.AnnouncementConsent=0) OR
+ (C.OwnerKind='Family' AND C.FamilyId IS NULL) OR T.Approved=0 OR C.OptedOut=1 OR C.Destination<>M.Destination OR
+ (C.OwnerKind='Student' AND comm.SchoolCommunicationState(C.AdmissionId,M.Destination,P.Channel)=0) OR
+ (C.Verified=0 AND NOT (C.OwnerKind='Student' AND comm.SchoolCommunicationState(C.AdmissionId,M.Destination,P.Channel)=2)) OR
+ (P.Channel='Sms' AND C.SmsConsent=0 AND NOT (C.OwnerKind='Student' AND comm.SchoolCommunicationState(C.AdmissionId,M.Destination,P.Channel)=2)) OR
+ (P.Channel='WhatsApp' AND C.WhatsAppConsent=0 AND NOT (C.OwnerKind='Student' AND comm.SchoolCommunicationState(C.AdmissionId,M.Destination,P.Channel)=2)) OR
+ (T.Category='Financial' AND C.FinancialConsent=0 AND NOT (C.OwnerKind='Student' AND comm.SchoolCommunicationState(C.AdmissionId,M.Destination,P.Channel)=2)) OR
+ (T.Category='Announcement' AND C.AnnouncementConsent=0 AND NOT (C.OwnerKind='Student' AND comm.SchoolCommunicationState(C.AdmissionId,M.Destination,P.Channel)=2)) OR
  (T.Category='Financial' AND P.PaymentId IS NULL AND (comm.Balance(M.AdmissionId)<=0 OR comm.Render(T.Body,C.ContactId,P.Announcement,P.PaymentId)<>M.Body)) OR
  (P.PaymentId IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.FeePayments F WHERE F.FeePaymentId=P.PaymentId AND F.AdmissionId=M.AdmissionId AND F.Status=N'Completed' AND F.PaymentMethod NOT IN(N'Refund',N'Correction'))));
  DECLARE @Id uniqueidentifier,@Campaign uniqueidentifier,@Cost decimal(18,4),@Token uniqueidentifier=NEWID();
