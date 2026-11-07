@@ -39,9 +39,10 @@ function New-MockStatus {
 function Assert-Outcome {
     param([string]$Case,[bool]$ShouldPass)
     $passed=$false
-    try { & $gate -SourceSha $sha | Out-Null; $passed=$true } catch {}
+    $reason=''
+    try { & $gate -SourceSha $sha | Out-Null; $passed=$true } catch { $reason=$_.Exception.Message }
     if ($passed -ne $ShouldPass) {
-        throw "Publication gate regression: $Case (actual pass=$passed, expected=$ShouldPass)"
+        throw "Publication gate regression: $Case (actual pass=$passed, expected=$ShouldPass; reason=$reason)"
     }
     Write-Host "PASS: $Case"
 }
