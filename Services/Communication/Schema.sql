@@ -143,6 +143,25 @@ BEGIN
  RETURN @Result;
 END;
 GO
+-- Admission consent restricts student-linked WhatsApp; it never grants comm.Contact consent.
+-- A missing admission preference preserves separately verified comm.Contact eligibility.
+CREATE FUNCTION comm.GuardianWhatsAppAllowed(@AdmissionId int,@Destination varchar(16)) RETURNS bit AS
+BEGIN
+ DECLARE @Recorded nvarchar(30),@Agreed bit;
+ SELECT @Recorded=Phone,@Agreed=WhatsAppConsent
+ FROM dbo.StudentGuardianCommunication WHERE AdmissionId=@AdmissionId;
+ IF @Agreed IS NULL RETURN 1;
+ IF @Agreed=0 OR @Recorded IS NULL RETURN 0;
+ DECLARE @Digits nvarchar(30)=REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+  LTRIM(RTRIM(@Recorded)),N'+',N''),N' ',N''),N'-',N''),N'(',N''),N')',N'');
+ IF LEFT(@Digits,4)=N'0092' AND LEN(@Digits)=14 SET @Digits=SUBSTRING(@Digits,5,10);
+ ELSE IF LEFT(@Digits,2)=N'92' AND LEN(@Digits)=12 SET @Digits=SUBSTRING(@Digits,3,10);
+ ELSE IF LEFT(@Digits,1)=N'0' AND LEN(@Digits)=11 SET @Digits=SUBSTRING(@Digits,2,10);
+ ELSE RETURN 0;
+ IF LEN(@Digits)<>10 OR @Digits NOT LIKE N'3[0-6]%' OR @Digits LIKE N'%[^0-9]%' RETURN 0;
+ RETURN CASE WHEN @Destination=CONCAT(N'+92',@Digits) THEN 1 ELSE 0 END;
+END;
+GO
 CREATE PROCEDURE comm.Preview @Actor int,@TemplateId uniqueidentifier,@Channel varchar(10),@ContactIds nvarchar(max),@Announcement nvarchar(1000)=N'',@PaymentId int=NULL AS
 BEGIN
  SET NOCOUNT ON; EXEC dbo.RequirePermission @Actor,N'Communication.Compose';
@@ -162,6 +181,8 @@ BEGIN
  WHEN C.Language<>T.Language THEN N'Template language does not match contact' WHEN C.Verified=0 THEN N'Unverified contact'
  WHEN C.OptedOut=1 THEN N'Opted out' WHEN @Channel='Sms' AND C.SmsConsent=0 THEN N'No SMS consent'
  WHEN @Channel='WhatsApp' AND C.WhatsAppConsent=0 THEN N'No WhatsApp consent'
+ WHEN @Channel='WhatsApp' AND C.OwnerKind='Student' AND comm.GuardianWhatsAppAllowed(C.AdmissionId,C.Destination)=0
+ THEN N'Admission WhatsApp consent withdrawn or guardian number changed'
  WHEN @Category='Financial' AND C.FinancialConsent=0 THEN N'Financial messages not consented'
  WHEN @Category='Announcement' AND C.AnnouncementConsent=0 THEN N'Announcements not consented'
  WHEN @Channel='WhatsApp' AND LEN(T.ProviderTemplate)=0 THEN N'WhatsApp template mapping missing'
@@ -322,6 +343,7 @@ BEGIN
  FROM comm.Message M JOIN comm.Campaign P ON P.CampaignId=M.CampaignId JOIN comm.Contact C ON C.ContactId=M.ContactId JOIN comm.Template T ON T.TemplateId=P.TemplateId
  WHERE P.DispatchActor=@Actor AND (@OnlyCampaign IS NULL OR P.CampaignId=@OnlyCampaign) AND M.State IN('Queued','Scheduled') AND (
  (C.OwnerKind='Family' AND C.FamilyId IS NULL) OR T.Approved=0 OR C.Verified=0 OR C.OptedOut=1 OR C.Destination<>M.Destination OR (P.Channel='Sms' AND C.SmsConsent=0) OR (P.Channel='WhatsApp' AND C.WhatsAppConsent=0) OR
+  (P.Channel='WhatsApp' AND C.OwnerKind='Student' AND comm.GuardianWhatsAppAllowed(C.AdmissionId,M.Destination)=0) OR
  (T.Category='Financial' AND C.FinancialConsent=0) OR (T.Category='Announcement' AND C.AnnouncementConsent=0) OR
  (T.Category='Financial' AND P.PaymentId IS NULL AND (comm.Balance(M.AdmissionId)<=0 OR comm.Render(T.Body,C.ContactId,P.Announcement,P.PaymentId)<>M.Body)) OR
  (P.PaymentId IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.FeePayments F WHERE F.FeePaymentId=P.PaymentId AND F.AdmissionId=M.AdmissionId AND F.Status=N'Completed' AND F.PaymentMethod NOT IN(N'Refund',N'Correction'))));
