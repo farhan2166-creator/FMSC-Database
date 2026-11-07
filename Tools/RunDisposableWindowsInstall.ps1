@@ -344,6 +344,28 @@ DBCC CHECKDB WITH NO_INFOMSGS;
                 $fixtureProbeName=''
             }
         }
+        # DACPAC publication preserves SQL schema but does not seed operational
+        # database-level GUID state. Create that state only on a disposable
+        # installer input copy. Never modify FMSC-Sandbox's master binaries.
+        $templateDb="FMSC_FixtureTemplate_$FixtureSchema"
+        $templateMdf=(Join-Path $database 'FMSC_DB.mdf').Replace("'","''")
+        $templateLdf=(Join-Path $database 'FMSC_DB_log.ldf').Replace("'","''")
+        try {
+            Sql 'master' "CREATE DATABASE [$templateDb] ON (FILENAME=N'$templateMdf'),(FILENAME=N'$templateLdf') FOR ATTACH;" | Out-Null
+            Sql $templateDb @'
+SET NOCOUNT ON;
+DECLARE @scope uniqueidentifier=NEWID();
+IF NOT EXISTS(SELECT 1 FROM sys.extended_properties WHERE class=0 AND name=N'FMSC_QuickRegistrationScope')
+    EXEC sys.sp_addextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@scope;
+IF NOT EXISTS(SELECT 1 FROM sys.extended_properties WHERE class=0 AND name=N'FMSC_QuickRegistrationScope'
+    AND SQL_VARIANT_PROPERTY(value,'BaseType')='uniqueidentifier'
+    AND TRY_CONVERT(uniqueidentifier,value)<>'00000000-0000-0000-0000-000000000000')
+    THROW 51012,'Disposable fixture lacks required quick-registration identity',1;
+'@ | Out-Null
+        } finally {
+            Sql 'master' "IF DB_ID(N'$templateDb') IS NOT NULL BEGIN ALTER DATABASE [$templateDb] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; EXEC sys.sp_detach_db @dbname=N'$templateDb'; END;" | Out-Null
+        }
+        $checks.Add("Prepared schema-$FixtureSchema installer COPY with required synthetic database identity")
     } else {
     Push-Location (Join-Path $project 'Tests/LifecycleSqlChecks')
     try {
