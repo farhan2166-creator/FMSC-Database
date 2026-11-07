@@ -135,7 +135,9 @@ internal static class CommunicationSqlChecks
         await report.Stage("Communication: one Admission Yes covers all school messages",async()=>{
             // No manual contact/consent action: a single Admission Yes automatically
             // provides the student guardian contact when recipients are requested.
-            var saved=Sql.Proc("AdmitStudent",f.AdmissionArgs("Unified Guardian Consent Example"));
+            var admissionArgs=f.AdmissionArgs("Unified Guardian Consent Example");
+            admissionArgs.Single(p=>p.ParameterName=="@ContactNumber").Value="03001234567";
+            var saved=Sql.Proc("AdmitStudent",admissionArgs);
             int schoolStudent=Convert.ToInt32(saved.Rows[0]["AdmissionId"]);
             string studentPhone=Convert.ToString(Sql.Scalar(
                 "SELECT ContactNumber FROM dbo.Students WHERE AdmissionId=@Id;",
