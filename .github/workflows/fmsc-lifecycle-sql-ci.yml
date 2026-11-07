@@ -3,6 +3,15 @@ name: '10 - CI - SQL Lifecycle Checks'
 on:
   workflow_dispatch:
   workflow_call:
+  pull_request:
+    paths:
+      - 'Migrations/**'
+      - 'Services/Communication/**'
+      - 'Tests/LifecycleSqlChecks/**'
+      - 'Pages/Students/Admissions/**'
+      - 'DatabaseHelper.cs'
+      - 'Core/DatabaseCompatibilityRequirements.json'
+      - '.github/workflows/fmsc-lifecycle-sql-ci.yml'
 permissions:
   contents: read
 
@@ -122,6 +131,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-# No pull_request_target, repository secrets, school connections, data-file mounts,
+# Pull-request runs use an owned fictional SQL fixture only. No pull_request_target,
+# repository secrets, school connections, data-file mounts,
 # database/raw-log uploads, public releases, or continue-on-error. Existing desktop CI
 # remains responsible for Windows control/PDF contracts on the same PR.
