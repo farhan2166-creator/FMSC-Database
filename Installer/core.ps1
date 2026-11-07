@@ -1012,6 +1012,7 @@ function Invoke-InstallationDatabaseCheck {
 function Invoke-SqlMigration {
     param([string]$FilePath, [int]$VersionBefore, [int]$ExpectedVersion)
     $fullPath = [IO.Path]::GetFullPath($FilePath)
+    $migrationSql = [IO.File]::ReadAllText($fullPath, [Text.Encoding]::UTF8)
     $wrapperPath = Join-Path ([IO.Path]::GetTempPath()) ('FMSC_migration_' + [Guid]::NewGuid().ToString('N') + '.sql')
     # One sqlcmd connection owns the lock and transaction across every GO batch.
     # Scripts may use a balanced nested transaction and must record their filename version.
@@ -1032,7 +1033,7 @@ DECLARE @Before int=(SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.Datab
 IF @Before IS NULL OR @Before<>$VersionBefore THROW 51000,'Database version changed since migration planning; rerun the installer.',1;
 BEGIN TRANSACTION;
 GO
-:r "$fullPath"
+$migrationSql
 GO
 IF @@TRANCOUNT<>1 THROW 51000,'Migration did not preserve the installer transaction.',1;
 DECLARE @After int=(SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC);
@@ -1041,7 +1042,9 @@ COMMIT TRANSACTION;
 "@
     try {
         [IO.File]::WriteAllText($wrapperPath, $wrapper, [Text.UTF8Encoding]::new($false))
-        $output = & $script:SqlCmdPath -S $SqlInstance -E -d $DatabaseName -C -b -f 65001 -i $wrapperPath 2>&1
+        # Pinned Microsoft go-sqlcmd reads UTF-8 input natively; it does not
+        # support the ODBC sqlcmd-only -f code-page switch.
+        $output = & $script:SqlCmdPath -S $SqlInstance -E -d $DatabaseName -C -b -i $wrapperPath 2>&1
         foreach ($line in $output) { Write-Log $line.ToString() }
         if ($LASTEXITCODE -ne 0) {
             throw "Migration $ExpectedVersion failed. The staged application was not activated. Keep the verified recovery backup and inspect the database before retrying."

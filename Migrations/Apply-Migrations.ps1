@@ -199,11 +199,12 @@ function New-VerifiedBackup {
 function Invoke-OneMigration {
     param([string]$FilePath, [int]$VersionBefore, [int]$ExpectedVersion)
     $fullPath = [IO.Path]::GetFullPath($FilePath)
+    $migrationSql = [IO.File]::ReadAllText($fullPath, [Text.Encoding]::UTF8)
     if ($fullPath.Contains('"') -or $fullPath.Contains([char]10) -or $fullPath.Contains([char]13)) {
         throw 'Migration file path contains characters unsafe for sqlcmd include syntax.'
     }
     $wrapperPath = Join-Path ([IO.Path]::GetTempPath()) ('FMSC_migration_' + [Guid]::NewGuid().ToString('N') + '.sql')
-    # The same wrapper used by Installer/core.ps1. :r preserves GO statements.
+    # Inline UTF-8 SQL preserves GO batches without sqlcmd-specific include quoting.
     # Closing the connection on any sqlcmd error rolls back the outer transaction.
     $wrapper = @"
 :on error exit
@@ -222,7 +223,7 @@ DECLARE @Before int=(SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.Datab
 IF @Before IS NULL OR @Before<>$VersionBefore THROW 51000,'Database version changed since migration planning; rerun the applier.',1;
 BEGIN TRANSACTION;
 GO
-:r "$fullPath"
+$migrationSql
 GO
 IF @@TRANCOUNT<>1 THROW 51000,'Migration did not preserve the installer transaction.',1;
 DECLARE @After int=(SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC);
@@ -231,7 +232,9 @@ COMMIT TRANSACTION;
 "@
     try {
         [IO.File]::WriteAllText($wrapperPath, $wrapper, [Text.UTF8Encoding]::new($false))
-        $output = & $script:ResolvedSqlCmd -S $SqlInstance -E -d $DatabaseName -C -b -f 65001 -i $wrapperPath 2>&1
+        # Pinned Microsoft go-sqlcmd reads UTF-8 input natively; it does not
+        # support the ODBC sqlcmd-only -f code-page switch.
+        $output = & $script:ResolvedSqlCmd -S $SqlInstance -E -d $DatabaseName -C -b -i $wrapperPath 2>&1
         foreach ($line in $output) { Write-Status $line.ToString() }
         if ($LASTEXITCODE -ne 0) {
             throw "Migration $ExpectedVersion failed. Keep the verified recovery backup and inspect the database before any retry."
