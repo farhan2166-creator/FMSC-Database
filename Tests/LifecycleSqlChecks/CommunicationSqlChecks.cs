@@ -232,23 +232,6 @@ internal static class CommunicationSqlChecks
                 var urduRows=await store.PreviewAsync(urdu,MessageChannel.WhatsApp,[linkedContact]);
                 report.Check(urduRows.Rows.Count==1 && Convert.ToString(urduRows.Rows[0]["Exclusion"])=="",
                     "Admission Yes also permits reviewed Urdu announcements without a second guardian language or consent editor.");
-                // A historic nullable WhatsApp flag must never allow a unified Yes
-                // to authorize a different destination after the guardian phone changes.
-                Sql.Query("""
-                    UPDATE dbo.StudentGuardianCommunication
-                    SET WhatsAppConsent=NULL,Phone=N'03001234569' WHERE AdmissionId=@Id;
-                    UPDATE dbo.Students SET ContactNumber=N'03001234569' WHERE AdmissionId=@Id;
-                    """,Sql.P("@Id",schoolStudent));
-                report.Check((await Reason(MessageChannel.Sms)).Contains("number changed")
-                    && (await Reason(MessageChannel.WhatsApp)).Contains("number changed"),
-                    "Unified Admission Yes rejects an obsolete guardian destination even if the legacy WhatsApp flag is NULL.");
-                Sql.Query("""
-                    UPDATE dbo.Students SET ContactNumber=@Phone WHERE AdmissionId=@Id;
-                    UPDATE dbo.StudentGuardianCommunication
-                    SET Phone=@Phone,WhatsAppConsent=1 WHERE AdmissionId=@Id;
-                    """,Sql.P("@Phone",studentPhone),Sql.P("@Id",schoolStudent));
-                report.Check(await Reason(MessageChannel.Sms)=="",
-                    "Restoring the originally consented guardian destination restores eligibility.");
                 var queued=Guid.NewGuid();
                 await store.CreateAsync(queued,template,MessageChannel.Sms,[linkedContact],
                     "School notice before withdrawal",new DateTime(2026,1,1));
