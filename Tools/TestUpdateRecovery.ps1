@@ -194,6 +194,41 @@ try {
     Require ((Get-Content -LiteralPath (Join-Path $app 'FMSC_SMS.exe') -Raw).Contains('old baseline')) 'Safe abort changed the previous application.'
     Require (Test-Path -LiteralPath $script:RecoveryJournal.Backup) 'Safe abort deleted its verified backup.'
     Refuse { Complete-FmscAbortedTransaction -ObservedSchema 5 -ApplicationDirectory $app -RollbackDirectory $rollback }
+    # Exercise the actual core abort decision with inert SQL/backup substitutes.
+    # This tests refusal before state mutation and successful no-migration closure.
+    Invoke-Expression $abortFunction.Extent.Text
+    function Get-InstalledApplicationVersion { return '1.0.8' }
+    function Compare-ApplicationVersion { param($Left,$Right) return -1 }
+    function Initialize-FmscRecoveryConnection { $script:connectionChecks++ }
+    function Assert-FmscRecoveryDatabaseIdentity { $script:identityChecks++ }
+    function Get-DatabaseVersion { return [string]$script:syntheticSchema }
+    function Convert-ToDbVersion { param($Version) return [int]$Version }
+    function Confirm-FmscRecoveryBackup {
+        param([int]$CurrentSchema)
+        $script:backupChecks++
+        if ($CurrentSchema -ne $script:RecoveryJournal.BeforeSchema -or
+            (Get-FileHash -LiteralPath $script:RecoveryJournal.Backup -Algorithm SHA256).Hash -ne
+            $script:RecoveryJournal.BackupSha256) {
+            throw 'Invalid fixture backup.'
+        }
+    }
+    $AppDir = $app; $AppRollbackDir = $rollback
+    $script:connectionChecks = 0; $script:identityChecks = 0; $script:backupChecks = 0
+    $script:RecoveryJournal.Phase = 'Migrating'
+    Save-FmscRecoveryJournal $script:RecoveryRoot $script:RecoveryJournal
+    $script:syntheticSchema = 6
+    Refuse { Invoke-FmscSafeUpdateAbort }
+    Require ((Read-FmscRecoveryJournal $script:RecoveryRoot).Phase -eq 'Migrating') 'Advanced schema was abandoned.'
+    $script:syntheticSchema = 5
+    $script:RecoveryJournal.BackupSha256 = '0' * 64
+    Save-FmscRecoveryJournal $script:RecoveryRoot $script:RecoveryJournal
+    Refuse { Invoke-FmscSafeUpdateAbort }
+    $script:RecoveryJournal.BackupSha256 = (Get-FileHash -LiteralPath $script:RecoveryJournal.Backup -Algorithm SHA256).Hash
+    Save-FmscRecoveryJournal $script:RecoveryRoot $script:RecoveryJournal
+    Invoke-FmscSafeUpdateAbort
+    Require ((Read-FmscRecoveryJournal $script:RecoveryRoot).Phase -eq 'Aborted' -and
+        $script:connectionChecks -eq 3 -and $script:identityChecks -eq 3 -and
+        $script:backupChecks -eq 2) 'Safe abort did not gate SQL identity, schema and backup integrity.'
     # An Aborted journal is terminal; a subsequent approved update may start.
     $previousTransaction = $script:RecoveryJournal.Transaction
     $script:RecoveryJournal = Initialize-FmscRecoveryTransaction $prepared $script:RecoveryRoot $version $schema $sid
@@ -203,7 +238,7 @@ try {
     & icacls.exe $script:RecoveryRoot /grant '*S-1-5-32-545:(M)' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Cannot weaken fixture ACL for refusal test.' }
     Refuse { Read-FmscRecoveryJournal $script:RecoveryRoot }
-    Write-Output 'PASS: interrupted activation and cleanup, safe baseline abort, partial-schema/rollback/missing-application refusal, no retry, next-update acceptance, identity and storage permission guards. No SQL or live installation.'
+    Write-Output 'PASS: interrupted activation and cleanup, safe baseline abort, partial-schema/backup-integrity/rollback/missing-application refusal, no retry, next-update acceptance, identity and storage permission guards. No SQL or live installation.'
 } finally {
     $absolute = [IO.Path]::GetFullPath($script:fixture)
     if (-not $absolute.StartsWith([IO.Path]::GetTempPath(),[StringComparison]::OrdinalIgnoreCase) -or
