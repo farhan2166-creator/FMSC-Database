@@ -86,11 +86,15 @@ try {
     } finally { $launcherProcess.Dispose() }
     Wait-File $completed $null 240
     Require ((Read-FmscRecoveryJournal $recovery).Phase -eq 'Completed') 'Actual resume did not reach Completed.'
-    Require ((Test-Path (Join-Path $installed 'FMSC_SMS.exe')) -and -not (Test-Path "$installed.rollback") -and
-        -not (Test-Path $prepared) -and (Test-Path $marker)) 'Verified cleanup or enrollment-neighbor preservation failed.'
+    # The verified latest prepared package must be retained for repeatable
+    # recovery; only the previous application and superseded downloads go.
+    Require (Test-Path (Join-Path $installed 'FMSC_SMS.exe')) 'Recovery completed without an installed application.'
+    Require (-not (Test-Path "$installed.rollback")) 'Verified recovery did not remove the previous application copy.'
+    Require (Test-Path $prepared) 'Recovery deleted the latest verified prepared package.'
+    Require (Test-Path $marker) 'Recovery removed an unrelated enrollment-neighbor marker.'
     Require ((Get-FileHash (Join-Path $installed 'FMSC_SMS.exe') -Algorithm SHA256).Hash -eq
         (Get-FileHash (Join-Path $SourceApplication 'FMSC_SMS.exe') -Algorithm SHA256).Hash) 'Resumed application executable differs from the source package.'
-    Write-Output 'PASS: actual prepared installer killed after old-app rename; real stable launcher elevated and resumed the existing installer, verified activation and cleaned rollback/payload while preserving enrollment neighbors. Restart observed, not interactively launched.'
+    Write-Output 'PASS: actual prepared installer killed after old-app rename; real stable launcher elevated and resumed the existing installer, verified activation, removed rollback and retained the latest verified prepared package while preserving enrollment neighbors. Restart observed, not interactively launched.'
 } finally {
     if ($child) { if (-not $child.HasExited) { $child.Kill($true);$child.WaitForExit() };$child.Dispose() }
     if ($original) { if (-not $original.HasExited) { $original.Kill($true);$original.WaitForExit() };$original.Dispose() }
