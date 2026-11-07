@@ -1206,7 +1206,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
         var guardianEmailField = AdmissionField("Guardian email (optional)", guardianEmail, false);
         guardianGrid.Controls.Add(guardianEmailField, 0, 2);
         guardianGrid.SetColumnSpan(guardianEmailField, 2);
-        var guardianConsentField = AdmissionField("Agreed to WhatsApp messages?", guardianConsent, false);
+        var guardianConsentField = AdmissionField("School messages? (SMS, WhatsApp, fees and notices)", guardianConsent, false);
         guardianGrid.Controls.Add(guardianConsentField, 2, 2);
         guardianGrid.SetColumnSpan(guardianConsentField, 2);
         int studentInfoHeight =
@@ -2717,7 +2717,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             PakistanPhoneNumber.ValidationMessage, () => IsValidOptionalPhone(altContact.Text));
         v.Check(guardianEmail, IsGuardianEmailValid(), "Enter a single email address or leave it blank.", IsGuardianEmailValid);
         v.Check(contact, guardianConsent.SelectedIndex!=1 || !string.IsNullOrWhiteSpace(contact.Text),
-            "Enter the guardian's primary phone to record WhatsApp consent.");
+            "Enter the guardian's primary phone to record school messaging consent.");
         v.Check(bform, IsValidOptionalBFormOrCnic(bform.Text),
             "Enter 13 digits, with or without dashes", () => IsValidOptionalBFormOrCnic(bform.Text));
         if (!isNew)
@@ -2811,7 +2811,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             }
             var guardian = await DatabaseHelper.QuerySqlAsync("""
                 EXEC dbo.RequirePermission @UserId,N'Students.View';
-                SELECT Email, Phone, WhatsAppConsent FROM dbo.StudentGuardianCommunication WHERE AdmissionId=@AdmissionId;
+                SELECT Email,Phone,SchoolCommunicationConsent FROM dbo.StudentGuardianCommunication WHERE AdmissionId=@AdmissionId;
                 """, DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@AdmissionId", admissionId));
             if (IsDisposed || version != admissionLoadVersion) return false;
             DataRow row = dt.Rows[0];
@@ -2880,7 +2880,8 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                       ?? string.Empty;
             guardianEmail.Text = guardian.Rows.Count == 0 ? "" : Convert.ToString(guardian.Rows[0]["Email"]) ?? "";
             guardianConsent.SelectedIndex = guardian.Rows.Count > 0 &&
-                Convert.ToBoolean(guardian.Rows[0]["WhatsAppConsent"]) &&
+                guardian.Rows[0]["SchoolCommunicationConsent"] is not DBNull &&
+                Convert.ToBoolean(guardian.Rows[0]["SchoolCommunicationConsent"]) &&
                 string.Equals(Convert.ToString(guardian.Rows[0]["Phone"]),contact.Text.Trim(),StringComparison.Ordinal) ? 1 : 0;
             address.Text =
                 row["Address"] == DBNull.Value
