@@ -26,6 +26,10 @@ jobs:
     uses: ./.github/workflows/fmsc-disposable-windows-install.yml
     with:
       test_scope: complete
+    # Only this dedicated read-only credential crosses into the trusted,
+    # reusable SQL acceptance workflow. Never pass the publishing token.
+    secrets:
+      FMSC_SANDBOX_READ_TOKEN: ${{ secrets.FMSC_SANDBOX_READ_TOKEN }}
     permissions:
       contents: read
 
