@@ -1,38 +1,100 @@
-# Private sandbox MDF/LDF release acceptance
+# Private MDF/LDF release acceptance (Sandbox-owned)
 
-## Fixed, one-time baselines
+## Immutable fixture baselines
 
-The owner-approved, **private** `farhan2166-creator/FMSC-Sandbox` repository contains independently extracted, synthetic-only SQL Server LocalDB pairs:
+Private `farhan2166-creator/FMSC-Sandbox` retains exact synthetic-only SQL
+LocalDB pairs extracted once, pinned at commit
+`5a8c5130c9d7b76552bb73a753cd44c4d192d2d0`:
 
-| Baseline | Checked-in Git LFS paths | Intended test |
+| Baseline | Permanent files | Acceptance |
 | --- | --- | --- |
-| Schema 3 | `Database/v3/FMSC_DB.mdf`, `Database/v3/FMSC_DB_log.ldf` | Real installer upgrades through all pending migrations |
-| Schema 7 | `Database/v7/FMSC_DB.mdf`, `Database/v7/FMSC_DB_log.ldf` | Real installer accepts an already current schema, or runs later migrations |
+| schema 3 | `Database/v3/FMSC_DB.mdf`, `Database/v3/FMSC_DB_log.ldf` | Apply migrations 4–7, verify full contract, then test actual installer |
+| schema 7 | `Database/v7/FMSC_DB.mdf`, `Database/v7/FMSC_DB_log.ldf` | Verify full contract, then test actual installer |
 
-Both baselines are permanently pinned to private sandbox commit `5a8c5130c9d7b76552bb73a753cd44c4d192d2d0`. They must not be replaced or edited during release runs. New migrations change source SQL only; these master fixtures remain frozen. A future deliberate fixture rotation requires reviewing the SQL schema/data, manifest checksums, pin SHA, and a fresh two-version Windows acceptance.
+Check the pinned checkout's original SHA-256/size values against
+`Tests/manifest.json`. Never attach or change the checked-in MDF/LDF:
+**all writes, migrations, extended-property adjustments, and installer
+operations must run against independent disposable copies**. Verify empty
+student/user tables and a dedicated synthetic ownership marker; perform
+`DBCC CHECKDB`.
 
-`Schema/Latest.dacpac` in FMSC-Sandbox is an optional *inspection* model that the owner may refresh. It is not the source of real release-acceptance databases, nor does it replace the historical DACPAC in this repository.
+These baselines are intentionally frozen as the application advances. New
+SQL revisions require numbered `Migrations/N.sql` updates and a renewed
+two-baseline migration/installer test. Never silently replace the fixtures.
 
-## One-time owner secret setup
+The root `FMSC-Source/fmsc.dacpac` is for manual inspection only. Its
+presence, freshness, content, checksum, and modification time are **not**
+workflow prerequisites. The old, independently committed
+`Tests/LifecycleSqlChecks/Baseline/schema.dacpac` is a static public smoke
+fixture; it is **not** trusted release acceptance and is not refreshed by
+the root DACPAC.
 
-The public `FMSC-Source` repository's default `GITHUB_TOKEN` **cannot** read a separate private repository. This must not be bypassed by making the fixture repository public or by reusing the private-update publishing token.
+`FMSC-Sandbox/Latest.dacpac` and its instructions are retired and must
+not be recreated as workflow dependencies.
 
-1. Create a **fine-grained personal access token** under GitHub account settings → Developer settings → Personal access tokens → Fine-grained tokens. Set repository owner to the owner of FMSC-Sandbox; choose **Only select repositories → FMSC-Sandbox**. Grant repository **Contents: Read-only** (Metadata read is automatic). Do not grant write, Issues, Actions, Administration, or FMSC-Updates access. Apply reasonable expiration and rotate when necessary.
-2. In **FMSC-Source → Settings → Secrets and variables → Actions → New repository secret**, create exactly `FMSC_SANDBOX_READ_TOKEN` containing that value. Never put a token in scripts, workflow YAML, source files, or chat messages.
-3. After the secret is configured, execute **02 - Release - Windows Installation Acceptance** with `test_scope=complete` on `main`. Check BOTH Windows matrix jobs (`schema 3` and `schema 7`) pass, then and only then use workflow 04 for build/publication.
+## Trusted execution and publication
 
-A missing or expired token blocks both trusted full-install matrix jobs and therefore **blocks workflow 04**. Do not add a skip/fallback for trusted release runs.
+1. On **Sandbox main**, run the permanent **Private SQL + Windows Installer
+   Acceptance** workflow. Its jobs check out a **specific public Source
+   commit** and the exact pinned private fixture revision with Git LFS,
+   with `persist-credentials: false`. The dedicated SQL jobs must pass
+   schema-3 migrations 4–7, full `Core/DatabaseCompatibilityRequirements.json`
+   checks (objects, columns, parameters, table types, unique indexes,
+   triggers, trusted FKs, check constraints, typed recovery GUID) and
+   schema-7 compatibility. Only then can the real Windows-installer jobs
+   run against both independent fixture copies. No real school data,
+   fixture bytes or database backups are uploaded as artifacts.
+2. A distinct, trusted **attestation** job runs only after *both* SQL
+   and *both* installer jobs pass. It verifies that the tested Source SHA
+   is still the current `FMSC-Source/main` head, then writes a single
+   commit status in FMSC-Source:
+   `fmsc/sandbox-mdf-ldf/v1` = `success`, bound to that exact SHA.
+   No attestation is issued for PR heads, moving main branches, skipped
+   matrix jobs, failures, missing credentials, or cancelled runs.
+3. **Workflow 04** in public Source checks the newest matching status
+   for its exact `github.sha` and the expected attestor identity,
+   description and Sandbox run target. It also verifies that `main`
+   still points at that SHA. A missing/failing/untrusted status blocks
+   **both build-only and publication** before packaging. The publishing
+   step repeats the gate immediately before it uses the separate
+   `FMSC_UPDATES_PUBLISH_TOKEN` credential.
 
-## Security and coverage
+The cross-repository flow is **Sandbox → public Source commit status**:
+Source never needs permission to read the private Sandbox. Sandboxed
+source scripts never have access to the attestation or publication token.
+Public Source PRs may run independent synthetic smoke checks; those are
+not release authorization.
 
-- Trusted full release acceptance on `main`: GitHub Actions checks out the private fixture repository at an exact commit using read-only token, downloads its Git LFS content, validates SHA-256/byte counts from `Tests/manifest.json`, copies the pair, attaches a **second isolated copy** in LocalDB, checks database version and disposable marker, rejects student/user data, runs `DBCC CHECKDB`, drops the probe, then hands an **unattached copy** to the real Windows installer. Actual installer applies pending numbered SQL migrations. The installed app, recovery launcher, optional module behavior, backups and synthetic Level 3 preservation are tested.
-- Public/untrusted pull requests: independent DACPAC/LocalDB regression **without** access to the private sandbox token. This is independent early smoke testing; only trusted release runs can certify private fixture-upgrade acceptance. The release workflow never publishes from a PR.
-- **No** MDF/LDF/NDF/BAK/ZIP database artifacts or SQL connection credentials are uploaded to public workflow artifacts or included in private app updates; the workflow only uploads sanitized evidence. Run failures block publication.
-- The current snapshots are *mostly empty* synthetic schemas; Level 3 adds minimal fictional role/user/school records after migrations. Rich data-**preservation during migration** coverage requires reviewed deterministic synthetic-data seed scripts on disposable copies before the migration step. Do not claim that full production-like data coverage exists yet.
-- Real school databases must never be attached to, pushed into, or anonymized in this repository; deleting records is not safe sanitization.
+## One-time least-privilege credential
 
-## Migration and release policy
+In **FMSC-Sandbox → Settings → Secrets and variables → Actions**, configure
+`FMSC_SOURCE_ATTEST_TOKEN`. Use a fine-grained GitHub token restricted to
+**only `farhan2166-creator/FMSC-Source`**, with **Commit statuses:
+Read and write** and automatic Metadata read. No Contents write,
+Actions write, repository admin, Sandbox read, or FMSC-Updates access.
+Keep this token only in the final Sandbox attestation job. If unavailable
+or expired, do not write approval, and Workflow 04 stays blocked.
 
-The original schema-1 DACPAC continues to support public PR regression tests but is **not required by trusted workflow 04 publication acceptance**. Application-only versions still bump the app version separately from the database version; a new database revision requires the next numbered `Migrations/N.sql`. Version labels do not themselves establish physical schema equivalence: the trusted gate checks the attached database's actual `dbo.DatabaseVersion` and runs migration/compatibility checks.
+The public Source workflow continues using its existing, separate
+`FMSC_UPDATES_PUBLISH_TOKEN` solely for final updates publication.
+It does **not** require `FMSC_SANDBOX_READ_TOKEN`.
 
-Do not merge or publish on a failed or cancelled full SQL/Windows acceptance.
+## Testing, limitations and release discipline
+
+- A synthetic fixture may require resetting filesystem read-only
+  flags/ACLs and converting `FMSC_QuickRegistrationScope` from a
+  DacFx-persisted SQL `varchar` to a native `uniqueidentifier`.
+  Apply these repairs **only to disposable copies**, never the master
+  fixture. A valid GUID string alone is not sufficient.
+- Installer success and matching `dbo.DatabaseVersion` are not enough:
+  enforce the full production structural manifest after migrations and
+  real installer execution.
+- Test reports are sanitized; do not upload MDF, LDF, NDF, BAK,
+  exported schools, credentials or source checkout archives.
+- Baselines mostly lack user/student records. Migration *data-preservation*
+  coverage beyond the deterministic synthetic records remains limited.
+  Do not claim live-school upgrade, interactive GUI, physical-printer,
+  reboot or clean-MSI coverage without independent evidence.
+- Do not bump an application/database version or publish a release just
+  to repair this gate. Retire temporary one-off diagnostic workflows
+  after acceptance succeeds and commit their removal separately.
