@@ -19,6 +19,8 @@ internal sealed record DatabaseCompatibilityFailure(
         long.TryParse(RequiredVersion, NumberStyles.None, CultureInfo.InvariantCulture, out long required)
             ? found.CompareTo(required) : null;
 
+    internal bool IsDatabaseOlder => Issue == DatabaseCompatibilityIssue.SchemaVersion && VersionDirection < 0;
+
     internal string Title => Issue switch {
         DatabaseCompatibilityIssue.SchemaVersion when VersionDirection < 0 => "Database update required",
         DatabaseCompatibilityIssue.SchemaVersion when VersionDirection > 0 => "Application update required",

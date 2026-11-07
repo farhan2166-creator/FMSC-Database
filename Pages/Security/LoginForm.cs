@@ -1,9 +1,12 @@
 using FMSC_SMS.Core;
+using FMSC_SMS.Core.Updates;
 namespace FMSC_SMS.Pages.Security;
 public sealed class LoginForm : ApplicationWindowForm
 {
     private readonly Func<string, string, (bool Success, string Message, Exception? ConnectionFailure)> signIn;
     private bool signingIn;
+    private readonly StartupUpdateController startupUpdates;
+    internal PreparedUpdate? PendingUpdate => startupUpdates.PendingUpdate;
     readonly ModernTextBox user = HumanUi.TextBox(false, 100);
     readonly ModernTextBox pass = HumanUi.TextBox(false, 100);
     readonly ModernButton login = new() { Text = "Sign In", Dock = DockStyle.Fill };
@@ -14,7 +17,8 @@ public sealed class LoginForm : ApplicationWindowForm
     internal LoginForm(Func<string, string, (bool Success, string Message, Exception? ConnectionFailure)> signIn,
         bool checkConnectionOnStartup = false,
         Func<bool, (bool Connected, string Message, Exception? Failure)>? connect = null,
-        Func<bool>? completeFirstRun = null)
+        Func<bool>? completeFirstRun = null,
+        Func<Form, Control, StartupUpdateController>? startupUpdateFactory = null)
     {
         this.signIn = signIn;
         FormClosing += (_, e) => { if (signingIn) e.Cancel = true; };
@@ -184,6 +188,7 @@ public sealed class LoginForm : ApplicationWindowForm
         var content = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
         content.Controls.Add(shell);
         Controls.Add(content);
+        startupUpdates = startupUpdateFactory?.Invoke(this, content) ?? new StartupUpdateController(this, content);
         FormClosed += (_, _) => logo.Image?.Dispose();
         AcceptButton = login;
         // Login must retain username -> Tab -> password -> Enter to sign in.
@@ -208,7 +213,7 @@ public sealed class LoginForm : ApplicationWindowForm
                 ClientSize = AppMetrics.StartupDialogClientSize;
                 shell.Visible = true;
                 user.Focus();
-            }, connect);
+            }, connect, startupUpdates.Open);
             content.Controls.Add(connection);
             shell.Visible = false;
             connection.BringToFront();

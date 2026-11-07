@@ -39,13 +39,18 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
     private PreparedUpdate? _prepared;
     private VerifiedUpdate? _release;
     private UpdateDownloadChoice _method;
+    private readonly int _installedSchema;
+    private readonly Func<bool> _networkAvailable;
     private static string InstalledVersion => typeof(UpdateConnectionForm).Assembly
         .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
         .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().First().InformationalVersion.Split('+')[0];
     private readonly CancellationTokenSource _lifetime = new();
 
-    internal UpdateConnectionForm(Func<(bool Enrolled, string PublicKey)>? authorization = null)
+    internal UpdateConnectionForm(Func<(bool Enrolled, string PublicKey)>? authorization = null, int? installedSchema = null,
+        Func<bool>? networkAvailable = null)
     {
+        _networkAvailable = networkAvailable ?? System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable;
+        _installedSchema = installedSchema ?? int.Parse(DatabaseHelper.RequiredDatabaseSchemaVersion);
         _authorization = authorization ?? (() => (UpdateDeviceKey.IsEnrolled,
             UpdateDeviceKey.IsEnrolled ? UpdateDeviceKey.GetPublicKey() : ""));
         Text = "FMSC — Check for Updates";
@@ -196,7 +201,7 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
 
     private void CenterOnOwnerScreen()
     {
-        if (!Visible) return;
+        if (!Visible || !TopLevel) return;
         var area = Screen.FromControl(Owner ?? this).WorkingArea;
         Location = new Point(area.Left + Math.Max(0, (area.Width - Width) / 2),
             area.Top + Math.Max(0, (area.Height - Height) / 2));
@@ -205,9 +210,17 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
     private void SetContentSize(bool expanded)
     {
         // Match login at rest; grow only for computer authorization or transfer details.
-        ClientSize = new Size(AppMetrics.StartupDialogClientSize.Width,
+        var size = new Size(AppMetrics.StartupDialogClientSize.Width,
             Math.Max(AppMetrics.StartupDialogClientSize.Height,
                 AppScale.S((expanded ? 580 : 405) + (_showTransferStats ? 65 : 0))));
+        if (!TopLevel && TopLevelControl is Form host && host != this)
+        {
+            host.ClientSize = size;
+            if (host is ApplicationWindowForm window)
+                window.FitToWorkingArea(Screen.FromControl(host).WorkingArea, host.DeviceDpi);
+        }
+        else
+            ClientSize = size;
         CenterOnOwnerScreen();
     }
 
@@ -263,6 +276,11 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
             _accessStatus.Text = state.Enrolled ? "Computer key ready" : "Authorization required";
             _status.Text = state.Enrolled ? "Select Check for Updates to contact the private update repository." :
                 "Authorize this computer before checking for updates.";
+            if (_installedSchema < int.Parse(DatabaseHelper.RequiredDatabaseSchemaVersion))
+                _status.Text = "Your school database needs an update before sign-in.\r\n\r\n" +
+                    (state.Enrolled ? "Connect to the internet and choose Check for Updates. After downloading, choose Install Update. " +
+                        "FMSC Setup will back up your school data and apply the required updates." :
+                        "Ask the administrator to authorize this computer, then connect to the internet and choose Check for Updates.");
         }
         catch (Exception error) when (error is CryptographicException or IOException or UnauthorizedAccessException or InvalidDataException)
         {
@@ -305,6 +323,11 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         _progress.Style = ProgressBarStyle.Marquee;
         try
         {
+            if (!_networkAvailable())
+            {
+                _status.Text = "This computer is offline. Connect to the internet, then choose Check for Updates again. Your school records have not been changed.";
+                return;
+            }
             await using var session = await UpdateGitSession.OpenAsync(_lifetime.Token);
             if (!await session.HasStableFeedAsync(_lifetime.Token))
             {
@@ -317,7 +340,7 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
             if (IsDisposed || Disposing) return;
             if (release is null) return;
             _method = await Task.Run(() => UpdateReleasePreparer.Choose(release, InstalledVersion,
-                int.Parse(DatabaseHelper.RequiredDatabaseSchemaVersion), AppContext.BaseDirectory), _lifetime.Token);
+                _installedSchema, AppContext.BaseDirectory), _lifetime.Token);
             if (IsDisposed || Disposing) return;
             _release = release;
             _latestVersion.Text = release.Manifest.Version;
@@ -373,7 +396,9 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
                                          or System.ComponentModel.Win32Exception or InvalidOperationException)
         {
             if (!IsDisposed && !Disposing)
-                _status.Text = "Unable to check updates safely: " + error.Message;
+                _status.Text = "Unable to check updates safely: " + error.Message +
+                    "\r\n\r\nCheck your internet connection, then choose Check for Updates to try again. " +
+                    "If the internet is working, ask the administrator to check this computer's update access.";
         }
         finally
         {

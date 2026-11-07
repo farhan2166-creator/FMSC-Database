@@ -20,6 +20,16 @@
   Windows login changes/reinstalls may require re-enrollment.
 - Account → **Check for Updates** is manual; no automatic program shutdown,
   replacement, or database migrations while the school works.
+- Before sign-in, detecting an older database automatically transitions to the
+  existing updater inside the same startup window. The user checks the repository
+  once, on that updater screen; no automatic network check or installation occurs.
+  Closing it returns to connection guidance with **Open Updates** in place of
+  Reconnect/Restart Connection. Installation requires
+  an explicit **Install Update** confirmation. The updater receives the detected
+  database version and uses the existing guarded installer for backups and migrations.
+  Internet failures explain how to retry; no database login is needed to check updates.
+  A newer application release must be published, including when application files
+  were replaced manually before the database was upgraded.
 - Prefer a changed-file incremental download for an EXACT matching installed
   version and file inventory. Otherwise use the full package.
 - A database schema mismatch routes to the existing guarded installer/migration

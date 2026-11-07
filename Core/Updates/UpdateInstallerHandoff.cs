@@ -45,9 +45,7 @@ internal static class UpdateInstallerHandoff
         throw new InvalidOperationException("Disposable test builds cannot activate school updates.");
 #else
         Validate(prepared);
-        if (!Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory).Equals(
-            @"C:\FMSC School Management", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Automatic update installation supports the existing standard installation folder only.");
+        EnsureInstalledLocation();
         using var original = Process.GetCurrentProcess();
         // Run the same native GUI launcher as the full installer. The launcher
         // elevates hidden PowerShell; core.ps1 retains process identity checks,
@@ -60,5 +58,12 @@ internal static class UpdateInstallerHandoff
             original.StartTime.ToUniversalTime().Ticks + " " + WindowsIdentity.GetCurrent().User!.Value;
         Process.Start(start)?.Dispose();
 #endif
+    }
+
+    internal static void EnsureInstalledLocation()
+    {
+        if (!Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory).Equals(
+            @"C:\FMSC School Management", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Automatic update installation supports the existing standard installation folder only.");
     }
 }

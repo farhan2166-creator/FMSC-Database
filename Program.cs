@@ -36,7 +36,20 @@ internal static class Program
         AppExceptionHandler.Register();
         MainDashboardForm.PrimeInitialScale();
         using var login = new LoginForm(checkConnectionOnStartup: true);
-        if (login.ShowDialog() != DialogResult.OK)
+        var loginResult = login.ShowDialog();
+        if (login.PendingUpdate is { } prepared)
+        {
+            try { FMSC_SMS.Core.Updates.UpdateInstallerHandoff.Launch(prepared); }
+            catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or
+                InvalidOperationException or System.Text.Json.JsonException or System.ComponentModel.Win32Exception)
+            {
+                ModernMessageDialog.ShowWarning(null,
+                    "The installer could not start. Reopen FMSC and choose Check for Updates to try again. " + error.Message,
+                    "FMSC Update");
+            }
+            return;
+        }
+        if (loginResult != DialogResult.OK)
             return;
         if (CurrentUser.MustChangePassword)
         {

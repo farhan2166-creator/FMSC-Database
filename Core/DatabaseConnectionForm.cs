@@ -35,6 +35,9 @@ internal sealed class DatabaseConnectionView : UserControl
     private readonly Form _host;
     private readonly Action<DatabaseConnectionView>? _connected;
     private readonly Func<bool, (bool Connected, string Message, Exception? Failure)> _connect;
+    private readonly Action<int>? _checkUpdates;
+    private readonly ModernButton _updates = new() { Text = "Open Updates", ThemeRole = "Primary", Visible = false };
+    private int? _olderSchema;
     private readonly Label _message = new() { Dock = DockStyle.Top, AutoSize = true };
     private readonly Label _status = new() { Dock = DockStyle.Fill, AutoSize = false };
     private readonly ProgressBar _progress = new() { Dock = DockStyle.Fill, Style = ProgressBarStyle.Marquee };
@@ -51,15 +54,17 @@ internal sealed class DatabaseConnectionView : UserControl
     private bool _canRepair;
 
     internal bool Busy => _busy;
-    internal IButtonControl AcceptAction => _reconnect;
+    internal IButtonControl AcceptAction => _olderSchema.HasValue && _checkUpdates is not null ? _updates : _reconnect;
     internal IButtonControl CancelAction => _close;
 
     internal DatabaseConnectionView(Form host, Action<DatabaseConnectionView>? connected,
-        Func<bool, (bool Connected, string Message, Exception? Failure)>? connect = null)
+        Func<bool, (bool Connected, string Message, Exception? Failure)>? connect = null,
+        Action<int>? checkUpdates = null)
     {
         _host = host;
         _connected = connected;
         _connect = connect ?? CheckConnection;
+        _checkUpdates = checkUpdates;
         Dock = DockStyle.Fill;
         AutoScaleMode = AutoScaleMode.None;
         int gap = UiDesignSystem.Spacing.Md;
@@ -116,7 +121,7 @@ internal sealed class DatabaseConnectionView : UserControl
             AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
             Anchor = AnchorStyles.None, WrapContents = false, Padding = Padding.Empty, Margin = Padding.Empty
         };
-        foreach (var button in new[] { _reconnect, _restart, _repair })
+        foreach (var button in new[] { _reconnect, _restart, _repair, _updates })
         {
             button.Height = AppMetrics.ButtonHeight;
             button.Width = TextRenderer.MeasureText(button.Text, button.Font).Width + AppScale.S(36);
@@ -151,6 +156,9 @@ internal sealed class DatabaseConnectionView : UserControl
         Controls.Add(root);
         _reconnect.Click += async (_, _) => await ConnectAsync(false);
         _restart.Click += async (_, _) => await ConnectAsync(true);
+        _updates.Click += (_, _) => {
+            if (!_busy && _olderSchema is int schema) _checkUpdates?.Invoke(schema);
+        };
 #if FMSC_LEVEL2
         // This fixture may reconnect, but must never launch the school installer.
         _repair.Visible = false;
@@ -177,7 +185,7 @@ internal sealed class DatabaseConnectionView : UserControl
     private void SetBusy(bool busy)
     {
         _busy = busy;
-        foreach (var button in new[] { _reconnect, _restart, _repair, _close }) button.Enabled = !busy;
+        foreach (var button in new[] { _reconnect, _restart, _repair, _updates, _close }) button.Enabled = !busy;
         _restart.Enabled = !busy && _canRestart;
         _repair.Enabled = !busy && _canRepair;
         _progress.Visible = busy;
@@ -197,6 +205,7 @@ internal sealed class DatabaseConnectionView : UserControl
             if (IsDisposed) return;
             if (result.Connected)
             {
+                SetUpdateAction(null);
                 _canRestart = true;
                 _canRepair = false;
                 _repair.Visible = false;
@@ -215,6 +224,9 @@ internal sealed class DatabaseConnectionView : UserControl
                 ex);
         }
         finally { if (!IsDisposed) SetBusy(false); }
+        // A connected but outdated database needs the existing updater, not
+        // another connection action. Only transition after releasing Busy.
+        if (!IsDisposed && _olderSchema is int schema) _checkUpdates?.Invoke(schema);
     }
 
     private static (bool Connected, string Message, Exception? Failure) CheckConnection(bool restart)
@@ -226,6 +238,16 @@ internal sealed class DatabaseConnectionView : UserControl
 
     private void ShowFailure(string message, Exception? failure = null)
     {
+        int? olderSchema = null;
+        string requiredVersion = DatabaseHelper.RequiredDatabaseSchemaVersion;
+        for (Exception? current = failure; current is not null; current = current.InnerException)
+            if (current is DatabaseCompatibilityException compatibility && compatibility.Failure.IsDatabaseOlder &&
+                int.TryParse(compatibility.Failure.FoundVersion, out int schema) && schema >= 0)
+            {
+                olderSchema = schema;
+                requiredVersion = compatibility.Failure.RequiredVersion;
+            }
+        SetUpdateAction(olderSchema);
         var guidance = DatabaseConnectionGuidance.Create(message, failure,
 #if FMSC_LEVEL2
             File.Exists(Path.Combine(Level2Target.Root,"database","fixture.mdf")));
@@ -242,7 +264,26 @@ internal sealed class DatabaseConnectionView : UserControl
         _repair.Visible = _canRepair;
         _status.Text = guidance.Status;
         _message.Text = guidance.Message;
+#if !FMSC_LEVEL2
+        if (_olderSchema.HasValue && _checkUpdates is not null)
+            _message.Text = $"Your database is connected, but it needs an update before you can sign in.\r\n\r\n" +
+                $"Database schema version: {_olderSchema}. Required by this application: {requiredVersion}.\r\n\r\n" +
+                "Choose Open Updates to return to the updater. Connect to the internet, check for updates, then download the approved release and choose Install Update. " +
+                "FMSC Setup will back up your school data and apply the required database updates.";
+#endif
         _details.Text = ConnectionDetails(message + (failure is null ? "" : "\r\n\r\n" + failure));
+    }
+
+    private void SetUpdateAction(int? olderSchema)
+    {
+#if FMSC_LEVEL2
+        olderSchema = null;
+#endif
+        _olderSchema = olderSchema;
+        bool offerUpdates = olderSchema.HasValue && _checkUpdates is not null;
+        _updates.Visible = offerUpdates;
+        _reconnect.Visible = _restart.Visible = !offerUpdates;
+        _host.AcceptButton = AcceptAction;
     }
 
     private async Task RepairDependenciesAsync()
