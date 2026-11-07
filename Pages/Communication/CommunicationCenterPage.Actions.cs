@@ -259,7 +259,7 @@ public sealed partial class CommunicationCenterPage
     }
     private Control BuildContacts()=>ListHost(contacts,Bar([Button("Refresh",RefreshContacts,"Communication.Configure"),..Paging(contacts,()=>contactPage,value=>contactPage=value,RefreshContacts,"Communication.Configure"),
         Button("Add From School Records",async()=>{var candidate=await PickCandidate();if(candidate is not null)await EditContact(null,candidate);},"Communication.Configure"),
-        Button("Add Manual Contact",()=>EditContact(null,null),"Communication.Configure"),Button("Edit Contact / Consent",()=>EditContact(Selected(contacts)??throw new ArgumentException("Select a contact first."),null),"Communication.Configure",selectedGrid:contacts)]));
+        Button("Add Manual Contact",()=>EditContact(null,null),"Communication.Configure"),Button("Edit Contact",()=>EditContact(Selected(contacts)??throw new ArgumentException("Select a contact first."),null),"Communication.Configure",selectedGrid:contacts)]));
     private Task<DataRow?> PickCandidate()
     {
         using var dialog=new ApplicationWindowForm{Text="Choose Student, Family or Staff Contact",ClientSize=new Size(AppScale.Scale(1050),AppScale.Scale(650)),ShowInTaskbar=false,StartPosition=FormStartPosition.CenterParent};
