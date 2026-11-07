@@ -53,9 +53,9 @@ internal static class UpdateStartupGuard
         if (record.RootElement.ValueKind != JsonValueKind.Object ||
             !record.RootElement.TryGetProperty("Format", out var format) || format.ValueKind != JsonValueKind.String ||
             format.GetString() != "fmsc-recovery/v1" || !record.RootElement.TryGetProperty("Phase", out var phase) ||
-            phase.ValueKind != JsonValueKind.String || phase.GetString() is not ("Prepared" or "Migrating" or "Activating" or "Verified" or "Completed"))
+            phase.ValueKind != JsonValueKind.String || phase.GetString() is not ("Prepared" or "Migrating" or "Activating" or "Verified" or "Completed" or "Aborted"))
             throw new InvalidDataException("The update recovery record is invalid. Contact support.");
-        return phase.GetString() != "Completed";
+        return phase.GetString() is not ("Completed" or "Aborted");
     }
 
     private static void ValidateRecoveryStorage(string root)
