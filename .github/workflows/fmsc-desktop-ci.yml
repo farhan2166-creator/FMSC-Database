@@ -7,6 +7,9 @@ on:
     paths:
       - 'Core/Updates/**'
       - 'Tests/ThemeSmokeChecks/**'
+      - 'Tests/HelpChecks/**'
+      - 'Tests/ReportReadChecks/**'
+      - 'Tools/test_permission_policy.py'
       - 'Core/MaintenanceTools.cs'
       - 'Core/SqlDependencyRepair.cs'
       - 'Installer/**'

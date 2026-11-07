@@ -1,5 +1,4 @@
-using System.IO.Compression;
-using System.Xml.Linq;
+using System.Text.Json;
 using Microsoft.SqlServer.TransactSql.ScriptDom;
 using FMSC_SMS.Pages.Reports.Finance;
 using FMSC_SMS.Pages.Reports.Certificates;
@@ -21,8 +20,8 @@ internal static partial class Program
             }
         }
         var folder=new DirectoryInfo(AppContext.BaseDirectory);
-        while(folder is not null && !File.Exists(Path.Combine(folder.FullName,"fmsc.dacpac")))folder=folder.Parent;
-        if(folder is null)throw new InvalidOperationException("Run checks from a checkout containing fmsc.dacpac.");
+        while(folder is not null && !File.Exists(Path.Combine(folder.FullName,"Core","DatabaseCompatibilityRequirements.json")))folder=folder.Parent;
+        if(folder is null)throw new InvalidOperationException("Run checks from a checkout containing the production SQL manifest.");
         string migration=File.ReadAllText(Path.Combine(folder.FullName,"Tests","LifecycleSqlChecks","Baseline","Sql","GetOutstandingAndAgingReport.sql"));
         string collectionMigration=File.ReadAllText(Path.Combine(folder.FullName,"Tests","LifecycleSqlChecks","Baseline","Sql","GetCollectionsAndReceiptsReport.sql"));
         new TSql160Parser(true).Parse(new StringReader(collectionMigration),out var collectionErrors);
@@ -38,9 +37,12 @@ internal static partial class Program
             "Debt reader separates overdue, due today and future charges");
         Check(System.Text.RegularExpressions.Regex.Matches(migration,@"FatherName \[__StudentFatherName\], Gender \[__StudentGender\]").Count==2,
             "Student and charge debt views return private recorded parent/gender metadata");
-        using var archive=ZipFile.OpenRead(Path.Combine(folder.FullName,"fmsc.dacpac"));
-        using var stream=archive.GetEntry("model.xml")!.Open();var model=XDocument.Load(stream);
-        var columns=model.Descendants().Where(e=>(string?)e.Attribute("Type") is "SqlSimpleColumn" or "SqlComputedColumn").Select(e=>(string?)e.Attribute("Name")).ToHashSet();
+        // Verify against the application's committed production SQL contract.
+        // The root DACPAC is solely an optional owner inspection artifact.
+        using var contract=JsonDocument.Parse(File.ReadAllText(Path.Combine(folder.FullName,"Core","DatabaseCompatibilityRequirements.json")));
+        var columns=contract.RootElement.GetProperty("columns").EnumerateArray()
+            .Select(e=>$"[{e.GetProperty("schema").GetString()}].[{e.GetProperty("objectName").GetString()}].[{e.GetProperty("name").GetString()}]")
+            .ToHashSet(StringComparer.Ordinal);
         var required=new Dictionary<string,string[]> {
             ["StudentCreditEntries"]=new[]{"AdmissionId","Amount","CreatedAt"},
             ["Students"]=new[]{"AdmissionId","AdmissionNumber","QuickReference","StudentName","FatherName","Gender","Status"},
@@ -55,7 +57,7 @@ internal static partial class Program
             ["Campuses"]=new[]{"CampusId","CampusName","DisplayOrder"},["Classes"]=new[]{"ClassId","ClassName","DisplayOrder"},["Sections"]=new[]{"SectionId","SectionName","DisplayOrder"}
         };
         foreach(var (table,fields) in required)foreach(string field in fields)
-            Check(columns.Contains($"[dbo].[{table}].[{field}]"),$"DACPAC contains {table}.{field}");
+            Check(columns.Contains($"[dbo].[{table}].[{field}]"),$"Production SQL contract contains {table}.{field}");
         foreach(var (table,key,staff,date) in new[] {
             ("CharacterCertificates","CertificateRecordId",false,"CertificateDate"),("DateOfBirthCertificates","CertificateRecordId",false,"CertificateDate"),
             ("LeaveCertificates","LeaveRecordId",false,"LeaveDate"),("RegularStudentCertificates","RegularStudentCertificateId",false,"CertificateDate"),
@@ -63,12 +65,17 @@ internal static partial class Program
             ("ProvisionalCertificates","ProvisionalCertificateId",false,"CertificateDate"),("RegularLecturerCertificates","RegularLecturerCertificateId",true,"CertificateDate"),
             ("BankAccountOpeningCertificates","BankAccountOpeningCertificateId",true,"CertificateDate") })
             foreach(string field in new[] {key,date,"CertificateNumber","CreatedAt","CreatedByUserId",staff ? "StaffId" : "AdmissionId",staff ? "StaffName" : "StudentName"})
-                Check(columns.Contains($"[dbo].[{table}].[{field}]"),$"DACPAC contains register source {table}.{field}");
+                Check(columns.Contains($"[dbo].[{table}].[{field}]"),$"Production SQL contract contains register source {table}.{field}");
         foreach(var (table,key,record) in new[] { ("CharacterCertificateIssues","CharacterCertificateIssueId","CertificateRecordId"),
             ("DateOfBirthCertificateIssues","DateOfBirthCertificateIssueId","CertificateRecordId"),("LeaveCertificateIssues","LeaveCertificateIssueId","LeaveRecordId") })
             foreach(string field in new[] {key,record,"IssuedAt","IssuedByUserId","CollectedAt","CollectedBy"})
-                Check(columns.Contains($"[dbo].[{table}].[{field}]"),$"DACPAC contains issue log {table}.{field}");
+                Check(columns.Contains($"[dbo].[{table}].[{field}]"),$"Production SQL contract contains issue log {table}.{field}");
         Check(columns.Contains("[dbo].[LeaveCertificates].[CertificateType]") && columns.Contains("[dbo].[LeaveCertificateIssues].[IssueType]"),"Leaving register preserves school/college and original/duplicate distinctions");
-        Check(model.Descendants().Any(e=>(string?)e.Attribute("Name")=="[dbo].[UQ_FamilyMembers_Student]"),"DACPAC enforces one family membership per student, preventing credit multiplication");
+        Check(contract.RootElement.GetProperty("uniqueIndexes").EnumerateArray().Any(e =>
+            e.GetProperty("schema").GetString()=="dbo" &&
+            e.GetProperty("objectName").GetString()=="FamilyMembers" &&
+            e.GetProperty("name").GetString()=="UQ_FamilyMembers_Student" &&
+            e.GetProperty("keys").GetString()=="AdmissionId"),
+            "Production SQL contract requires one family membership per student, preventing credit multiplication");
     }
 }

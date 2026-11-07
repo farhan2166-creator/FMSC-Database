@@ -15,23 +15,32 @@ concurrency:
 
 permissions:
   contents: read
+  statuses: read
 
 jobs:
-  # Mandatory on every build and publication attempt. The reusable workflow
-  # checks out the SAME commit as this workflow and runs the real installer
-  # against an approved, record-free disposable SQL LocalDB instance.
-  sql-install-acceptance:
-    name: Block publication unless real Windows SQL installation passes
+  # Private FMSC-Sandbox tests the exact PUBLIC Source SHA and publishes
+  # a tightly scoped commit status only after two real installer matrices pass.
+  # No Sandbox read token and no publishing credential enters this job.
+  sandbox-release-gate:
+    name: Require successful schema-3 and schema-7 real installer attestation
     if: github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/fmsc-disposable-windows-install.yml
-    with:
-      test_scope: complete
+    runs-on: ubuntu-latest
     permissions:
       contents: read
+      statuses: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify current commit was accepted in private Sandbox
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./Tools/AssertSandboxPublicationGate.ps1
 
   package:
     name: Verify and package Windows x64
-    needs: sql-install-acceptance
+    needs: sandbox-release-gate
     if: github.ref == 'refs/heads/main'
     runs-on: windows-2022
     timeout-minutes: 45
@@ -203,7 +212,11 @@ jobs:
         timeout-minutes: 25
         env:
           FMSC_UPDATES_PUBLISH_TOKEN: ${{ secrets.FMSC_UPDATES_PUBLISH_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
+          # Recheck the main SHA and the latest signed-off status just before
+          # publication; a failed or revoked run must not reuse old approval.
+          .\Tools\AssertSandboxPublicationGate.ps1
           .\Tools\PublishPrivateUpdate.ps1 `
             -ApplicationDirectory (Join-Path $env:GITHUB_WORKSPACE 'out/windows-x64-app') `
             -WorkDirectory (Join-Path $env:RUNNER_TEMP ('fmsc-publication-' + [Guid]::NewGuid().ToString('N')))

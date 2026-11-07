@@ -1,4 +1,4 @@
-name: '02 - Release - Windows Installation Acceptance'
+name: '02 - CI - Disposable Windows SQL Smoke'
 
 on:
   workflow_dispatch:
@@ -39,7 +39,8 @@ concurrency:
 
 jobs:
   clean-install:
-    name: Real Windows installer with approved synthetic LocalDB
+    name: Public synthetic SQL installer smoke (not release acceptance)
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
     runs-on: windows-2022
     timeout-minutes: 55
     env:
@@ -61,7 +62,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install full FMSC package on disposable Windows with synthetic SQL
+      - name: Install full FMSC package with committed data-free synthetic baseline
         if: ${{ inputs.test_scope != 'sql' }}
         shell: pwsh
         timeout-minutes: 45
@@ -94,7 +95,8 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-# This opt-in / focused same-repository PR test runs actual core.ps1 with synthetic
-# MDF/LDF pair. It never imports, packages, commits or uploads any school database.
-# On GitHub-hosted images LocalDB might be preinstalled; the report records the
-# missing pristine-MSI coverage instead of claiming it was tested.
+# Public PR and release-branch smoke checks use only a pinned, committed
+# synthetic test baseline. They are NOT a production release acceptance.
+# Actual schema-3/schema-7 MDF/LDF acceptance runs in private FMSC-Sandbox,
+# and its successful exact-commit status is mandatory for Workflow 04.
+# The root fmsc.dacpac is manual inspection material and is never referenced.

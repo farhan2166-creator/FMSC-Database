@@ -58,8 +58,10 @@ class PermissionPolicyChecks(unittest.TestCase):
                          {path.name for path in (ROOT/'Migrations').glob('*.sql')})
         self.assertFalse((ROOT/'Tests/LifecycleSqlChecks/Migrations').exists(), 'Pre-release migration replay has been retired.')
 
-    def test_release_schema_package_integrity(self):
-        with zipfile.ZipFile(ROOT/'fmsc.dacpac') as package:
+    def test_committed_synthetic_smoke_schema_package_integrity(self):
+        # Root fmsc.dacpac is owner-managed manual inspection material.
+        # The committed, data-free smoke fixture is independent of that file.
+        with zipfile.ZipFile(ROOT/'Tests/LifecycleSqlChecks/Baseline/schema.dacpac') as package:
             origin = ET.fromstring(package.read('Origin.xml'))
             checksums = [node for node in origin.iter() if node.tag.endswith('}Checksum')]
             self.assertTrue(checksums, 'DACPAC must contain its model checksum.')
