@@ -7,7 +7,7 @@ on:
         description: 'Publish this approved version to private FMSC-Updates (disable for build only)'
         required: true
         type: boolean
-        default: true
+        default: false
 
 concurrency:
   group: fmsc-owner-private-update-publication
