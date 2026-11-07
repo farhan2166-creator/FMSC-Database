@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Xml.Linq;
 using FMSC_SMS.Core;
 using Microsoft.Reporting.WinForms;
 using PdfSharp.Pdf;
@@ -109,7 +108,7 @@ internal static partial class Program
     };
 
     // Mirrors the issued-number contract in dbo.GetNextCertificateNumber and the
-    // per-certificate INSERT triggers in fmsc.dacpac (PREFIX-YYYY-NNNN).
+    // reviewed SQL numbering convention (PREFIX-YYYY-NNNN).
     private static string CertificateReviewPrefix(string template)
     {
         return template switch
@@ -164,89 +163,40 @@ internal static partial class Program
         _=>throw new ArgumentOutOfRangeException(nameof(exam),exam,"Unknown provisional exam")
     };
 
-    private static void CheckCertificateReviewSourceContracts()
+    // PDF review checks only fictional presentation fixtures. Production SQL and
+    // installer compatibility are independently verified by private release acceptance.
+    // In particular, the manually maintained root fmsc.dacpac is NOT an input.
+    private static void CheckCertificateReviewFixtureContracts()
     {
-        // Directly read the shipped DACPAC's model.xml: these checks guard the
-        // fixture against drift in the real SQL number and display contracts.
-        string dacpac=Path.GetFullPath("fmsc.dacpac");
-        Check(File.Exists(dacpac),"The deployed SQL model is available for certificate fidelity checks");
-        using var archive=System.IO.Compression.ZipFile.OpenRead(dacpac);
-        using var source=archive.GetEntry("model.xml")!.Open();
-        var model=XDocument.Load(source);
-        string Script(string name)
+        foreach (var (template, prefix) in new (string Template, string Prefix)[]
         {
-            string identifier="[dbo].["+name+"]";
-            var entity=model.Descendants().FirstOrDefault(item=>
-                item.Name.LocalName=="Element" &&
-                (string?)item.Attribute("Name")==identifier &&
-                ((string?)item.Attribute("Type") is "SqlProcedure" or "SqlDmlTrigger" or "SqlScalarFunction"));
-            Check(entity is not null,"DACPAC defines "+name);
-            var body=entity!.Descendants().FirstOrDefault(item=>
-                item.Name.LocalName=="Property" && (string?)item.Attribute("Name")=="BodyScript");
-            Check(body is not null,name+" has a SQL body");
-            return body!.Descendants().First(item=>item.Name.LocalName=="Value").Value;
-        }
-        string number=Script("GetNextCertificateNumber");
-        Check(System.Text.RegularExpressions.Regex.IsMatch(number,
-            @"@Prefix\s*\+\s*N'-'\s*\+\s*CONVERT\(NVARCHAR\(4\),\s*@Year\)\s*\+\s*N'-'\s*\+\s*@Padded",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase),
-            "Certificate numbers use PREFIX-YYYY-NNNN in SQL");
-        foreach(var (template,trigger,prefix) in new (string Template,string Trigger,string Prefix)[]
-        {
-            ("CharacterCertificate","TR_CharacterCertificates_CertificateNumber","CC"),
-            ("DateOfBirthCertificate","TR_DateOfBirthCertificates_CertificateNumber","DOB"),
-            ("RegularStudentCertificate","TR_RegularStudentCertificates_CertificateNumber","REG"),
-            ("SportsCertificate","TR_SportsCertificates_CertificateNumber","SPT"),
-            ("NoObjectionCertificate","TR_NoObjectionCertificates_CertificateNumber","NOC"),
-            ("ProvisionalCertificate","TR_ProvisionalCertificates_CertificateNumber","SPC"),
-            ("RegularLecturerCertificate","TR_RegularLecturerCertificates_CertificateNumber","EMP"),
-            ("BankAccountOpeningCertificate","TR_BankAccountOpeningCertificates_CertificateNumber","EMP")
+            ("CharacterCertificate", "CC"),
+            ("DateOfBirthCertificate", "DOB"),
+            ("RegularStudentCertificate", "REG"),
+            ("LeaveCertificate", "SLC"),
+            ("CollegeLeaveCertificate", "CLC"),
+            ("SportsCertificate", "SPT"),
+            ("NoObjectionCertificate", "NOC"),
+            ("ProvisionalCertificate", "SPC"),
+            ("RegularLecturerCertificate", "EMP"),
+            ("BankAccountOpeningCertificate", "EMP")
         })
         {
-            string triggerSql=Script(trigger);
-            Check(triggerSql.Contains("GetNextCertificateNumber N'"+prefix+"'",StringComparison.OrdinalIgnoreCase),
-                template+": number prefix matches its SQL issuance trigger");
-            Check(CertificateReviewPrefix(template)==prefix,
-                template+": review prefix matches its SQL issuance trigger");
+            Check(CertificateReviewPrefix(template) == prefix,
+                template + ": synthetic certificate prefix matches its presentation fixture");
+            Check(CertificateReviewNumber(template, 2026, 7) == $"{prefix}-2026-0007",
+                template + ": fictional review number follows PREFIX-YYYY-NNNN");
         }
-        string leaving=Script("TR_LeaveCertificates_CertificateNumber");
-        Check(leaving.Contains("N'CLC'",StringComparison.Ordinal) &&
-              leaving.Contains("N'SLC'",StringComparison.Ordinal) &&
-              leaving.Contains("CertificateType",StringComparison.OrdinalIgnoreCase),
-            "Leaving-number trigger switches between school and college prefixes");
-        Check(CertificateReviewPrefix("LeaveCertificate")=="SLC" &&
-              CertificateReviewPrefix("CollegeLeaveCertificate")=="CLC",
-            "The school and college review formats match their respective SQL issuance paths");
-
-        string character=Script("GetCharacterCertificatePrintData");
-        Check(character.Contains("N'S.S.C (Matric)'",StringComparison.Ordinal) &&
-              character.Contains("N'H.S.S.C (Intermediate)'",StringComparison.Ordinal),
-            "Character qualification wording is taken from the SQL printing rule");
-        string provisional=Script("GetProvisionalCertificatePrintData");
-        foreach(string label in new[]
-        {
-            "Secondary School Certificate",
-            "Higher Secondary School Certificate Part-I",
-            "Higher Secondary School Certificate Part-II"
-        })
-            Check(provisional.Contains("N'"+label+"'",StringComparison.Ordinal),
-                "Provisional printing contains the live "+label+" label");
-        Check(provisional.Contains("dbo.fn_DateToWords(PC.DateOfBirth)",StringComparison.Ordinal),
-            "Provisional birth date is printed in number words by SQL");
-        Check(provisional.Contains("STRING_AGG",StringComparison.OrdinalIgnoreCase) &&
-              provisional.Contains("SubjectsPassedLine",StringComparison.Ordinal),
-            "Provisional subjects come from saved ordered subjects in SQL");
-        string birth=Script("GetDateOfBirthCertificatePrintData");
-        Check(birth.Contains("105) DateOfBirthInFigures",StringComparison.OrdinalIgnoreCase) &&
-              birth.Contains("N'st'",StringComparison.Ordinal) &&
-              birth.Contains("N'nd'",StringComparison.Ordinal) &&
-              birth.Contains("N'rd'",StringComparison.Ordinal) &&
-              birth.Contains("N'th'",StringComparison.Ordinal),
-            "Birth certificate figures and ordinal date text use the SQL print convention");
-        string written=Script("fn_DateToWords");
-        Check(written.Contains("dbo.fn_NumberToWords(DAY(@TheDate))",StringComparison.Ordinal) &&
-              written.Contains("dbo.fn_NumberToWords(YEAR(@TheDate))",StringComparison.Ordinal),
-            "Provisional birth date's text comes from the SQL number-to-words function");
+        Check(CertificateReviewBirthDateWithOrdinal(new DateTime(2012, 3, 9)) == "09th, March, 2012",
+            "Fictional DOB fixture formats the day with an ordinal suffix");
+        Check(CertificateReviewBirthDateWithOrdinal(new DateTime(2012, 3, 21)) == "21st, March, 2012",
+            "Fictional DOB fixture handles the 21st ordinal suffix");
+        Check(CertificateReviewBirthDateInWords(new DateTime(2012, 3, 9)) == "Nine March Two Thousand Twelve",
+            "Fictional DOB fixture formats date words consistently");
+        Check(CertificateReviewQualification("SSC") == "Secondary School Certificate" &&
+              CertificateReviewQualification("HSSC1") == "Higher Secondary School Certificate Part-I" &&
+              CertificateReviewQualification("HSSC2") == "Higher Secondary School Certificate Part-II",
+            "Provisional certificate review displays the expected qualification labels");
     }
 
     private static void CheckCertificatePdfReview()
@@ -263,7 +213,7 @@ internal static partial class Program
         var entries=new List<object>();
         string[] templates=CertificateReviewCases.Select(sample=>sample.Template).Distinct().ToArray();
         Check(templates.Length==10,"All ten production certificate templates are covered");
-        CheckCertificateReviewSourceContracts();
+        CheckCertificateReviewFixtureContracts();
         Check(CertificateReviewCases.Select(sample=>sample.FileKey).Distinct(StringComparer.OrdinalIgnoreCase).Count()==CertificateReviewCases.Length,
             "Each certificate scenario must have a unique file key");
         try
