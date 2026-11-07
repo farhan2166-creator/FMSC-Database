@@ -132,6 +132,94 @@ internal static class CommunicationSqlChecks
                 await Contact(true,false);
             }
         });
+        await report.Stage("Communication: one Admission Yes covers all school messages",async()=>{
+            // No manual contact/consent action: a single Admission Yes automatically
+            // provides the student guardian contact when recipients are requested.
+            var saved=Sql.Proc("AdmitStudent",f.AdmissionArgs("Unified Guardian Consent Example"));
+            int schoolStudent=Convert.ToInt32(saved.Rows[0]["AdmissionId"]);
+            string studentPhone=Convert.ToString(Sql.Scalar(
+                "SELECT ContactNumber FROM dbo.Students WHERE AdmissionId=@Id;",
+                Sql.P("@Id",schoolStudent)))??"";
+            Guid originalTemplate=template;
+            try
+            {
+                Sql.Query("""
+                    INSERT dbo.StudentGuardianCommunication
+                      (AdmissionId,Phone,WhatsAppConsent,SchoolCommunicationConsent,RecordedUtc,RecordedBy)
+                    VALUES(@Id,@Phone,1,1,SYSUTCDATETIME(),@Actor);
+                    """,Sql.P("@Id",schoolStudent),Sql.P("@Phone",studentPhone),Sql.P("@Actor",f.Admin));
+                int oldCampaigns=Sql.Count("SELECT COUNT(*) FROM comm.Campaign;");
+                await store.CallAsync("SyncAdmissionContacts");
+                report.Check(Sql.Count("SELECT COUNT(*) FROM comm.Campaign;")==oldCampaigns,
+                    "Synchronizing Admission Yes does not compose, queue or send a message.");
+                var linked=Sql.Query("""
+                    SELECT ContactId,Verified,SmsConsent,WhatsAppConsent,FinancialConsent,
+                           AnnouncementConsent,OptedOut
+                    FROM comm.Contact WHERE OwnerKind='Student' AND AdmissionId=@Id;
+                    """,Sql.P("@Id",schoolStudent));
+                report.Check(linked.Rows.Count==1 && linked.Rows[0].Field<bool>("Verified") &&
+                    linked.Rows[0].Field<bool>("SmsConsent") && linked.Rows[0].Field<bool>("WhatsAppConsent") &&
+                    linked.Rows[0].Field<bool>("FinancialConsent") && linked.Rows[0].Field<bool>("AnnouncementConsent") &&
+                    !linked.Rows[0].Field<bool>("OptedOut"),
+                    "One Admission Yes provides an eligible SMS, WhatsApp, fee and announcement contact without another consent checklist.");
+                Guid linkedContact=linked.Rows[0].Field<Guid>("ContactId");
+                template=Guid.NewGuid();
+                await Template("school_all_messages","Financial","{{student}} — school fee notice.",
+                    mapping:"synthetic-approved-provider-name");
+                async Task<string> Reason(MessageChannel channel)
+                {
+                    var rows=await store.PreviewAsync(template,channel,[linkedContact],"Example");
+                    report.Check(rows.Rows.Count==1,"Unified consent retains exactly one linked recipient.");
+                    return Convert.ToString(rows.Rows[0]["Exclusion"])??"";
+                }
+                report.Check(await Reason(MessageChannel.WhatsApp)=="" && await Reason(MessageChannel.Sms)=="",
+                    "Admission Yes alone is sufficient for Financial WhatsApp and SMS eligibility.");
+                var queued=Guid.NewGuid();
+                await store.CreateAsync(queued,template,MessageChannel.Sms,[linkedContact],
+                    "School notice before withdrawal",new DateTime(2026,1,1));
+                await store.TransitionAsync(queued,"Submit");
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication
+                    SET SchoolCommunicationConsent=0,WhatsAppConsent=0,RecordedUtc=SYSUTCDATETIME()
+                    WHERE AdmissionId=@Id;
+                    """,Sql.P("@Id",schoolStudent));
+                report.Check((await Reason(MessageChannel.Sms)).Contains("declined")
+                    && (await Reason(MessageChannel.WhatsApp)).Contains("declined"),
+                    "Admission No withdraws all supported school messages immediately.");
+                Ready();
+                report.Check(await store.ClaimAsync(default,queued) is null &&
+                    Sql.Count("SELECT COUNT(*) FROM comm.Attempt A JOIN comm.Message M ON A.MessageId=M.MessageId WHERE M.CampaignId=@Id;",Sql.P("@Id",queued))==0,
+                    "Queued messages are suppressed after Admission No, before provider submission.");
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication
+                    SET SchoolCommunicationConsent=1,WhatsAppConsent=1,Phone=N'03001234569',
+                        RecordedUtc=SYSUTCDATETIME()
+                    WHERE AdmissionId=@Id;
+                    """,Sql.P("@Id",schoolStudent));
+                report.Check((await Reason(MessageChannel.Sms)).Contains("number changed"),
+                    "Admission Yes for another phone does not authorize the previous destination.");
+                await store.CallAsync("SyncAdmissionContacts");
+                report.Check(Sql.Count("SELECT COUNT(*) FROM comm.Contact WHERE AdmissionId=@Id;",Sql.P("@Id",schoolStudent))==1,
+                    "Stale Student contact data never auto-enrolls an unrelated phone.");
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication SET Phone=@Phone WHERE AdmissionId=@Id;
+                    """,Sql.P("@Phone",studentPhone),Sql.P("@Id",schoolStudent));
+                report.Check(await Reason(MessageChannel.Sms)=="",
+                    "The same matching saved Admission Yes restores eligibility without another consent form.");
+                Sql.Query("""
+                    UPDATE comm.Contact SET OptedOut=1,ConsentUtc=SYSUTCDATETIME()
+                    WHERE ContactId=@Id;
+                    """,Sql.P("@Id",linkedContact));
+                await store.CallAsync("SyncAdmissionContacts");
+                var suppressed=await Reason(MessageChannel.WhatsApp);
+                report.Check(suppressed.Contains("Opted out")
+                    && Sql.Count("SELECT COUNT(*) FROM comm.Contact WHERE AdmissionId=@Id;",Sql.P("@Id",schoolStudent))==1,
+                    "An explicit later messaging opt-out stays effective and cannot be bypassed by re-linking a saved Admission Yes.");
+                // Keep the shared fixture focused on its original student/contact.
+                Sql.Query("DELETE comm.Contact WHERE ContactId=@Id;",Sql.P("@Id",linkedContact));
+            }
+            finally {template=originalTemplate;}
+        });
         await report.Stage("Communication: reviewed content and campaign-scoped sending",async()=>{
             await Settings();
             var due=new DateTime(2026,1,1);
