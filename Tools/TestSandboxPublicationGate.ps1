@@ -9,15 +9,15 @@ $original = @{}
 foreach ($key in @('GITHUB_REPOSITORY','GITHUB_REF','GITHUB_TOKEN')) {
     $original[$key] = [Environment]::GetEnvironmentVariable($key)
 }
-$script:mockMain = $sha
-$script:mockStatuses = @()
+$global:__FmscGateMockMain = $sha
+$global:__FmscGateMockStatuses = @()
 function Invoke-RestMethod {
     param([string]$Uri, [hashtable]$Headers, [string]$Method)
     if ($Uri -eq 'https://api.github.com/repos/farhan2166-creator/FMSC-Source/branches/main') {
-        return [pscustomobject]@{commit=[pscustomobject]@{sha=$script:mockMain}}
+        return [pscustomobject]@{commit=[pscustomobject]@{sha=$global:__FmscGateMockMain}}
     }
     if ($Uri -eq "https://api.github.com/repos/farhan2166-creator/FMSC-Source/commits/$sha/statuses?per_page=100") {
-        return $script:mockStatuses
+        return $global:__FmscGateMockStatuses
     }
     throw "Unsafe unexpected network request: $Uri"
 }
@@ -50,26 +50,26 @@ try {
     $env:GITHUB_REPOSITORY='farhan2166-creator/FMSC-Source'
     $env:GITHUB_REF='refs/heads/main'
     $env:GITHUB_TOKEN='synthetic-token-never-used-for-network'
-    $script:mockStatuses=@()
+    $global:__FmscGateMockStatuses=@()
     Assert-Outcome 'missing attestation blocks' $false
 
-    $script:mockStatuses=@((New-MockStatus -State 'failure'),(New-MockStatus))
+    $global:__FmscGateMockStatuses=@((New-MockStatus -State 'failure'),(New-MockStatus))
     Assert-Outcome 'newer failure cannot be bypassed by older success' $false
 
-    $script:mockStatuses=@(New-MockStatus -Creator 'untrusted-actor')
+    $global:__FmscGateMockStatuses=@(New-MockStatus -Creator 'untrusted-actor')
     Assert-Outcome 'untrusted status author blocks' $false
 
-    $script:mockStatuses=@(New-MockStatus -Description 'not accepted')
+    $global:__FmscGateMockStatuses=@(New-MockStatus -Description 'not accepted')
     Assert-Outcome 'incorrect acceptance description blocks' $false
 
-    $script:mockStatuses=@(New-MockStatus -Url 'https://example.invalid/forged')
+    $global:__FmscGateMockStatuses=@(New-MockStatus -Url 'https://example.invalid/forged')
     Assert-Outcome 'untrusted run target blocks' $false
 
-    $script:mockStatuses=@(New-MockStatus)
-    $script:mockMain=$otherSha
+    $global:__FmscGateMockStatuses=@(New-MockStatus)
+    $global:__FmscGateMockMain=$otherSha
     Assert-Outcome 'stale main revision blocks' $false
 
-    $script:mockMain=$sha
+    $global:__FmscGateMockMain=$sha
     $env:GITHUB_REF='refs/heads/feature/untrusted'
     Assert-Outcome 'non-main ref blocks' $false
     $env:GITHUB_REF='refs/heads/main'
@@ -78,10 +78,11 @@ try {
     Assert-Outcome 'missing token blocks' $false
     $env:GITHUB_TOKEN='synthetic-token-never-used-for-network'
 
-    $script:mockStatuses=@((New-MockStatus),(New-MockStatus -State 'failure'))
+    $global:__FmscGateMockStatuses=@((New-MockStatus),(New-MockStatus -State 'failure'))
     Assert-Outcome 'newest valid trusted status allows build-only gate' $true
 } finally {
     foreach ($key in $original.Keys) {
         [Environment]::SetEnvironmentVariable($key,$original[$key])
     }
+    Remove-Variable -Name __FmscGateMockMain,__FmscGateMockStatuses -Scope Global -ErrorAction SilentlyContinue
 }
