@@ -300,12 +300,21 @@ public sealed partial class CommunicationCenterPage
     private static string GuardianAdmissionPreferenceNote(string contactNumber,string admissionNumber,
         bool whatsappConsent,DateTime recordedUtc)
     {
+        static string NormalizeEvidencePhone(string raw)
+        {
+            // A full non-Pakistan E.164 number must use the provider's explicit
+            // international normalization branch; local numbers remain +92.
+            string number=raw.Trim();
+            string countryCode=number.StartsWith('+')&&!number.StartsWith("+92",StringComparison.Ordinal)
+                ? "+international" : "+92";
+            return CommunicationPhone.Normalize(number,countryCode);
+        }
         bool sameNumber=false;
         try
         {
             sameNumber=string.Equals(
-                CommunicationPhone.Normalize(contactNumber,"+92"),
-                CommunicationPhone.Normalize(admissionNumber,"+92"),
+                NormalizeEvidencePhone(contactNumber),
+                NormalizeEvidencePhone(admissionNumber),
                 StringComparison.Ordinal);
         }
         catch(ArgumentException) { /* Invalid or missing numbers cannot be assumed equal. */ }
