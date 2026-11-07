@@ -1,6 +1,6 @@
 # Communication Center redesign — staged implementation
 
-Status: **UI-first development branch; not production-ready.** Scope is the optional Communication Center, not the admissions or finance transaction workflows.
+Status: **Redesign and versioned consent-integration development branch; not production-ready.** Scope includes the single Admission consent choice and optional Communication Center. No optional send buttons or automatic sending are being added to Admission or Fee Collection in this phase.
 
 ## Product contract
 
@@ -23,8 +23,10 @@ Direct reviewed sending can use the existing `MessageDispatcher.DispatchOneAsync
 
 ## Identified integration gaps — do not guess around them
 
-1. **Guardian consent:** Admission currently records `dbo.StudentGuardianCommunication` (guardian email/phone/WhatsApp preference). The Communication module independently validates `comm.Contact` (verified ownership, WhatsApp/SMS consent, financial/announcement purpose consent, opt-out status and a consent source). Those are not a unified authoritative model. A phone number or WhatsApp preference alone does not satisfy the module's verified contact/purpose consent checks. Design a permission-checked, idempotent enrollment/reconciliation flow, with explicit handling for number changes, revoked preferences, existing opt-outs, row versions and historic message snapshots. Avoid silently upgrading consent or registering contacts automatically as verified. Do not modify Admission in this first UI pass.
-   - **Current UI-first bridge (read-only):** when an administrator reviews a student-linked communication contact, the editor looks up the guardian's admission WhatsApp preference using `Students.View` permissions. It displays whether the recorded number matches and whether the admission choice is Yes or No, including its recorded date. It does **not** auto-check verification, purpose consent or opt-in flags, auto-register a contact, override an opt-out, or trigger sending. This is contextual guidance **not** full consent synchronization; centralized revocation and cross-record precedence remain a release-blocking design task.
+1. **Single Admission consent:** From schema 7, Admission has one explicit **School messages?** Yes/No choice, covering guardian SMS, WhatsApp, fee/payment messages, school announcements and other supported school-message templates. Yes is final: school staff must not re-enter verification, channel or message-purpose consent in Communication Center for that student. The choice and phone are saved transactionally in `dbo.StudentGuardianCommunication.SchoolCommunicationConsent`.
+   - On an explicit **Find Contacts** or group **Preview** action, `comm.SyncAdmissionContacts` links matching guardian contacts without opening a second consent editor. It does not create a campaign or send a message. SQL preview and provider-claim gates re-evaluate Yes/No, phone matches with the current Student record, and explicit channel opt-outs. An admission **No** or changed number blocks all subsequent student-linked school messages, including queued submissions.
+   - Existing legacy `WhatsAppConsent` values are **not** retroactively promoted to all-purpose consent: schema 7 uses nullable broad consent. Previously recorded WhatsApp-only preferences retain their original scope until a user saves a new Admission Yes/No.
+   - Staff, family-wide and manual contacts without a student-linked admission still use separately documented consent/opt-outs. The provider retains its own WhatsApp template, sender and contact rules. This does not provision a gateway, sender or unattended worker.
 2. **Unattended delivery:** `Apps/Worker` is opt-in and not provisioned by the current installer. An enabled rule or a scheduled message therefore must not promise automatic execution unless a supported worker/dispatcher is actually configured. Keep rules disabled by default. A complete worker lifecycle, permissions, credentials, diagnostics and updater strategy must be reviewed before offering a simple automation switch.
 3. **Provider templates:** Approved local templates and actual provider-side WhatsApp template approvals are separate. Do not allow arbitrary live WhatsApp text without provider mapping.
 
@@ -41,7 +43,7 @@ Direct reviewed sending can use the existing `MessageDispatcher.DispatchOneAsync
 ### Phase B — complete functional readiness
 
 - Verify campus/class/outstanding selection, recipient exclusions, matching limit, and appropriate template/category/scope checks.
-- Formalize guardian preference to communication-contact reconciliation without weakening verification or consent rules.
+- Verify single-choice Admission school consent and automatic student-contact linking on disposable SQL fixtures, including legacy records, number changes, opt-out precedence, multi-campus filters and provider-claim revalidation.
 - Resolve sender readiness, approved WhatsApp templates, trial/simulation/live warnings and actual dispatch availability.
 - Decide whether optional scheduled delivery can be made reliable without deploying a new always-on component. If not, make limitations explicit and leave automation unavailable.
 - Review status naming, empty states, keyboard navigation, theming, scaling and small-screen layouts.
@@ -57,7 +59,7 @@ Direct reviewed sending can use the existing `MessageDispatcher.DispatchOneAsync
 ## Deployment and acceptance gates
 
 - Preserve installed databases, school records, guardian preferences and existing communication history. No destructive migration or hidden first-run installation.
-- If schema changes become necessary, use the existing numbered migration / DACPAC compatibility process and approved updater/release pipeline; support data-preserving upgrades and explicit failure recovery.
+- Apply required numbered migrations **6** and **7** through the existing backup-and-verify updater sequence, not by rebuilding or overwriting production databases. Schema 6 adds the legacy WhatsApp withdrawal safeguard; schema 7 adds the new unified school-messaging choice and updates the optional `comm` procedures only when present.
 - Run native ThemeSmoke checks, Communication SQL lifecycle tests, build/publish checks, permissions and role isolation, mode/simulation/live invariants, provider failure and timeout handling, duplicate-send checks and upgrade regression tests.
 - Validate both administrator and limited operator UX at relevant DPI/window sizes.
 - Keep the work on a review branch until these gates pass. **Do not ship this first-pass UI without a successful Windows build and runtime smoke test.**
