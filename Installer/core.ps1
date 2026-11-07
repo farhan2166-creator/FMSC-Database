@@ -954,6 +954,65 @@ function Remove-OldPreMigrationBackups {
     }
 }
 
+# Retain the most recently installed verified prepared package for offline
+# inspection/retry; prune only older GUID-named prepared folders and redundant
+# chunk-cache hash folders after the activated application has passed verification.
+# Never remove enrollment/DPAPI keys, failed-update evidence or arbitrary files.
+function Remove-SupersededPreparedUpdates {
+    param([string]$PreservePrepared)
+    $state = [IO.Path]::GetFullPath((Get-FmscDownloadParent)).TrimEnd('\')
+    $keep = [IO.Path]::GetFullPath($PreservePrepared).TrimEnd('\')
+    if ((Split-Path -Parent $keep) -ine $state -or
+        (Split-Path -Leaf $keep) -notmatch '^prepared-[a-f0-9]{32}$' -or
+        -not (Test-Path -LiteralPath $keep -PathType Container)) {
+        throw 'The verified package must be an existing prepared folder in this user update cache.'
+    }
+    if ($script:RecoveryJournal -and
+        ($script:RecoveryJournal.Phase -notin @('Verified','Completed') -or
+         $script:RecoveryJournal.DownloadRoot -ine $keep)) {
+        throw 'Recovery has not verified this prepared package; cache cleanup refused.'
+    }
+    # Ensure we are not traversing a junction/symlink for the cache root or
+    # retained package, before deleting anything else.
+    foreach ($path in @($state, $keep)) {
+        $ancestor = Get-Item -LiteralPath $path -Force -ErrorAction Stop
+        while ($null -ne $ancestor) {
+            if ($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                throw 'Linked update storage is not eligible for automatic cleanup.'
+            }
+            $ancestor = $ancestor.Parent
+        }
+    }
+    foreach ($entry in Get-ChildItem -LiteralPath $state -Directory -Force) {
+        if ($entry.Name -notmatch '^prepared-[a-f0-9]{32}$' -or
+            $entry.FullName -ieq $keep) { continue }
+        try {
+            Remove-VerifiedUpdateDirectory -Path $entry.FullName -ExpectedPath (Join-Path $state $entry.Name)
+            Write-Log "Removed superseded prepared package: $($entry.FullName)"
+        } catch {
+            Write-WarningMessage "Could not remove old prepared package $($entry.Name): $($_.Exception.Message)"
+        }
+    }
+    $cache = Join-Path $state 'download-cache'
+    if (-not (Test-Path -LiteralPath $cache)) { return }
+    $ancestor = Get-Item -LiteralPath $cache -Force
+    while ($null -ne $ancestor) {
+        if ($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw 'Linked chunk-cache storage refused.'
+        }
+        $ancestor = $ancestor.Parent
+    }
+    foreach ($entry in Get-ChildItem -LiteralPath $cache -Directory -Force) {
+        if ($entry.Name -notmatch '^[a-f0-9]{64}$') { continue }
+        try {
+            Remove-VerifiedUpdateDirectory -Path $entry.FullName -ExpectedPath (Join-Path $cache $entry.Name)
+            Write-Log "Removed redundant downloaded chunks: $($entry.FullName)"
+        } catch {
+            Write-WarningMessage "Could not remove old chunks $($entry.Name): $($_.Exception.Message)"
+        }
+    }
+}
+
 function Complete-VerifiedApplicationUpdate {
     param([string]$ApplicationDirectory, [string]$Source, [string]$Prepared = '')
     # Verification failures keep rollback and downloads for recovery.
@@ -974,29 +1033,10 @@ function Complete-VerifiedApplicationUpdate {
     if (-not $Prepared) { return }
     if ($script:RecoveryJournal) { $Prepared = $script:RecoveryJournal.DownloadRoot }
     try {
-        $preparedPath = [IO.Path]::GetFullPath($Prepared).TrimEnd('\')
-        $state = Split-Path -Parent $preparedPath
-        if ((Split-Path -Leaf $preparedPath) -notmatch '^prepared-[a-f0-9]{32}$' -or
-            (Split-Path -Leaf $state) -ine 'Updates' -or
-            (Split-Path -Leaf (Split-Path -Parent $state)) -ine 'FMSC') {
-            throw 'Prepared directory is outside the standard updater storage layout.'
-        }
-        $cache = Join-Path $state 'download-cache'
-        if (Test-Path -LiteralPath $cache) {
-            $ancestor = Get-Item -LiteralPath $cache -Force
-            while ($null -ne $ancestor) {
-                if ($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Linked cache directory refused.' }
-                $ancestor = $ancestor.Parent
-            }
-            foreach ($entry in Get-ChildItem -LiteralPath $cache -Directory -Force) {
-                if ($entry.Name -match '^[a-f0-9]{64}$') {
-                    Remove-VerifiedUpdateDirectory -Path $entry.FullName -ExpectedPath (Join-Path $cache $entry.Name)
-                }
-            }
-        }
-        Remove-VerifiedUpdateDirectory -Path $preparedPath -ExpectedPath (Join-Path $state (Split-Path -Leaf $preparedPath))
-        Write-Log 'Successful update staging files and downloaded chunks removed.'
+        Remove-SupersededPreparedUpdates -PreservePrepared $Prepared
+        Write-Log 'Successful update: latest verified package retained, older prepared packages and redundant chunks pruned.'
     } catch { Write-WarningMessage "Update succeeded; downloaded-file cleanup is pending: $($_.Exception.Message)" }
+
 }
 function Invoke-InstallationDatabaseCheck {
     param([string]$Application)
