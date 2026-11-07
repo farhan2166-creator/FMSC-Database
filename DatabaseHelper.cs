@@ -7,7 +7,7 @@ public static class DatabaseHelper
     public const string LocalDbInstance = @"(localdb)\MSSQLLocalDB";
     private const string DatabaseName = "FMSC_DB";
     // Version and required schema features are checked together by DatabaseCompatibility.
-    public const string RequiredDatabaseSchemaVersion = "6";
+    public const string RequiredDatabaseSchemaVersion = "7";
 #if !FMSC_LEVEL2
     private static volatile bool _databaseAttachConfirmed;
     private static readonly object DatabaseAttachSync = new();
@@ -578,13 +578,16 @@ FOR ATTACH;";
                 using var preference = new SqlCommand("""
                     UPDATE dbo.StudentGuardianCommunication WITH (UPDLOCK, HOLDLOCK)
                     SET Email=@Email, Phone=@Phone, WhatsAppConsent=@Consent,
+                        SchoolCommunicationConsent=@Consent,
                         RecordedUtc=SYSUTCDATETIME(), RecordedBy=@UserId
                     WHERE AdmissionId=@Id AND EXISTS (
-                        SELECT @Email,@Phone,@Consent EXCEPT SELECT Email,Phone,WhatsAppConsent
+                        SELECT @Email,@Phone,@Consent,@Consent
+                        EXCEPT SELECT Email,Phone,WhatsAppConsent,SchoolCommunicationConsent
                     );
                     IF NOT EXISTS (SELECT 1 FROM dbo.StudentGuardianCommunication WITH (UPDLOCK,HOLDLOCK) WHERE AdmissionId=@Id)
-                        INSERT dbo.StudentGuardianCommunication (AdmissionId, Email, Phone, WhatsAppConsent, RecordedUtc, RecordedBy)
-                        VALUES (@Id,@Email,@Phone,@Consent,SYSUTCDATETIME(),@UserId);
+                        INSERT dbo.StudentGuardianCommunication (AdmissionId, Email, Phone, WhatsAppConsent,
+                            SchoolCommunicationConsent,RecordedUtc,RecordedBy)
+                        VALUES (@Id,@Email,@Phone,@Consent,@Consent,SYSUTCDATETIME(),@UserId);
                     """, connection, transaction);
                 preference.Parameters.AddRange([Int("@Id", id), P("@Email", email.Length == 0 ? null : email),
                     P("@Phone", phone.Length == 0 ? null : phone), Bit("@Consent", consent), Int("@UserId", actor)]);
