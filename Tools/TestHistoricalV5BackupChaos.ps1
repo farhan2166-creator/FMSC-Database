@@ -99,12 +99,30 @@ function CheckLive {
     Require ((Version 'FMSC_DB') -eq 7) 'Real FMSC_DB changed version.'
     Require ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -eq $liveHash) 'Real installed executable changed.'
 }
+function Resolve-LocalDbNamedPipe {
+    # go-sqlcmd 1.10.0 cannot reliably resolve (localdb)\\MSSQLLocalDB.
+    # The production recovery path already passes its explicit named pipe.
+    $found = Get-Command 'sqllocaldb.exe' -ErrorAction SilentlyContinue
+    $localDbExe = if ($found) { $found.Source } else {
+        Join-Path $env:ProgramFiles 'Microsoft SQL Server\160\Tools\Binn\SqlLocalDB.exe'
+    }
+    Require (Test-Path -LiteralPath $localDbExe -PathType Leaf) 'SQL LocalDB executable was not found.'
+    $null = @(& $localDbExe start MSSQLLocalDB 2>&1)
+    Require ($LASTEXITCODE -eq 0) 'Cannot start the current user MSSQLLocalDB instance.'
+    $info = @(& $localDbExe info MSSQLLocalDB 2>&1)
+    Require ($LASTEXITCODE -eq 0) 'Cannot inspect the current user MSSQLLocalDB instance.'
+    $prefix = [regex]::Escape('\\.\pipe\LOCALDB#')
+    $suffix = [regex]::Escape('\tsql\query')
+    $foundPipe = [regex]::Match(($info -join "`n"), '(?:np:)?(' + $prefix + '[A-Za-z0-9]+' + $suffix + ')')
+    Require ($foundPipe.Success) 'Cannot discover the SQL LocalDB named-pipe endpoint.'
+    return 'np:' + $foundPipe.Groups[1].Value
+}
 function Apply([string]$Label) {
     Write-Host "RUN: $Label"
     $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     # Do not return both the child process output AND its exit code. PowerShell
     # otherwise produces an array that can evaluate as true even after failure.
-    $lines = @(& $ps -NoProfile -ExecutionPolicy Bypass -File $script:applyScript -DatabaseName $target -BackupRoot (Join-Path $root 'Backups') -SqlCmdPath $script:sqlcmd -Apply 2>&1)
+    $lines = @(& $ps -NoProfile -ExecutionPolicy Bypass -File $script:applyScript -DatabaseName $target -SqlInstance $script:pipeInstance -BackupRoot (Join-Path $root 'Backups') -SqlCmdPath $script:sqlcmd -Apply 2>&1)
     $exitCode = [int]$LASTEXITCODE
     foreach ($line in $lines) { Write-Host ([string]$line) }
     Write-Host "MIGRATION RUNNER EXIT CODE: $exitCode"
@@ -178,6 +196,8 @@ try {
     $valid = Find-FmscMaintenanceTool 'SqlCmd'
     Require ($null -ne $valid) 'Validated maintenance sqlcmd not available.'
     $script:sqlcmd = Join-Path $valid 'sqlcmd.exe'
+    $script:pipeInstance = Resolve-LocalDbNamedPipe
+    Write-Host 'Resolved LocalDB named pipe for go-sqlcmd (endpoint verified).' -ForegroundColor Cyan
     $realFirst = Join-Path $installedMigrations ($firstMigration.ToString() + '.sql')
     $realNext = Join-Path $installedMigrations ($nextMigration.ToString() + '.sql')
     $script:applyScript = [IO.Path]::GetFullPath($script:applyScript)
