@@ -1,4 +1,4 @@
-# DEVELOPMENT PC ONLY. Real v5 backup -> disposable SQL database -> migration faults.
+# DEVELOPMENT PC ONLY. Historical schema 1..5 -> disposable SQL database -> migration faults.
 # Never uses RESTORE WITH REPLACE; never changes FMSC_DB or the real installer.
 [CmdletBinding()]
 param(
@@ -130,8 +130,10 @@ try {
         Sql master $sql
         $created = $true
         AssertFixtureFiles $target
-        Require ((Version $target) -eq 5) 'Copied MDF/LDF are not schema 5.'
-        $historical = Join-Path $root 'verified-v5-from-detached-files.bak'
+        $sourceVersion = Version $target
+        Write-Host "Detected ORIGINAL detached database schema: $sourceVersion" -ForegroundColor Cyan
+        Require ($sourceVersion -ge 1 -and $sourceVersion -le 6) "Unsupported source schema $sourceVersion: requires an independently reviewed migration path (1-6 supported)."
+        $historical = Join-Path $root ("verified-v$sourceVersion-from-detached-files.bak")
         Sql master ("BACKUP DATABASE [$target] TO DISK=N'" + (Q $historical) + "' WITH INIT, CHECKSUM;")
         Sql master ("RESTORE VERIFYONLY FROM DISK=N'" + (Q $historical) + "' WITH CHECKSUM;")
         # Drop ONLY the newly attached copy; not the original source files.
@@ -144,17 +146,25 @@ try {
     RestoreFixture $target $historical (Join-Path $root 'source')
     $created = $true
     AssertFixtureFiles $target
-    Require ((Version $target) -eq 5) 'Historical backup is not schema 5.'
+    $actualSource = Version $target
+    Write-Host "Original database schema detected: $actualSource" -ForegroundColor Cyan
+    Require ($actualSource -ge 1 -and $actualSource -le 6) "Unsupported source schema $actualSource. No migrations were executed."
+    if ($usingFiles) {
+        Require ($sourceVersion -eq $actualSource) 'Backup restored to an unexpected schema.'
+    }
     CheckLive
-    Write-Host 'PASS: detached-source copy or backup verified, independently restored at v5.' -ForegroundColor Green
+    Write-Host "PASS: historical database verified, independently restored at schema $actualSource." -ForegroundColor Green
 
     $migrationRoot = Join-Path $root 'Migrations'
     $null = New-Item -ItemType Directory -Path $migrationRoot
     $installedMigrations = Join-Path $app 'UpdateSupport\Migrations'
-    foreach ($number in @('6','7')) {
-        $source = Join-Path $installedMigrations ($number + '.sql')
-        Require (Test-Path -LiteralPath $source -PathType Leaf) "Installed migration $number is missing."
-        Copy-Item -LiteralPath $source -Destination (Join-Path $migrationRoot ($number + '.sql'))
+    $firstMigration = $actualSource + 1
+    $nextMigration = $actualSource + 2
+    Require ($nextMigration -le 7) 'Need two pending schema versions for the interruption-and-resume test.'
+    foreach ($number in ($firstMigration..7)) {
+        $source = Join-Path $installedMigrations ($number.ToString() + '.sql')
+        Require (Test-Path -LiteralPath $source -PathType Leaf) "Installed migration $number is missing. No migration has been applied."
+        Copy-Item -LiteralPath $source -Destination (Join-Path $migrationRoot ($number.ToString() + '.sql'))
     }
     $script:applyScript = Join-Path $migrationRoot 'Apply-Migrations.ps1'
     Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/farhan2166-creator/FMSC-Source/287b16e606f99aa139f6c98cc6021753f7f476a0/Migrations/Apply-Migrations.ps1' -OutFile $script:applyScript
@@ -163,31 +173,31 @@ try {
     $valid = Find-FmscMaintenanceTool 'SqlCmd'
     Require ($null -ne $valid) 'Validated maintenance sqlcmd not available.'
     $script:sqlcmd = Join-Path $valid 'sqlcmd.exe'
-    $real6 = Join-Path $installedMigrations '6.sql'
-    $real7 = Join-Path $installedMigrations '7.sql'
+    $realFirst = Join-Path $installedMigrations ($firstMigration.ToString() + '.sql')
+    $realNext = Join-Path $installedMigrations ($nextMigration.ToString() + '.sql')
     $script:applyScript = [IO.Path]::GetFullPath($script:applyScript)
 
-    Write-Host 'TEST 2/5: real migration runner fails before migration 6 (no SQL changes).'
-    [IO.File]::WriteAllText((Join-Path $migrationRoot '6.sql'), "THROW 51000,'FMSC deliberate chaos failure before schema 6',1;", [Text.UTF8Encoding]::new($false))
-    $code = Apply 'v5 -> failing migration 6'
-    Require ($code -ne 0 -and (Version $target) -eq 5) 'Pre-6 rollback did not preserve schema 5.'
+    Write-Host "TEST 2/5: intentionally fail before migration $firstMigration (rollback must preserve schema $actualSource)."
+    [IO.File]::WriteAllText((Join-Path $migrationRoot ($firstMigration.ToString() + '.sql')), "THROW 51000,'FMSC deliberate chaos failure before schema $firstMigration',1;", [Text.UTF8Encoding]::new($false))
+    $code = Apply "v$actualSource -> injected failure at $firstMigration"
+    Require ($code -ne 0 -and (Version $target) -eq $actualSource) "Migration $firstMigration rollback did not preserve original schema $actualSource."
     CheckLive
-    Write-Host 'PASS: failure before schema 6 preserves baseline 5.' -ForegroundColor Green
+    Write-Host "PASS: failed first migration preserves baseline $actualSource." -ForegroundColor Green
 
-    Write-Host 'TEST 3/5: real migration 6 commits, migration 7 fails and rolls back.'
-    Copy-Item -LiteralPath $real6 -Destination (Join-Path $migrationRoot '6.sql') -Force
-    [IO.File]::WriteAllText((Join-Path $migrationRoot '7.sql'), "THROW 51000,'FMSC deliberate chaos failure before schema 7',1;", [Text.UTF8Encoding]::new($false))
-    $code = Apply 'v5 -> schema 6, then failing schema 7'
-    Require ($code -ne 0 -and (Version $target) -eq 6) 'Expected intermediate schema 6 missing.'
+    Write-Host "TEST 3/5: commit migration $firstMigration, then fail before migration $nextMigration."
+    Copy-Item -LiteralPath $realFirst -Destination (Join-Path $migrationRoot ($firstMigration.ToString() + '.sql')) -Force
+    [IO.File]::WriteAllText((Join-Path $migrationRoot ($nextMigration.ToString() + '.sql')), "THROW 51000,'FMSC deliberate chaos failure before schema $nextMigration',1;", [Text.UTF8Encoding]::new($false))
+    $code = Apply "v$actualSource -> schema $firstMigration, then fail $nextMigration"
+    Require ($code -ne 0 -and (Version $target) -eq $firstMigration) "Expected committed intermediate schema $firstMigration missing."
     CheckLive
-    Write-Host 'PASS: committed migration 6 survives; failing migration 7 does not record v7.' -ForegroundColor Green
+    Write-Host "PASS: migration $firstMigration committed; failed migration $nextMigration rolled back." -ForegroundColor Green
 
-    Write-Host 'TEST 4/5: restore correct migration 7, safely finish schema 6 to 7.'
-    Copy-Item -LiteralPath $real7 -Destination (Join-Path $migrationRoot '7.sql') -Force
-    $code = Apply 'resume 6 -> 7'
+    Write-Host "TEST 4/5: restore original migration $nextMigration and resume through schema 7."
+    Copy-Item -LiteralPath $realNext -Destination (Join-Path $migrationRoot ($nextMigration.ToString() + '.sql')) -Force
+    $code = Apply "resume $firstMigration -> 7"
     Require ($code -eq 0 -and (Version $target) -eq 7) 'Forward recovery to schema 7 failed.'
     CheckLive
-    Write-Host 'PASS: original migrations successfully advanced schema 5 through 7.' -ForegroundColor Green
+    Write-Host "PASS: original migrations advanced schema $actualSource through 7." -ForegroundColor Green
 
     Write-Host 'TEST 5/5: restore verified pre-migration recovery backup to another isolated database.'
     $backupDir = Join-Path $root 'Backups'
@@ -198,9 +208,9 @@ try {
     RestoreFixture $restored $first (Join-Path $root 'recovered')
     $recovered = $true
     AssertFixtureFiles $restored
-    Require ((Version $restored) -eq 5 -and (Version $target) -eq 7) 'Recovered backup did not reproduce v5 while target stays v7.'
+    Require ((Version $restored) -eq $actualSource -and (Version $target) -eq 7) "Recovered backup did not reproduce schema $actualSource while target stays v7."
     CheckLive
-    Write-Host 'PASS: backup restores original schema v5; migrated target remains v7.' -ForegroundColor Green
+    Write-Host "PASS: backup restored original schema $actualSource; migrated target remains v7." -ForegroundColor Green
     $success = $true
 } finally {
     foreach ($entry in @(@($restored,$recovered),@($target,$created))) {
