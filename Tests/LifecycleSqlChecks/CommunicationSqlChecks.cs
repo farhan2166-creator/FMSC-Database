@@ -48,6 +48,79 @@ internal static class CommunicationSqlChecks
             await report.Refused("A restricted user cannot read communication history",()=>new SqlCommunicationStore(DatabaseHelper.GetConnection,f.Restricted).ReadAsync("History"),50001,50002,50003);
         });
         if(!installed)return;
+        await report.Stage("Communication: admission WhatsApp withdrawal and number-change gate",async()=>{
+            // The admission preference narrows independently verified comm.Contact rights;
+            // it never creates a contact or adds a purpose/channel permission.
+            Guid formerTemplate=template;
+            template=Guid.NewGuid();
+            try
+            {
+                await Settings();
+                await Contact(true,false,whatsapp:true);
+                await Template("guardian_preference_fixture","Utility","{{school}}: {{student}} {{announcement}}",
+                    mapping:"synthetic-provider-template");
+                async Task<string> WhatsAppReason()
+                {
+                    var rows=await store.PreviewAsync(template,MessageChannel.WhatsApp,[contact],"Fictional guardian preference");
+                    report.Check(rows.Rows.Count==1,"Student-linked WhatsApp preview has exactly one known contact.");
+                    return Convert.ToString(rows.Rows[0]["Exclusion"])??"";
+                }
+                report.Check(await WhatsAppReason()=="",
+                    "A separately verified communication contact remains usable before a guardian admission preference exists.");
+                Sql.Query("""
+                    INSERT dbo.StudentGuardianCommunication(AdmissionId,Email,Phone,WhatsAppConsent,RecordedUtc,RecordedBy)
+                    VALUES(@Id,NULL,N'0300 1234567',1,SYSUTCDATETIME(),@Actor);
+                    """,Sql.P("@Id",student),Sql.P("@Actor",f.Admin));
+                report.Check(await WhatsAppReason()=="",
+                    "Consent for the normalized admission phone matches the verified contact destination.");
+                var pending=Guid.NewGuid();
+                await store.CreateAsync(pending,template,MessageChannel.WhatsApp,[contact],
+                    "Pending before withdrawal",new DateTime(2026,1,1));
+                await store.TransitionAsync(pending,"Submit");
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication
+                    SET WhatsAppConsent=0,RecordedUtc=SYSUTCDATETIME(),RecordedBy=@Actor
+                    WHERE AdmissionId=@Id;
+                    """,Sql.P("@Id",student),Sql.P("@Actor",f.Admin));
+                report.Check((await WhatsAppReason()).Contains("withdrawn"),
+                    "Admission WhatsApp withdrawal immediately blocks new previews.");
+                await report.Refused("Admission withdrawal prevents new campaign preparation",
+                    ()=>store.CreateAsync(Guid.NewGuid(),template,MessageChannel.WhatsApp,[contact],
+                        "Fresh after withdrawal",new DateTime(2026,1,1)),51001);
+                Ready();
+                report.Check(await store.ClaimAsync(default,pending) is null,
+                    "A committed admission withdrawal blocks a previously queued provider submission.");
+                report.Check(Sql.Count("""
+                    SELECT COUNT(*) FROM comm.Message
+                    WHERE CampaignId=@Id AND State='Cancelled' AND LastCode='CONTACT_OR_BALANCE_CHANGED';
+                    """,Sql.P("@Id",pending))==1 &&
+                    Sql.Count("SELECT COUNT(*) FROM comm.Attempt A JOIN comm.Message M ON A.MessageId=M.MessageId WHERE M.CampaignId=@Id;",Sql.P("@Id",pending))==0,
+                    "Withdrawal suppresses queued work without a provider attempt or altering historic message records.");
+
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication
+                    SET WhatsAppConsent=1,Phone=N'03001234568',RecordedUtc=SYSUTCDATETIME()
+                    WHERE AdmissionId=@Id;
+                    """,Sql.P("@Id",student));
+                report.Check((await WhatsAppReason()).Contains("number changed"),
+                    "A later Yes for a different guardian phone cannot authorize the old communication destination.");
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication
+                    SET Phone=N'00923001234567',RecordedUtc=SYSUTCDATETIME()
+                    WHERE AdmissionId=@Id;
+                    """,Sql.P("@Id",student));
+                report.Check(await WhatsAppReason()=="",
+                    "Supported full international-prefix formatting maps to the verified guardian destination.");
+                var sms=await store.PreviewAsync(template,MessageChannel.Sms,[contact],"Unrelated SMS");
+                report.Check(sms.Rows.Count==1 && Convert.ToString(sms.Rows[0]["Exclusion"])=="",
+                    "Admission WhatsApp preferences do not silently revoke separately consented SMS.");
+            }
+            finally
+            {
+                template=formerTemplate;
+                await Contact(true,false);
+            }
+        });
         await report.Stage("Communication: reviewed content and campaign-scoped sending",async()=>{
             await Settings();
             var due=new DateTime(2026,1,1);
