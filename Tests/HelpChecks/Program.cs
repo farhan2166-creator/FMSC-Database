@@ -20,6 +20,14 @@ foreach (var key in new[] { "objects", "uniqueIndexes", "checkConstraints", "tri
         var owner = entry.GetProperty("schema").GetString()!;
         sqlNames.Add(owner + "." + name);
     }
+// Runtime validates the FK by relationship/columns, not its SQL Server name.
+if (schema.RootElement.GetProperty("foreignKeys").EnumerateArray().Any(fk =>
+    fk.GetProperty("schema").GetString() == "dbo" &&
+    fk.GetProperty("objectName").GetString() == "FamilyMembers" &&
+    fk.GetProperty("referencedObject").GetString() == "Students" &&
+    fk.GetProperty("columns").GetString() == "AdmissionId" &&
+    fk.GetProperty("referencedColumns").GetString() == "AdmissionId"))
+    sqlNames.Add("dbo.FK_FamilyMembers_Student");
 var entries = HelpCatalog.Entries;
 Check(entries.Count >= 77, "Preserve the original useful questions");
 Check(entries.Select(e => e.Id).Distinct().Count() == entries.Count, "Unique stable IDs");
