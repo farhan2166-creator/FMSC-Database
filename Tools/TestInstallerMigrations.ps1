@@ -85,18 +85,28 @@ try {
     Scenario @('7.sql','8.sql','9.sql') 6 9 'backup:6->9,apply:7' 'expected database version'
     $script:wrongVersion=$false
     # Inspect the real runner's same-connection wrapper through an inert sqlcmd replacement.
-    function Invoke-FakeSqlcmd { param($S,[switch]$E,$d,[switch]$C,[switch]$b,$f,$i)
+    # The fixture has GO batches and a path with spaces; the runner must inline its SQL.
+    $fixturePath = Join-Path $scratch '8.sql'
+    $fixtureSql = "PRINT N'FMSC_INLINE_BATCH_ONE';`r`nGO`r`nPRINT N'FMSC_INLINE_BATCH_TWO';"
+    [IO.File]::WriteAllText($fixturePath, $fixtureSql, [Text.UTF8Encoding]::new($false))
+    function Invoke-FakeSqlcmd { param($S,[switch]$E,$d,[switch]$C,[switch]$b,$i)
         $script:wrapperPath=$i; $script:wrapper=Get-Content -LiteralPath $i -Raw
         $global:LASTEXITCODE=$script:sqlExit
     }
     $script:SqlCmdPath='Invoke-FakeSqlcmd'; $SqlInstance='inert'; $DatabaseName='inert'
     $script:sqlExit=0
-    & $sqlRunner -FilePath (Join-Path $scratch '8.sql') -VersionBefore 6 -ExpectedVersion 8
+    & $sqlRunner -FilePath $fixturePath -VersionBefore 6 -ExpectedVersion 8
+    $firstBatch = $script:wrapper.IndexOf("PRINT N'FMSC_INLINE_BATCH_ONE';", [StringComparison]::Ordinal)
+    $secondBatch = $script:wrapper.IndexOf("PRINT N'FMSC_INLINE_BATCH_TWO';", [StringComparison]::Ordinal)
     if($script:wrapper -notmatch 'sp_getapplock' -or $script:wrapper -notmatch 'BEGIN TRANSACTION;' -or
-       $script:wrapper -notmatch ':r "' -or $script:wrapper -notmatch '@After<>8' -or $script:wrapper -notmatch 'COMMIT TRANSACTION;') {throw 'Migration transaction/version wrapper is incomplete.'}
+       $firstBatch -lt 0 -or $secondBatch -le $firstBatch -or
+       $script:wrapper -match '(?m)^\s*:r\s' -or
+       $script:wrapper -notmatch '@After<>8' -or $script:wrapper -notmatch 'COMMIT TRANSACTION;') {
+        throw 'Migration transaction/version wrapper or inline SQL is incomplete.'
+    }
     if(Test-Path -LiteralPath $script:wrapperPath){throw 'Wrapper was not removed.'}
     $script:sqlExit=1; $failure=''
-    try{& $sqlRunner -FilePath (Join-Path $scratch '8.sql') -VersionBefore 6 -ExpectedVersion 8}catch{$failure=$_.Exception.Message}
+    try{& $sqlRunner -FilePath $fixturePath -VersionBefore 6 -ExpectedVersion 8}catch{$failure=$_.Exception.Message}
     if(-not $failure.Contains('Migration 8 failed') -or (Test-Path -LiteralPath $script:wrapperPath)){throw 'SQL failure/cleanup must be reported.'}
     Write-Output "PASS: 15 application-version cases; $checks folder/version/backup scenarios plus SQL wrapper, failure cleanup and activation-order checks."
 } finally {
