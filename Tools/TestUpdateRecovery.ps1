@@ -205,6 +205,7 @@ try {
     function Convert-ToDbVersion { param($Version) return [int]$Version }
     function Confirm-FmscRecoveryBackup {
         param([int]$CurrentSchema)
+        if (-not $script:RecoveryJournal.Backup) { return }
         $script:backupChecks++
         if ($CurrentSchema -ne $script:RecoveryJournal.BeforeSchema -or
             (Get-FileHash -LiteralPath $script:RecoveryJournal.Backup -Algorithm SHA256).Hash -ne
