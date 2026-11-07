@@ -102,8 +102,13 @@ function CheckLive {
 function Apply([string]$Label) {
     Write-Host "RUN: $Label"
     $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    & $ps -NoProfile -ExecutionPolicy Bypass -File $script:applyScript -DatabaseName $target -BackupRoot (Join-Path $root 'Backups') -SqlCmdPath $script:sqlcmd -Apply
-    return $LASTEXITCODE
+    # Do not return both the child process output AND its exit code. PowerShell
+    # otherwise produces an array that can evaluate as true even after failure.
+    $lines = @(& $ps -NoProfile -ExecutionPolicy Bypass -File $script:applyScript -DatabaseName $target -BackupRoot (Join-Path $root 'Backups') -SqlCmdPath $script:sqlcmd -Apply 2>&1)
+    $exitCode = [int]$LASTEXITCODE
+    foreach ($line in $lines) { Write-Host ([string]$line) }
+    Write-Host "MIGRATION RUNNER EXIT CODE: $exitCode"
+    return [pscustomobject]@{ ExitCode=$exitCode; Output=($lines -join [Environment]::NewLine) }
 }
 try {
     $live = Version 'FMSC_DB'
@@ -179,23 +184,26 @@ try {
 
     Write-Host "TEST 2/5: intentionally fail before migration $firstMigration (rollback must preserve schema $actualSource)."
     [IO.File]::WriteAllText((Join-Path $migrationRoot ($firstMigration.ToString() + '.sql')), "THROW 51000,'FMSC deliberate chaos failure before schema $firstMigration',1;", [Text.UTF8Encoding]::new($false))
-    $code = Apply "v$actualSource -> injected failure at $firstMigration"
-    Require ($code -ne 0 -and (Version $target) -eq $actualSource) "Migration $firstMigration rollback did not preserve original schema $actualSource."
+    $run = Apply "v$actualSource -> injected failure at $firstMigration"
+    Require ($run.ExitCode -ne 0 -and $run.Output -match "Migration $firstMigration failed" -and
+        (Version $target) -eq $actualSource) "Migration $firstMigration did not fail at the intended SQL boundary; review the printed child output."
     CheckLive
     Write-Host "PASS: failed first migration preserves baseline $actualSource." -ForegroundColor Green
 
     Write-Host "TEST 3/5: commit migration $firstMigration, then fail before migration $nextMigration."
     Copy-Item -LiteralPath $realFirst -Destination (Join-Path $migrationRoot ($firstMigration.ToString() + '.sql')) -Force
     [IO.File]::WriteAllText((Join-Path $migrationRoot ($nextMigration.ToString() + '.sql')), "THROW 51000,'FMSC deliberate chaos failure before schema $nextMigration',1;", [Text.UTF8Encoding]::new($false))
-    $code = Apply "v$actualSource -> schema $firstMigration, then fail $nextMigration"
-    Require ($code -ne 0 -and (Version $target) -eq $firstMigration) "Expected committed intermediate schema $firstMigration missing."
+    $run = Apply "v$actualSource -> schema $firstMigration, then fail $nextMigration"
+    $observed = Version $target
+    Require ($run.ExitCode -ne 0 -and $run.Output -match "Migration $nextMigration failed" -and
+        $observed -eq $firstMigration) "Expected committed intermediate schema $firstMigration missing (actual $observed). Inspect child failure above."
     CheckLive
     Write-Host "PASS: migration $firstMigration committed; failed migration $nextMigration rolled back." -ForegroundColor Green
 
     Write-Host "TEST 4/5: restore original migration $nextMigration and resume through schema 7."
     Copy-Item -LiteralPath $realNext -Destination (Join-Path $migrationRoot ($nextMigration.ToString() + '.sql')) -Force
-    $code = Apply "resume $firstMigration -> 7"
-    Require ($code -eq 0 -and (Version $target) -eq 7) 'Forward recovery to schema 7 failed.'
+    $run = Apply "resume $firstMigration -> 7"
+    Require ($run.ExitCode -eq 0 -and (Version $target) -eq 7) 'Forward recovery to schema 7 failed; inspect child failure above.'
     CheckLive
     Write-Host "PASS: original migrations advanced schema $actualSource through 7." -ForegroundColor Green
 
