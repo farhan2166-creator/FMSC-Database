@@ -36,8 +36,21 @@ internal static partial class Program
             string Status()=>((Label)typeof(V2Page).GetField("StatusLabel",flags)!.GetValue(page)!).Text;
             using var parent=new Form{ClientSize=new Size(1100,720)};parent.Controls.Add(page);parent.Show();Application.DoEvents();
             var tabs=Field<TabControl>("tabs");typeof(CommunicationCenterPage).GetField("installed",flags)!.SetValue(page,true);tabs.Enabled=true;
-            Descendants(page).OfType<ModernButton>().Single(button=>button.Text=="Advanced Settings").PerformClick();
-            for(int index=1;index<6;index++)
+            // A guardian who answered Yes on Admission must never face another
+            // contact-verification, SMS/WhatsApp or purpose-consent editor.
+            var candidateTable=new DataTable();
+            candidateTable.Columns.Add("OwnerKind",typeof(string));
+            candidateTable.Columns.Add("OwnerId",typeof(int));
+            candidateTable.Columns.Add("ContactNumber",typeof(string));
+            candidateTable.Rows.Add("Student",999,"03001234567");
+            var studentContactEdit=(Task)Invoke("EditContact",null!,candidateTable.Rows[0])!;
+            PumpUntil(()=>studentContactEdit.IsCompleted,"Student consent redirects to Admission");
+            studentContactEdit.GetAwaiter().GetResult();
+            Check(Status().Contains("consent is managed on Admission"),
+                "Student guardian contact editing requires no second consent checklist or SQL write");
+
+            Check(tabs.TabPages.Count==3,"Communication administrator navigation is limited to Send, History and Settings");
+            for(int index=1;index<3;index++)
             {
                 tabs.SelectedIndex=index;PumpUntil(()=>!page.IsBusy,"Tab data load settles");
                 Check(tabs.SelectedIndex==index,"Busy refresh preserves the operator's selected tab");
@@ -53,7 +66,7 @@ internal static partial class Program
             Check(tabs.SelectedIndex==1&&Field<ModernTextBox>("announcement").Text=="Preserve this fictional draft","Delayed refresh preserves selected tab and unsaved composition");
             Check(Descendants(tabs.Parent!.Parent!).OfType<ModernButton>().Count(b=>b.ThemeRole=="TabActive")==1,"Busy disable/restore leaves exactly one tab selected");
             tabs.SelectedIndex=1;PumpUntil(()=>!page.IsBusy,"Outbox opens");
-            Check(Status().Contains("No messages")&&Convert.ToString(history.Tag)!.Contains("Create a draft"),"An empty outbox explains how to begin and how to widen filters");
+            Check(Status().Contains("No messages")&&Convert.ToString(history.Tag)!.Contains("Send a message"),"An empty outbox explains how to begin and how to widen filters");
             Check(!Descendants(tabs.TabPages[1]).OfType<ModernButton>().Single(b=>b.Text=="Submit").Enabled,"No campaign-selection action is enabled on an empty outbox");
             Field<ModernTextBox>("historySearch").Text="Fictional search";
             Check(history.DataSource is null,"Changed history filters clear stale campaign selection before another action");
@@ -67,7 +80,7 @@ internal static partial class Program
             fail=false;Await("RefreshHistory");Check(history.Enabled,"Refreshing after a read failure restores the grid");
             tabs.SelectedIndex=0;PumpUntil(()=>!page.IsBusy,"Compose opens");
             var recipients=Field<DataGridView>("recipients");
-            Check(Convert.ToString(recipients.Tag)!.Contains("Add From School Records")&&Status().Contains("No saved contacts"),"Empty recipient results explain filters and consented-contact setup without inventing an active-student restriction");
+            Check(Convert.ToString(recipients.Tag)!.Contains("Yes on Admission")&&Status().Contains("No contacts match"),"Empty student recipient results direct operators to the one Admission consent choice without a second checklist");
             var included=Field<HashSet<Guid>>("included");included.Add(Guid.NewGuid());
             Field<ModernTextBox>("search").Text="Changed student filter";
             Check(!recipients.Enabled&&included.Count==1&&!Field<ModernButton>("prepare").Enabled,"Changing recipient filters blocks stale rows and preview while preserving the explicit cross-page selection");
@@ -77,7 +90,7 @@ internal static partial class Program
             var templateTable=Rows("Templates",[]);
             for(int i=0;i<100;i++)templateTable.Rows.Add(Guid.NewGuid(),true,"fixture_"+i,"en",1);
             templateReply=templateTable;Await("RefreshTemplates");
-            var templateButtons=Descendants(tabs.TabPages[3]).OfType<ModernButton>().ToArray();
+            var templateButtons=Descendants(Field<DataGridView>("templates").Parent!).OfType<ModernButton>().ToArray();
             Check(templateButtons.Single(b=>b.Text=="Next").Enabled&&!templateButtons.Single(b=>b.Text=="Previous").Enabled,"Paging enables Next only for a full page and disables Previous at the start");
             Guid chosen=(Guid)templateTable.Rows[0]["TemplateId"];Field<ModernComboBox>("templateChoice").SelectedValue=chosen;
             templateReply=templateTable.Clone();templateReply.Rows.Add(Guid.NewGuid(),true,"another_page","en",1);
@@ -86,13 +99,41 @@ internal static partial class Program
             Check(!templateButtons.Single(b=>b.Text=="Next").Enabled&&templateButtons.Single(b=>b.Text=="Previous").Enabled,"A short or empty result page stops Next while allowing a return");
             templateReply=templateTable.Clone();templateReply.Rows.Add(chosen,false,"revoked_fixture","en",1);Await("RefreshTemplates");
             Check(Field<ModernComboBox>("templateChoice").SelectedIndex==-1,"A known revoked template is removed rather than silently replaced by a different template");
+
+            // The task-oriented recipient choice must not offer a school notice as
+            // an outstanding reminder or a student template to staff/manual contacts.
+            var scoped=Rows("Templates",[]);
+            scoped.Columns.Add("Scope",typeof(string));
+            scoped.Columns.Add("Category",typeof(string));
+            scoped.Rows.Add(Guid.NewGuid(),true,"year_commencement","en",1,"Student","Announcement");
+            scoped.Rows.Add(Guid.NewGuid(),true,"outstanding","en",1,"Student","Financial");
+            scoped.Rows.Add(Guid.NewGuid(),true,"staff_announcement","en",1,"Staff","Announcement");
+            scoped.Rows.Add(Guid.NewGuid(),true,"general_announcement","en",1,"Manual","Announcement");
+            templateReply=scoped;
+            typeof(CommunicationCenterPage).GetField("templatePage",flags)!.SetValue(page,0);
+            Await("RefreshTemplates");
+            var audience=Field<ModernComboBox>("audience");
+            var choice=Field<ModernComboBox>("templateChoice");
+            audience.SelectedIndex=2;
+            Check(choice.Items.Count==1 && (choice.Items[0] as DataRowView)?.Row.Field<string>("Code")=="outstanding",
+                "Outstanding-fee recipients can only choose the reviewed reminder template");
+            audience.SelectedIndex=4;
+            Check(choice.Items.Count==1 && (choice.Items[0] as DataRowView)?.Row.Field<string>("Scope")=="Staff",
+                "Staff recipients do not see student or manual templates");
+            audience.SelectedIndex=5;
+            Check(choice.Items.Count==1 && (choice.Items[0] as DataRowView)?.Row.Field<string>("Scope")=="Manual",
+                "Manual contacts use appropriately scoped templates");
+            audience.SelectedIndex=0;
+            Check(choice.Items.Count==2 && choice.Items.Cast<DataRowView>().All(item=>item.Row.Field<string>("Scope")=="Student"),
+                "Campus messages offer student-scoped templates instead of cross-purpose contact types");
+
             Check(connections==0&&reads>0,"Communication workflow fixtures exercise injected reads only, without SQL, writes or external delivery");
             CurrentUser.SignIn(920,"View-only fixture","Operator",false,["Communication.View"]);
             using var restricted=new CommunicationCenterPage(store,false);
             var restrictedTabs=(TabControl)typeof(CommunicationCenterPage).GetField("tabs",flags)!.GetValue(restricted)!;
             Check(restrictedTabs.SelectedIndex==1,"A view-only operator starts in the outbox rather than an unavailable compose workflow");
             Check(restrictedTabs.TabPages.Count==2 && restrictedTabs.SelectedTab?.Text=="History",
-                "A view-only operator sees History without administration tabs in the simple view");
+                "A view-only operator sees History without restricted Settings");
         }
         finally{CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Item5);}
     }

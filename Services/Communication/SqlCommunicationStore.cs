@@ -11,7 +11,7 @@ public sealed class SqlCommunicationStore(Func<SqlConnection> connections, int a
     public static SqlParameter Revision(object? value)=>new("@ExpectedRevision",SqlDbType.Binary,8){Value=value??DBNull.Value};
     public async Task<DataTable> CallAsync(string operation,CancellationToken token=default,params SqlParameter[] parameters)
     {
-        if(!new[]{"Read","SaveContact","SaveTemplate","Preview","CreateCampaign","Transition","Claim","Complete","StatusUpdate","SaveSettings","SaveRule","Evaluate","Retry","Details","CampaignSummary","RevokeTemplate"}.Contains(operation))
+        if(!new[]{"Read","SaveContact","SaveTemplate","Preview","CreateCampaign","Transition","Claim","Complete","StatusUpdate","SaveSettings","SaveRule","Evaluate","Retry","Details","CampaignSummary","RevokeTemplate","SyncAdmissionContacts"}.Contains(operation))
             throw new ArgumentException("Unknown communication operation.");
         await using var connection=connections();
         await connection.OpenAsync(token).ConfigureAwait(false);

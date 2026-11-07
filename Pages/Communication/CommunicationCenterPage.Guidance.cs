@@ -14,15 +14,15 @@ public sealed partial class CommunicationCenterPage
         read(view,[SqlCommunicationStore.P("@Page",page),SqlCommunicationStore.P("@Search",search),SqlCommunicationStore.P("@Filter",filter),..scope]);
 
     private string EmptyRecipients()=>CurrentUser.HasPermission("Communication.Configure")
-        ? "No saved contacts match these filters. Clear or widen the filters, or open Contacts / Consent → Add From School Records to register a guardian or staff contact. Student phone numbers are not added as consented contacts automatically."
-        : "No saved contacts match these filters. Clear or widen the filters, or ask an authorized administrator to add and verify the contact and record consent.";
+        ? "No contacts match. For student guardians, record Yes on Admission, then choose Find Contacts or Preview to link them automatically. For other contacts, check Settings → Contacts."
+        : "No contacts match. Check campus or class filters. Student guardians only need Yes recorded on Admission; Find Contacts or Preview links them automatically.";
     private void ConfigureGuidance()
     {
         foreach(var item in new[]{(recipients,"Find contacts to choose recipients. "+EmptyRecipients()),(preview,"Choose a reviewed template and contacts, then select Preview Messages. No message is sent by previewing."),
-            (history,"No messages match this view. Create a draft in Compose / Bulk, or clear the search and state filter. Scheduled work appears after a campaign is submitted."),
-            (contacts,"No communication contacts are recorded on this page. Use Add From School Records or Add Manual Contact, then verify ownership and record consent."),
+            (history,"No messages found. Send a message or clear the search and status filter. Scheduled work appears once submitted."),
+            (contacts,"No saved contacts are listed. Student guardian contacts come from Admission Yes when recipients are searched or previewed; other contacts can be entered here."),
             (templates,"No templates are available on this page. Return to the previous page or use New Version / Review."),
-            (rules,"No automation rules are configured. Review a student-context template first, then use New / Edit Rule. Rules remain disabled until explicitly enabled.")})
+            (rules,"No existing automation rules. Automatic messaging is optional and is not enabled from this workspace.")})
         {UiHelper.SetGridEmptyMessage(item.Item1,item.Item2);UiHelper.SetGridPlaceholderMessage(item.Item1,item.Item2);}
         tabs.Selecting+=(_,e)=>{if(IsBusy)e.Cancel=true;};
         tabs.SelectedIndexChanged+=async(_,_)=>{
@@ -38,12 +38,9 @@ public sealed partial class CommunicationCenterPage
     {
         SetPageHeaderText("Communication Center",tabs.SelectedTab?.Text??"");
         string text=tabs.SelectedIndex switch {
-            0=>CurrentUser.HasPermission("Communication.Compose")?"Choose who to message, pick a template, then preview and send.":"View previous messages in History.",
-            1=>"Check what happened to each message. Open Advanced Settings for approvals, drafts, and dispatcher controls.",
-            2=>CurrentUser.HasPermission("Communication.Configure")?"Verify number ownership and record channel/purpose consent. Saving a contact sends nothing.":"Contact and consent administration requires Communication.Configure. Ask an authorized administrator to add or update a contact.",
-            3=>"Review text, language and recipient context. New Version / Review saves an immutable version; approve before composing. WhatsApp requires an approved provider mapping.",
-            4=>CurrentUser.HasPermission("Communication.Configure")?"Rules apply to future events and require contacts, consent and reviewed templates. Evaluation prepares eligible campaigns; approval and dispatcher controls still apply.":"Automation configuration requires Communication.Configure. Ask an authorized administrator to review the rules.",
-            _=>CurrentUser.HasPermission("Communication.Configure")?"Start with Simulation to rehearse without external delivery. Configure budgets, sender credentials and approved templates before explicitly enabling Live. Credentials are protected for this Windows user.":"Gateway configuration requires Communication.Configure. Ask an authorized administrator; no credentials are displayed here."
+            0=>CurrentUser.HasPermission("Communication.Compose")?"Choose a campus, class or recipient, select a template, then preview and send.":"View previous messages in History.",
+            1=>"Review message results, pending work and available actions. More Actions contains approvals and operational controls.",
+            _=>"Manage contact consent, reviewed templates and sending configuration. Automatic messaging is not enabled here."
         };
         SetHeaderGuidance(text);
     }
@@ -53,9 +50,7 @@ public sealed partial class CommunicationCenterPage
         {
             case 0: await RefreshRecipients();break;
             case 1: await RefreshHistory();break;
-            case 2: if(CurrentUser.HasPermission("Communication.Configure"))await RefreshContacts();break;
-            case 3: await RefreshTemplates();break;
-            case 4: if(CurrentUser.HasPermission("Communication.Configure"))await RefreshRules();break;
+            case 2: if(CurrentUser.HasPermission("Communication.Configure"))await LoadSettingsSection();break;
         }
     }
     private Control[] Paging(DataGridView grid,Func<int> page,Action<int> setPage,Func<Task> refresh,string permission="Communication.View")

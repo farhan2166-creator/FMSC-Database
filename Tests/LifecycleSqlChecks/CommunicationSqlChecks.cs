@@ -48,6 +48,236 @@ internal static class CommunicationSqlChecks
             await report.Refused("A restricted user cannot read communication history",()=>new SqlCommunicationStore(DatabaseHelper.GetConnection,f.Restricted).ReadAsync("History"),50001,50002,50003);
         });
         if(!installed)return;
+        await report.Stage("Communication: admission WhatsApp withdrawal and number-change gate",async()=>{
+            // The admission preference narrows independently verified comm.Contact rights;
+            // it never creates a contact or adds a purpose/channel permission.
+            Guid formerTemplate=template;
+            template=Guid.NewGuid();
+            try
+            {
+                await Settings();
+                await Contact(true,false,whatsapp:true);
+                await Template("guardian_preference_fixture","Utility","{{school}}: {{student}} {{announcement}}",
+                    mapping:"synthetic-provider-template");
+                async Task<string> WhatsAppReason()
+                {
+                    var rows=await store.PreviewAsync(template,MessageChannel.WhatsApp,[contact],"Fictional guardian preference");
+                    report.Check(rows.Rows.Count==1,"Student-linked WhatsApp preview has exactly one known contact.");
+                    return Convert.ToString(rows.Rows[0]["Exclusion"])??"";
+                }
+                report.Check(await WhatsAppReason()=="",
+                    "A separately verified communication contact remains usable before a guardian admission preference exists.");
+                Sql.Query("""
+                    INSERT dbo.StudentGuardianCommunication(AdmissionId,Email,Phone,WhatsAppConsent,RecordedUtc,RecordedBy)
+                    VALUES(@Id,NULL,N'0300 1234567',1,SYSUTCDATETIME(),@Actor);
+                    """,Sql.P("@Id",student),Sql.P("@Actor",f.Admin));
+                report.Check(await WhatsAppReason()=="",
+                    "Consent for the normalized admission phone matches the verified contact destination.");
+                var pending=Guid.NewGuid();
+                await store.CreateAsync(pending,template,MessageChannel.WhatsApp,[contact],
+                    "Pending before withdrawal",new DateTime(2026,1,1));
+                await store.TransitionAsync(pending,"Submit");
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication
+                    SET WhatsAppConsent=0,RecordedUtc=SYSUTCDATETIME(),RecordedBy=@Actor
+                    WHERE AdmissionId=@Id;
+                    """,Sql.P("@Id",student),Sql.P("@Actor",f.Admin));
+                report.Check((await WhatsAppReason()).Contains("declined"),
+                    "Admission WhatsApp withdrawal immediately blocks new previews under the unified consent exclusion.");
+                await report.Refused("Admission withdrawal prevents new campaign preparation",
+                    ()=>store.CreateAsync(Guid.NewGuid(),template,MessageChannel.WhatsApp,[contact],
+                        "Fresh after withdrawal",new DateTime(2026,1,1)),51001);
+                Ready();
+                report.Check(await store.ClaimAsync(default,pending) is null,
+                    "A committed admission withdrawal blocks a previously queued provider submission.");
+                report.Check(Sql.Count("""
+                    SELECT COUNT(*) FROM comm.Message
+                    WHERE CampaignId=@Id AND State='Cancelled' AND LastCode='CONTACT_OR_BALANCE_CHANGED';
+                    """,Sql.P("@Id",pending))==1 &&
+                    Sql.Count("SELECT COUNT(*) FROM comm.Attempt A JOIN comm.Message M ON A.MessageId=M.MessageId WHERE M.CampaignId=@Id;",Sql.P("@Id",pending))==0,
+                    "Withdrawal suppresses queued work without a provider attempt or altering historic message records.");
+
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication
+                    SET WhatsAppConsent=1,Phone=N'03001234568',RecordedUtc=SYSUTCDATETIME()
+                    WHERE AdmissionId=@Id;
+                    """,Sql.P("@Id",student));
+                report.Check((await WhatsAppReason()).Contains("number changed"),
+                    "A later Yes for a different guardian phone cannot authorize the old communication destination.");
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication
+                    SET Phone=N'+44 7700 900123',RecordedUtc=SYSUTCDATETIME()
+                    WHERE AdmissionId=@Id;
+                    """,Sql.P("@Id",student));
+                report.Check(Convert.ToInt32(Sql.Scalar(
+                    "SELECT comm.GuardianWhatsAppAllowed(@AdmissionId,@Destination);",
+                    Sql.P("@AdmissionId",student),Sql.P("@Destination","+447700900123")))==1,
+                    "Explicit international E.164 guardian numbers remain usable when the verified destination matches.");
+                report.Check((await WhatsAppReason()).Contains("number changed"),
+                    "International consent for another number never authorizes the previous Pakistan destination.");
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication
+                    SET Phone=N'00923001234567',RecordedUtc=SYSUTCDATETIME()
+                    WHERE AdmissionId=@Id;
+                    """,Sql.P("@Id",student));
+                report.Check(await WhatsAppReason()=="",
+                    "Supported full international-prefix formatting maps to the verified guardian destination.");
+                var sms=await store.PreviewAsync(template,MessageChannel.Sms,[contact],"Unrelated SMS");
+                report.Check(sms.Rows.Count==1 && Convert.ToString(sms.Rows[0]["Exclusion"])=="",
+                    "Admission WhatsApp preferences do not silently revoke separately consented SMS.");
+            }
+            finally
+            {
+                template=formerTemplate;
+                await Contact(true,false);
+            }
+        });
+        await report.Stage("Communication: one Admission Yes covers all school messages",async()=>{
+            // No manual contact/consent action: a single Admission Yes automatically
+            // provides the student guardian contact when recipients are requested.
+            var admissionArgs=f.AdmissionArgs("Unified Guardian Consent Example");
+            admissionArgs.Single(p=>p.ParameterName=="@ContactNumber").Value="03001234567";
+            var saved=Sql.Proc("AdmitStudent",admissionArgs);
+            int schoolStudent=Convert.ToInt32(saved.Rows[0]["AdmissionId"]);
+            string studentPhone=Convert.ToString(Sql.Scalar(
+                "SELECT ContactNumber FROM dbo.Students WHERE AdmissionId=@Id;",
+                Sql.P("@Id",schoolStudent)))??"";
+            Guid originalTemplate=template;
+            try
+            {
+                Sql.Query("""
+                    INSERT dbo.StudentGuardianCommunication
+                      (AdmissionId,Phone,WhatsAppConsent,SchoolCommunicationConsent,RecordedUtc,RecordedBy)
+                    VALUES(@Id,@Phone,1,1,SYSUTCDATETIME(),@Actor);
+                    """,Sql.P("@Id",schoolStudent),Sql.P("@Phone",studentPhone),Sql.P("@Actor",f.Admin));
+                int oldCampaigns=Sql.Count("SELECT COUNT(*) FROM comm.Campaign;");
+                await store.CallAsync("SyncAdmissionContacts");
+                report.Check(Sql.Count("SELECT COUNT(*) FROM comm.Campaign;")==oldCampaigns,
+                    "Synchronizing Admission Yes does not compose, queue or send a message.");
+                var linked=Sql.Query("""
+                    SELECT ContactId,Verified,SmsConsent,WhatsAppConsent,FinancialConsent,
+                           AnnouncementConsent,OptedOut
+                    FROM comm.Contact WHERE OwnerKind='Student' AND AdmissionId=@Id;
+                    """,Sql.P("@Id",schoolStudent));
+                report.Check(linked.Rows.Count==1 && linked.Rows[0].Field<bool>("Verified") &&
+                    linked.Rows[0].Field<bool>("SmsConsent") && linked.Rows[0].Field<bool>("WhatsAppConsent") &&
+                    linked.Rows[0].Field<bool>("FinancialConsent") && linked.Rows[0].Field<bool>("AnnouncementConsent") &&
+                    !linked.Rows[0].Field<bool>("OptedOut"),
+                    "One Admission Yes provides an eligible SMS, WhatsApp, fee and announcement contact without another consent checklist.");
+                Guid linkedContact=linked.Rows[0].Field<Guid>("ContactId");
+                await store.CallAsync("SyncAdmissionContacts");
+                report.Check(Sql.Count("SELECT COUNT(*) FROM comm.Contact WHERE OwnerKind='Student' AND AdmissionId=@Id;",
+                    Sql.P("@Id",schoolStudent))==1,
+                    "Repeated student recipient discovery is idempotent and never adds a second linked contact.");
+
+                Guid manualContact=Guid.NewGuid();
+                await store.CallAsync("SaveContact",default,
+                    SqlCommunicationStore.P("@Id",manualContact),
+                    SqlCommunicationStore.P("@Kind","Manual"),
+                    SqlCommunicationStore.P("@Name","Fictional manual recipient"),
+                    SqlCommunicationStore.P("@Phone","+923001234568"),
+                    SqlCommunicationStore.P("@Language","en"),
+                    SqlCommunicationStore.P("@Channel","Sms"),
+                    SqlCommunicationStore.P("@Verified",true),
+                    SqlCommunicationStore.P("@Sms",true),
+                    SqlCommunicationStore.P("@WhatsApp",true),
+                    SqlCommunicationStore.P("@Financial",false),
+                    SqlCommunicationStore.P("@Announcements",true),
+                    SqlCommunicationStore.P("@OptOut",false),
+                    SqlCommunicationStore.P("@Source","Fictional manual fixture consent"));
+                async Task<DataTable> ScopedRecipients(string filter,int campusId=0,int classId=0)=>
+                    await store.CallAsync("Read",default,
+                        SqlCommunicationStore.P("@View","Recipients"),
+                        SqlCommunicationStore.P("@Filter",filter),
+                        SqlCommunicationStore.P("@Campus",campusId),
+                        SqlCommunicationStore.P("@Class",classId));
+                var campusStudents=await ScopedRecipients("Student",f.Campus,f.Class6);
+                report.Check(campusStudents.AsEnumerable().Any(row=>row.Field<Guid>("ContactId")==linkedContact)
+                        && campusStudents.AsEnumerable().All(row=>row.Field<string>("OwnerKind")=="Student")
+                        && campusStudents.AsEnumerable().All(row=>row.Field<string>("Class")=="Class 6"),
+                    "Campus and class recipient selection returns student-linked contacts only.");
+                var wrongClass=await ScopedRecipients("Student",f.Campus,f.Class7);
+                report.Check(wrongClass.AsEnumerable().All(row=>row.Field<Guid>("ContactId")!=linkedContact),
+                    "Class selection never includes a guardian from another class.");
+                var allStudents=await ScopedRecipients("Student");
+                report.Check(allStudents.AsEnumerable().All(row=>row.Field<string>("OwnerKind")=="Student")
+                    && allStudents.AsEnumerable().All(row=>row.Field<Guid>("ContactId")!=manualContact),
+                    "Student group selection excludes manual contacts even without a campus filter.");
+                var outstandingStudents=await ScopedRecipients("Outstanding",f.Campus);
+                report.Check(outstandingStudents.AsEnumerable().All(row=>row.Field<string>("OwnerKind")=="Student"),
+                    "Outstanding-fee group searches exclude family and manual contacts.");
+                template=Guid.NewGuid();
+                await Template("school_all_messages","Financial","{{student}} — school fee notice.",
+                    mapping:"synthetic-approved-provider-name");
+                async Task<string> Reason(MessageChannel channel)
+                {
+                    var rows=await store.PreviewAsync(template,channel,[linkedContact],"Example");
+                    report.Check(rows.Rows.Count==1,"Unified consent retains exactly one linked recipient.");
+                    return Convert.ToString(rows.Rows[0]["Exclusion"])??"";
+                }
+                report.Check(await Reason(MessageChannel.WhatsApp)=="" && await Reason(MessageChannel.Sms)=="",
+                    "Admission Yes alone is sufficient for Financial WhatsApp and SMS eligibility.");
+                var urdu=Guid.NewGuid();
+                await store.CallAsync("SaveTemplate",default,
+                    SqlCommunicationStore.P("@Id",urdu),
+                    SqlCommunicationStore.P("@Code","school_urdu_notice"),
+                    SqlCommunicationStore.P("@Version",1),
+                    SqlCommunicationStore.P("@Language","ur"),
+                    SqlCommunicationStore.P("@Category","Announcement"),
+                    SqlCommunicationStore.P("@Scope","Student"),
+                    SqlCommunicationStore.P("@Body","یہ اسکول کی اطلاع ہے"),
+                    SqlCommunicationStore.P("@ProviderTemplate","synthetic-approved-urdu"),
+                    SqlCommunicationStore.P("@Order","[]"),
+                    SqlCommunicationStore.P("@Approved",true));
+                var urduRows=await store.PreviewAsync(urdu,MessageChannel.WhatsApp,[linkedContact]);
+                report.Check(urduRows.Rows.Count==1 && Convert.ToString(urduRows.Rows[0]["Exclusion"])=="",
+                    "Admission Yes also permits reviewed Urdu announcements without a second guardian language or consent editor.");
+                var queued=Guid.NewGuid();
+                await store.CreateAsync(queued,template,MessageChannel.Sms,[linkedContact],
+                    "School notice before withdrawal",new DateTime(2026,1,1));
+                await store.TransitionAsync(queued,"Submit");
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication
+                    SET SchoolCommunicationConsent=0,WhatsAppConsent=0,RecordedUtc=SYSUTCDATETIME()
+                    WHERE AdmissionId=@Id;
+                    """,Sql.P("@Id",schoolStudent));
+                report.Check((await Reason(MessageChannel.Sms)).Contains("declined")
+                    && (await Reason(MessageChannel.WhatsApp)).Contains("declined"),
+                    "Admission No withdraws all supported school messages immediately.");
+                Ready();
+                report.Check(await store.ClaimAsync(default,queued) is null &&
+                    Sql.Count("SELECT COUNT(*) FROM comm.Attempt A JOIN comm.Message M ON A.MessageId=M.MessageId WHERE M.CampaignId=@Id;",Sql.P("@Id",queued))==0,
+                    "Queued messages are suppressed after Admission No, before provider submission.");
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication
+                    SET SchoolCommunicationConsent=1,WhatsAppConsent=1,Phone=N'03001234569',
+                        RecordedUtc=SYSUTCDATETIME()
+                    WHERE AdmissionId=@Id;
+                    """,Sql.P("@Id",schoolStudent));
+                report.Check((await Reason(MessageChannel.Sms)).Contains("number changed"),
+                    "Admission Yes for another phone does not authorize the previous destination.");
+                await store.CallAsync("SyncAdmissionContacts");
+                report.Check(Sql.Count("SELECT COUNT(*) FROM comm.Contact WHERE AdmissionId=@Id;",Sql.P("@Id",schoolStudent))==1,
+                    "Stale Student contact data never auto-enrolls an unrelated phone.");
+                Sql.Query("""
+                    UPDATE dbo.StudentGuardianCommunication SET Phone=@Phone WHERE AdmissionId=@Id;
+                    """,Sql.P("@Phone",studentPhone),Sql.P("@Id",schoolStudent));
+                report.Check(await Reason(MessageChannel.Sms)=="",
+                    "The same matching saved Admission Yes restores eligibility without another consent form.");
+                Sql.Query("""
+                    UPDATE comm.Contact SET OptedOut=1,ConsentUtc=SYSUTCDATETIME()
+                    WHERE ContactId=@Id;
+                    """,Sql.P("@Id",linkedContact));
+                await store.CallAsync("SyncAdmissionContacts");
+                var suppressed=await Reason(MessageChannel.WhatsApp);
+                report.Check(suppressed.Contains("Opted out")
+                    && Sql.Count("SELECT COUNT(*) FROM comm.Contact WHERE AdmissionId=@Id;",Sql.P("@Id",schoolStudent))==1,
+                    "An explicit later messaging opt-out stays effective and cannot be bypassed by re-linking a saved Admission Yes.");
+                // Keep the linked contact as historical evidence. Queued message
+                // snapshots reference it even after cancellation; never delete it.
+            }
+            finally {template=originalTemplate;}
+        });
         await report.Stage("Communication: reviewed content and campaign-scoped sending",async()=>{
             await Settings();
             var due=new DateTime(2026,1,1);

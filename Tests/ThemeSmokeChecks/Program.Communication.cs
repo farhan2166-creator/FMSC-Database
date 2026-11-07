@@ -20,6 +20,26 @@ internal static partial class Program
                 var commands=(List<NavigationCommand>)typeof(MainDashboardForm).GetField("navigationCommands",flags)!.GetValue(shell)!;
                 Check(commands.Count(c=>c.Caption=="Communication Center")== (access.Allowed?1:0),"Communication navigation uses explicit permission and preserves Administrator authority without expanding Accountant access");
             }
+            CurrentUser.SignIn(920,"Scoped communication fixture","Operator",false,
+                ["Communication.View","Communication.Compose","Staff.View"]);
+            using(var staffPage=new CommunicationCenterPage(
+                new SqlCommunicationStore(()=>throw new Exception("Scoped UI must not connect to SQL."),920),false))
+            {
+                var modes=((ModernComboBox)typeof(CommunicationCenterPage).GetField("audience",flags)!.GetValue(staffPage)!)
+                    .Items.Cast<object>().Select(Convert.ToString).ToArray();
+                Check(modes.SequenceEqual(["Staff","Manual Contacts"]),
+                    "A staff-only operator is not offered student, campus or financial recipient types");
+            }
+            CurrentUser.SignIn(921,"Scoped communication fixture","Operator",false,
+                ["Communication.View","Communication.Compose","Students.View"]);
+            using(var studentPage=new CommunicationCenterPage(
+                new SqlCommunicationStore(()=>throw new Exception("Scoped UI must not connect to SQL."),921),false))
+            {
+                var modes=((ModernComboBox)typeof(CommunicationCenterPage).GetField("audience",flags)!.GetValue(studentPage)!)
+                    .Items.Cast<object>().Select(Convert.ToString).ToArray();
+                Check(modes.Contains("Campus") && !modes.Contains("Outstanding Fees"),
+                    "Fee reminders are not offered to a student-only operator without Fees.View");
+            }
             CurrentUser.SignIn(919,"Communication fixture","Administrator",false,Array.Empty<string>());
             int connections=0;var store=new SqlCommunicationStore(()=>{connections++;throw new Exception("Native control fixture must not connect to SQL.");},919);
             using var page=new CommunicationCenterPage(store,false);
@@ -27,10 +47,20 @@ internal static partial class Program
             using var parent=new Form{ClientSize=new Size(1000,620)};parent.Controls.Add(page);parent.Show();Application.DoEvents();
             Check(!page.IsBusy&&!page.HasUnsavedChanges,"An unopened communication draft starts clean and idle");
             var tabs=Field<TabControl>("tabs");
-            Check(tabs.TabPages.Count==2&&!tabs.Enabled,"Only Send Message and History are shown by default, pending schema verification");
-            Check(!Field<Control>("schedule").Visible && !Field<Control>("prepare").Visible,"Scheduling and drafts are hidden in the simple view");
-            Descendants(page).OfType<ModernButton>().Single(button=>button.Text=="Advanced Settings").PerformClick();
-            Check(tabs.TabPages.Count==6,"Advanced settings restores the administration and automation tabs");
+            Check(tabs.TabPages.Count==3&&!tabs.Enabled,"Administrator sees Send Message, History and Settings pending schema verification");
+            var settingsButtons=Descendants(tabs.TabPages[2]).OfType<ModernButton>().Select(button=>button.Text).ToArray();
+            Check(settingsButtons.Contains("Existing Automations") && settingsButtons.Contains("Disable Selected Rule"),
+                "Previously configured rules remain reviewable and explicitly disableable without a new automation enable switch");
+            Check(!settingsButtons.Contains("New / Edit Rule"),
+                "New unattended automation is not enabled from the simplified Settings interface");
+            Check(settingsButtons.Contains("Try a Sample"),
+                "Administrator can test a purely simulated practice message without provider delivery");
+            Check(!Field<Control>("schedule").Visible && !Field<Control>("prepare").Visible,"Scheduling and drafts are hidden by default");
+            typeof(CommunicationCenterPage).GetField("installed",flags)!.SetValue(page,true);
+            tabs.Enabled=true;
+            Descendants(page).OfType<ModernButton>().Single(button=>button.Text=="More Options").PerformClick();
+            Check(Field<Control>("schedule").Visible&&Field<Control>("prepare").Visible,"More Options exposes scheduled and draft workflows without another module navigation layer");
+            typeof(CommunicationCenterPage).GetField("installed",flags)!.SetValue(page,false);
             Field<ModernTextBox>("announcement").Text="Fictional school notice";
             Check(page.HasUnsavedChanges,"A substantive unsaved message gets the existing navigation guard");
             var dispatcher=(Task?)typeof(CommunicationCenterPage).GetField("dispatchTask",flags)!.GetValue(page);
@@ -46,6 +76,7 @@ internal static partial class Program
                     Check(input.Visible&&input.Width>=AppScale.Scale(100)&&input.Height>0,"Compose message settings have visible, usable bounds");
                     Check(input.Parent!.Parent is TableLayoutPanel layout&&layout.GetRow(input.Parent)==0,"Compose message settings share the first layout row");
                 }
+                Field<ModernComboBox>("audience").SelectedIndex=3;
                 var clear=Descendants(tabs.TabPages[0]).OfType<ModernButton>().Single(b=>b.Text=="Clear Selection");
                 Check(clear.Bottom<=clear.Parent!.ClientSize.Height,"Compose toolbar grows to fit wrapped actions at smaller window sizes");
             }
@@ -53,12 +84,12 @@ internal static partial class Program
             {AppTheme.SetTheme(selected);Application.DoEvents();Check(Field<ModernTextBox>("announcement").Text=="Fictional school notice","Theme changes preserve the communication draft");}
             tabs.Enabled=true;
             var tabButtons=Descendants(tabs.Parent!.Parent!).OfType<ModernButton>().Where(b=>b.ThemeRole is "TabActive" or "TabInactive").ToArray();
-            Check(tabButtons.Length==6,"Communication uses one shared navigation button per tab");
+            Check(tabButtons.Length==3,"Communication uses only three main navigation sections");
             var first=tabButtons.Single(b=>b.Text=="Send Message");
             foreach(var selectedTheme in AppTheme.SelectableThemes)
             {
                 AppTheme.SetTheme(selectedTheme);Application.DoEvents();
-                for(int target=1;target<6;target++)
+                for(int target=1;target<3;target++)
                 {
                     tabs.SelectedIndex=0;Check(first.Focus(),"Compose tab can receive keyboard focus");
                     tabs.SelectedIndex=target;Application.DoEvents();

@@ -122,6 +122,8 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     private readonly ModernTextBox altContact = HumanUi.TextBox(false, SchemaLengths.AlternateContactNumber);
     private readonly ModernTextBox guardianEmail = HumanUi.TextBox(false, 254);
     private readonly ModernComboBox guardianConsent = HumanUi.Combo();
+    private bool legacyWhatsappChoiceUnanswered;
+    private bool schoolConsentChoiceChanged;
     private readonly ModernTextBox name = HumanUi.TextBox(false, SchemaLengths.StudentName);
     private readonly ModernDatePicker dob = HumanUi.Date();
     private readonly ModernComboBox gender = HumanUi.Combo();
@@ -1202,11 +1204,17 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             1);
         guardianConsent.Items.AddRange(["No", "Yes"]);
         guardianConsent.SelectedIndex = 0;
-        contact.TextChanged += (_, _) => guardianConsent.SelectedIndex = 0;
+        guardianConsent.SelectedIndexChanged += (_, _) => schoolConsentChoiceChanged = true;
+        contact.TextChanged += (_, _) =>
+        {
+            if (legacyWhatsappChoiceUnanswered) schoolConsentChoiceChanged = true;
+            guardianConsent.SelectedIndex = 0;
+        };
+        schoolConsentChoiceChanged = false;
         var guardianEmailField = AdmissionField("Guardian email (optional)", guardianEmail, false);
         guardianGrid.Controls.Add(guardianEmailField, 0, 2);
         guardianGrid.SetColumnSpan(guardianEmailField, 2);
-        var guardianConsentField = AdmissionField("Agreed to WhatsApp messages?", guardianConsent, false);
+        var guardianConsentField = AdmissionField("School messages? (SMS, WhatsApp, fees and notices)", guardianConsent, false);
         guardianGrid.Controls.Add(guardianConsentField, 2, 2);
         guardianGrid.SetColumnSpan(guardianConsentField, 2);
         int studentInfoHeight =
@@ -2717,7 +2725,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             PakistanPhoneNumber.ValidationMessage, () => IsValidOptionalPhone(altContact.Text));
         v.Check(guardianEmail, IsGuardianEmailValid(), "Enter a single email address or leave it blank.", IsGuardianEmailValid);
         v.Check(contact, guardianConsent.SelectedIndex!=1 || !string.IsNullOrWhiteSpace(contact.Text),
-            "Enter the guardian's primary phone to record WhatsApp consent.");
+            "Enter the guardian's primary phone to record school messaging consent.");
         v.Check(bform, IsValidOptionalBFormOrCnic(bform.Text),
             "Enter 13 digits, with or without dashes", () => IsValidOptionalBFormOrCnic(bform.Text));
         if (!isNew)
@@ -2811,7 +2819,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             }
             var guardian = await DatabaseHelper.QuerySqlAsync("""
                 EXEC dbo.RequirePermission @UserId,N'Students.View';
-                SELECT Email, Phone, WhatsAppConsent FROM dbo.StudentGuardianCommunication WHERE AdmissionId=@AdmissionId;
+                SELECT Email,Phone,WhatsAppConsent,SchoolCommunicationConsent FROM dbo.StudentGuardianCommunication WHERE AdmissionId=@AdmissionId;
                 """, DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@AdmissionId", admissionId));
             if (IsDisposed || version != admissionLoadVersion) return false;
             DataRow row = dt.Rows[0];
@@ -2879,9 +2887,18 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                         row["AlternateContactNumber"])
                       ?? string.Empty;
             guardianEmail.Text = guardian.Rows.Count == 0 ? "" : Convert.ToString(guardian.Rows[0]["Email"]) ?? "";
-            guardianConsent.SelectedIndex = guardian.Rows.Count > 0 &&
-                Convert.ToBoolean(guardian.Rows[0]["WhatsAppConsent"]) &&
+            // Older records may contain WhatsApp-only permission. Leave the
+            // new broader choice unanswered until a guardian explicitly selects
+            // Yes or No; an unrelated admission edit must not expand or erase it.
+            legacyWhatsappChoiceUnanswered = guardian.Rows.Count > 0 &&
+                guardian.Rows[0]["SchoolCommunicationConsent"] is DBNull &&
+                Convert.ToBoolean(guardian.Rows[0]["WhatsAppConsent"]);
+            guardianConsent.SelectedIndex = legacyWhatsappChoiceUnanswered ? -1 :
+                guardian.Rows.Count > 0 &&
+                guardian.Rows[0]["SchoolCommunicationConsent"] is not DBNull &&
+                Convert.ToBoolean(guardian.Rows[0]["SchoolCommunicationConsent"]) &&
                 string.Equals(Convert.ToString(guardian.Rows[0]["Phone"]),contact.Text.Trim(),StringComparison.Ordinal) ? 1 : 0;
+            schoolConsentChoiceChanged = false;
             address.Text =
                 row["Address"] == DBNull.Value
                     ? string.Empty
@@ -4530,7 +4547,9 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
 
     private Task<DataSet> SaveWithGuardianAsync(string procedure, int admissionId, params Microsoft.Data.SqlClient.SqlParameter[] parameters) =>
         DatabaseHelper.SaveAdmissionWithGuardianAsync(procedure, parameters, admissionId, guardianEmail.Text.Trim(),
-            contact.Text.Trim(), guardianConsent.SelectedIndex == 1);
+            contact.Text.Trim(),
+            legacyWhatsappChoiceUnanswered && !schoolConsentChoiceChanged && guardianConsent.SelectedIndex != 1
+                ? (bool?)null : guardianConsent.SelectedIndex == 1);
     /// <summary>Validates the optional 13-digit B-Form/CRC or CNIC identity number, with or without dashes.</summary>
     private static bool IsValidOptionalBFormOrCnic(string? text)
     {
@@ -4647,6 +4666,8 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
         altContact.Clear();
         guardianEmail.Clear();
         guardianConsent.SelectedIndex = 0;
+        legacyWhatsappChoiceUnanswered = false;
+        schoolConsentChoiceChanged = false;
         address.Clear();
         placeOfBirthInput.Clear();
         prevSchool.Clear();
