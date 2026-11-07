@@ -592,7 +592,7 @@ FOR ATTACH;";
                     """, connection, transaction);
                 preference.Parameters.AddRange([Int("@Id", id), P("@Email", email.Length == 0 ? null : email),
                     P("@Phone", phone.Length == 0 ? null : phone),
-                    new SqlParameter("@Consent",SqlDbType.Bit){Value=consent is bool agreed?agreed:DBNull.Value},
+                    new SqlParameter("@Consent",SqlDbType.Bit){Value=consent is bool agreed?(object)agreed:DBNull.Value},
                     Int("@UserId", actor)]);
                 await preference.ExecuteNonQueryAsync(token).ConfigureAwait(false);
             });
