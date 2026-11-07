@@ -8,7 +8,7 @@ internal static partial class HelpCatalog
     {
         new("FAQ-068", "Communication", "Why don't all students with phone numbers appear as message recipients?",
             "For student guardians, choose Yes once in Admission for school SMS, WhatsApp, fee notices and announcements. Find Contacts or Preview then links the current guardian number automatically; no separate consent editor is needed. A missing Yes, changed phone or later opt-out prevents sending. Other contact types may still need their own authorization.",
-            "contact,consent,guardian,phone,recipient", "Communication Center → Settings → Contacts & Consent",
+            "contact,consent,guardian,phone,recipient", "Communication Center → Settings → Contacts",
             new[] { HelpRule.System, HelpRule.Choice, HelpRule.Permission }, HelpOwner.SQL | HelpOwner.CSharp | HelpOwner.Environment,
             new[] { "Pages/Communication/CommunicationCenterPage.cs#CommunicationCenterPage", "Services/Communication/Schema.sql" }, new[] { "FAQ-115" }, ""),
         new("FAQ-069", "Communication", "How do I prepare and send a message?",
