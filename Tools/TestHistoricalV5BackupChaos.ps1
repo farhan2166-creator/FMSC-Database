@@ -131,7 +131,7 @@ function Apply([string]$Label) {
 try {
     $live = Version 'FMSC_DB'
     Require ($live -eq 7) 'Real school database must currently be schema 7.'
-    Write-Host 'TEST 1/5: build verified schema-v5 recovery backup and restore under unique SQL database names.'
+    Write-Host 'TEST 1/5: build verified historical recovery backup and restore under unique SQL database names.'
     if ($usingFiles) {
         # Refuse SQL files that are already attached to THIS LocalDB instance.
         # Copying an in-use database's MDF and LDF is not a supported backup.
@@ -197,7 +197,11 @@ try {
     Require ($null -ne $valid) 'Validated maintenance sqlcmd not available.'
     $script:sqlcmd = Join-Path $valid 'sqlcmd.exe'
     $script:pipeInstance = Resolve-LocalDbNamedPipe
-    Write-Host 'Resolved LocalDB named pipe for go-sqlcmd (endpoint verified).' -ForegroundColor Cyan
+    # Verify the exact transport used by the child migration runner before
+    # any schema mutation, so this cannot masquerade as a migration rollback.
+    $probe = @(& $script:sqlcmd -S $script:pipeInstance -E -d master -C -b -Q 'SET NOCOUNT ON; SELECT 1;' 2>&1)
+    Require ($LASTEXITCODE -eq 0 -and ($probe -join ' ') -match '\b1\b') ("go-sqlcmd LocalDB named-pipe preflight failed: " + ($probe -join ' '))
+    Write-Host 'PASS: go-sqlcmd connected to current-user LocalDB through verified named pipe.' -ForegroundColor Green
     $realFirst = Join-Path $installedMigrations ($firstMigration.ToString() + '.sql')
     $realNext = Join-Path $installedMigrations ($nextMigration.ToString() + '.sql')
     $script:applyScript = [IO.Path]::GetFullPath($script:applyScript)
