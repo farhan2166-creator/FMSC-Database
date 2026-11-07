@@ -53,20 +53,6 @@ internal sealed class CommunicationEditor : ApplicationWindowForm, IBusyPage, IU
     }
     public void Flag(string key,string label,bool value=false)
     {var input=new CheckBox{Text=label,Checked=value,AutoSize=true,Font=AppTheme.NormalFont,ForeColor=AppTheme.Text};inputs[key]=input;fields.RowStyles.Add(new RowStyle(SizeType.AutoSize));fields.Controls.Add(input,0,fields.RowCount++);}
-    public void Notice(string message)
-    {
-        // An informational note is not editable and never participates in the
-        // contact-consent values submitted to SQL.
-        var note=new Label
-        {
-            Text=message,AutoSize=true,Dock=DockStyle.Top,
-            MaximumSize=new Size(AppScale.Scale(630),0),
-            Padding=new Padding(0,AppScale.Scale(4),0,AppScale.Scale(8)),
-            Font=AppTheme.NormalFont,ForeColor=AppTheme.MutedText
-        };
-        fields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        fields.Controls.Add(note,0,fields.RowCount++);
-    }
     private void Add(string key,string label,Control input,int height)
     {inputs[key]=input;var field=HumanUi.Field(label,input);field.Dock=DockStyle.Top;field.MinimumSize=new Size(0,height);fields.RowStyles.Add(new RowStyle(SizeType.Absolute,height));fields.Controls.Add(field,0,fields.RowCount++);}
     public void OnChange(string key,Action action)=>inputs[key].TextChanged+=(_,_)=>action();
