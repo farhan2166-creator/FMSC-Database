@@ -123,7 +123,9 @@ BEGIN
  comm.Segments(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId)) Segments,
  CASE WHEN S.Mode<>''Live'' THEN 0 WHEN @Channel=''Sms'' THEN S.SmsUnitCost*comm.Segments(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId)) ELSE S.WhatsAppUnitCost END EstimatedCost,S.Currency,
  CASE WHEN DATALENGTH(Rendered.Parameters)>8000 THEN N''Personalized provider parameters exceed the supported size; shorten the template'' WHEN DATALENGTH(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId))>4000 THEN N''Personalized message exceeds 2000 characters; shorten the template'' WHEN C.OwnerKind=''Family'' AND C.FamilyId IS NULL THEN N''Family link retired; select a current family contact'' WHEN T.Approved=0 THEN N''Template requires approval'' WHEN C.OwnerKind<>T.Scope THEN N''Contact context does not match template''
- WHEN C.Language<>T.Language THEN N''Template language does not match contact'' WHEN C.Verified=0 AND NOT (C.OwnerKind=''Student''
+ WHEN C.Language<>T.Language AND NOT (C.OwnerKind=''Student''
+ AND comm.SchoolCommunicationState(C.AdmissionId,C.Destination,@Channel)=2)
+ THEN N''Template language does not match contact'' WHEN C.Verified=0 AND NOT (C.OwnerKind=''Student''
  AND comm.SchoolCommunicationState(C.AdmissionId,C.Destination,@Channel)=2) THEN N''Unverified contact''
  WHEN C.OptedOut=1 THEN N''Opted out'' WHEN @Channel=''Sms'' AND C.SmsConsent=0 AND NOT (C.OwnerKind=''Student''
  AND comm.SchoolCommunicationState(C.AdmissionId,C.Destination,@Channel)=2) THEN N''No SMS consent''
