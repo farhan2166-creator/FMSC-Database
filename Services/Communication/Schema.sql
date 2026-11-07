@@ -172,18 +172,6 @@ GO
 -- New broad consent is authoritative for school SMS and WhatsApp messages.
 -- 0 = declined or number mismatched; 1 = legacy contact rules; 2 = admission Yes.
 -- Legacy WhatsApp-only choices cannot silently become broad school consent.
-CREATE FUNCTION comm.SchoolCommunicationState(@AdmissionId int,@Destination varchar(16),@Channel varchar(10)) RETURNS tinyint AS
-BEGIN
- DECLARE @School bit;
- SELECT @School=SchoolCommunicationConsent FROM dbo.StudentGuardianCommunication
- WHERE AdmissionId=@AdmissionId;
- IF @School IS NULL
-  RETURN CASE WHEN @Channel='WhatsApp' AND comm.GuardianWhatsAppAllowed(@AdmissionId,@Destination)=0 THEN 0 ELSE 1 END;
- IF @School=0 RETURN 0;
- RETURN CASE WHEN comm.GuardianWhatsAppAllowed(@AdmissionId,@Destination)=1 THEN 2 ELSE 0 END;
-END;
-GO
--- Only explicitly written +E.164 or unambiguous Pakistani mobile numbers are linked.
 CREATE FUNCTION comm.NormalizeSchoolPhone(@Raw nvarchar(30)) RETURNS varchar(16) AS
 BEGIN
  IF @Raw IS NULL OR LEN(LTRIM(RTRIM(@Raw)))=0 RETURN NULL;
@@ -207,6 +195,26 @@ BEGIN
  RETURN CONVERT(varchar(16),N'+92'+@Digits);
 END;
 GO
+CREATE FUNCTION comm.SchoolCommunicationState(@AdmissionId int,@Destination varchar(16),@Channel varchar(10)) RETURNS tinyint AS
+BEGIN
+ DECLARE @School bit,@RecordedPhone nvarchar(30),@CurrentPhone nvarchar(30);
+ SELECT @School=G.SchoolCommunicationConsent,@RecordedPhone=G.Phone,
+  @CurrentPhone=S.ContactNumber
+ FROM dbo.StudentGuardianCommunication G JOIN dbo.Students S ON S.AdmissionId=G.AdmissionId
+ WHERE G.AdmissionId=@AdmissionId;
+ -- A later phone edit outside Admission must also stop messages to the old number.
+ IF @School IS NOT NULL AND
+  (comm.NormalizeSchoolPhone(@RecordedPhone) IS NULL OR comm.NormalizeSchoolPhone(@CurrentPhone) IS NULL
+   OR comm.NormalizeSchoolPhone(@RecordedPhone)<>comm.NormalizeSchoolPhone(@CurrentPhone))
+  RETURN 0;
+ IF @School IS NULL
+  RETURN CASE WHEN @Channel='WhatsApp' AND comm.GuardianWhatsAppAllowed(@AdmissionId,@Destination)=0 THEN 0 ELSE 1 END;
+ IF @School=0 RETURN 0;
+ RETURN CASE WHEN comm.GuardianWhatsAppAllowed(@AdmissionId,@Destination)=1 THEN 2 ELSE 0 END;
+END;
+GO
+-- Only explicitly written +E.164 or unambiguous Pakistani mobile numbers are linked.
+
 -- Explicit recipient discovery can link the consent already recorded in Admission.
 -- This only creates/updates contact records; it NEVER composes or sends messages.
 -- Existing inbound opt-outs always win over a previously recorded Admission Yes.
@@ -224,7 +232,8 @@ BEGIN
  FROM dbo.StudentGuardianCommunication G
  JOIN dbo.Students S ON S.AdmissionId=G.AdmissionId
  CROSS APPLY(SELECT comm.NormalizeSchoolPhone(G.Phone) Destination) P
- WHERE G.SchoolCommunicationConsent=1 AND P.Destination IS NOT NULL;
+ WHERE G.SchoolCommunicationConsent=1 AND P.Destination IS NOT NULL
+ AND P.Destination=comm.NormalizeSchoolPhone(S.ContactNumber);
  BEGIN TRANSACTION;
  DECLARE @Linked TABLE(ContactId uniqueidentifier PRIMARY KEY);
  UPDATE C SET Verified=1,SmsConsent=1,WhatsAppConsent=1,FinancialConsent=1,
