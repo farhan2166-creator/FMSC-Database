@@ -190,7 +190,8 @@ try {
     Refuse { Complete-FmscAbortedTransaction -ObservedSchema 5 -ApplicationDirectory $app -RollbackDirectory $rollback }
     Move-Item -LiteralPath (Join-Path $app 'missing.exe') -Destination (Join-Path $app 'FMSC_SMS.exe')
     Complete-FmscAbortedTransaction -ObservedSchema 5 -ApplicationDirectory $app -RollbackDirectory $rollback
-    Require ((Read-FmscRecoveryJournal $script:RecoveryRoot).Phase -eq 'Aborted') 'Safe abort was not durably committed.'
+    Require ((Read-FmscRecoveryJournal $script:RecoveryRoot).Phase -eq 'Completed' -and
+        $script:RecoveryJournal.Outcome -eq 'Aborted') 'Safe abort was not durably committed in a legacy-compatible state.'
     Require ((Get-Content -LiteralPath (Join-Path $app 'FMSC_SMS.exe') -Raw).Contains('old baseline')) 'Safe abort changed the previous application.'
     Require (Test-Path -LiteralPath $script:RecoveryJournal.Backup) 'Safe abort deleted its verified backup.'
     Refuse { Complete-FmscAbortedTransaction -ObservedSchema 5 -ApplicationDirectory $app -RollbackDirectory $rollback }
@@ -227,7 +228,8 @@ try {
     $script:RecoveryJournal.BackupSha256 = (Get-FileHash -LiteralPath $script:RecoveryJournal.Backup -Algorithm SHA256).Hash
     Save-FmscRecoveryJournal $script:RecoveryRoot $script:RecoveryJournal
     Invoke-FmscSafeUpdateAbort
-    Require ((Read-FmscRecoveryJournal $script:RecoveryRoot).Phase -eq 'Aborted' -and
+    Require ((Read-FmscRecoveryJournal $script:RecoveryRoot).Phase -eq 'Completed' -and
+        $script:RecoveryJournal.Outcome -eq 'Aborted' -and
         $script:connectionChecks -eq 3 -and $script:identityChecks -eq 3 -and
         $script:backupChecks -eq 2) 'Safe abort did not gate SQL identity, schema and backup integrity.'
     # Inject a deterministic failure at the first SQL execution boundary after
@@ -285,12 +287,17 @@ try {
     Require (($script:faultEvents -join ',') -eq 'backup-created,backup-verified,fault-before-sql-6') 'The failure was not injected at the required boundary.'
     $script:RecoveryJournal = $failedRecord
     Invoke-FmscSafeUpdateAbort
-    Require ((Read-FmscRecoveryJournal $script:RecoveryRoot).Phase -eq 'Aborted') 'Injected failure was not safely aborted.'
+    Require ((Read-FmscRecoveryJournal $script:RecoveryRoot).Phase -eq 'Completed' -and
+        $script:RecoveryJournal.Outcome -eq 'Aborted') 'Injected failure was not safely aborted.'
     Require ((Get-FileHash -LiteralPath (Join-Path $app 'FMSC_SMS.exe') -Algorithm SHA256).Hash -eq
         $previousAppHash -and $script:syntheticSchema -eq 5) 'Fault-recovery test changed the app or schema.'
     Refuse { Complete-FmscAbortedTransaction -ObservedSchema 5 -ApplicationDirectory $app -RollbackDirectory $rollback }
     Write-Output 'PASS: fault injected AFTER verified backup and BEFORE migration 6; verified baseline 5 -> 7 recorded; no SQL applied, old app unchanged, recovery Aborted, no repeat.'
     # An Aborted journal is terminal; a subsequent approved update may start.
+    # Verify the actual v1.0.8 C# startup guard accepts the terminal journal.
+    # Older FMSC rejects a novel Aborted phase but accepts Completed.
+    $legacyGuard = Get-Content -LiteralPath (Join-Path $project 'Core/Updates/UpdateStartupGuard.cs') -Raw
+    Require ($legacyGuard -match '"Completed"') 'A terminal phase must remain recognized by the old application.'
     $previousTransaction = $script:RecoveryJournal.Transaction
     $script:RecoveryJournal = Initialize-FmscRecoveryTransaction $prepared $script:RecoveryRoot $version $schema $sid
     Require ($script:RecoveryJournal.Transaction -ne $previousTransaction -and
