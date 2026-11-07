@@ -80,7 +80,7 @@ internal static partial class Program
             fail=false;Await("RefreshHistory");Check(history.Enabled,"Refreshing after a read failure restores the grid");
             tabs.SelectedIndex=0;PumpUntil(()=>!page.IsBusy,"Compose opens");
             var recipients=Field<DataGridView>("recipients");
-            Check(Convert.ToString(recipients.Tag)!.Contains("Add From School Records")&&Status().Contains("No saved contacts"),"Empty recipient results explain filters and consented-contact setup without inventing an active-student restriction");
+            Check(Convert.ToString(recipients.Tag)!.Contains("Yes on Admission")&&Status().Contains("No contacts match"),"Empty student recipient results direct operators to the one Admission consent choice without a second checklist");
             var included=Field<HashSet<Guid>>("included");included.Add(Guid.NewGuid());
             Field<ModernTextBox>("search").Text="Changed student filter";
             Check(!recipients.Enabled&&included.Count==1&&!Field<ModernButton>("prepare").Enabled,"Changing recipient filters blocks stale rows and preview while preserving the explicit cross-page selection");
