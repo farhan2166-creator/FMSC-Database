@@ -264,7 +264,8 @@ internal sealed class ReliabilityChecks(Fixture f, Report r)
     private Task Compatibility()
     {
         Sql.ValidateTarget(); string before = FinancialSnapshot();
-        foreach (string version in new[] { "5", "7" }) {
+        int requiredVersion=int.Parse(DatabaseHelper.RequiredDatabaseSchemaVersion,System.Globalization.CultureInfo.InvariantCulture);
+        foreach (string version in new[] { (requiredVersion-1).ToString(System.Globalization.CultureInfo.InvariantCulture), (requiredVersion+1).ToString(System.Globalization.CultureInfo.InvariantCulture) }) {
             Sql.Query("INSERT dbo.DatabaseVersion(VersionNumber) VALUES(@V);", Sql.P("@V", version));
             try {
                 using var c = DatabaseHelper.GetConnection(); c.Open();
@@ -280,7 +281,7 @@ internal sealed class ReliabilityChecks(Fixture f, Report r)
         }
         try {
             using var c = DatabaseHelper.GetConnection(); c.Open();
-            try { DatabaseCompatibility.Validate(c); throw new AssertionFailure("Version-6 missing procedure was accepted."); }
+            try { DatabaseCompatibility.Validate(c); throw new AssertionFailure("A current-schema database with a missing required procedure was accepted."); }
             catch (DatabaseCompatibilityException) { r.Check(true, "A matching version does not bypass structural requirements."); }
         } finally { Sql.Query("EXEC sys.sp_rename N'dbo.FMSC_Level3HiddenStatement',N'GetFeeStatement';"); }
         using (var c = DatabaseHelper.GetConnection()) { c.Open(); DatabaseCompatibility.Validate(c); }
