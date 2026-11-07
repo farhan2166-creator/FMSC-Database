@@ -176,6 +176,21 @@ internal static class CommunicationSqlChecks
                 }
                 report.Check(await Reason(MessageChannel.WhatsApp)=="" && await Reason(MessageChannel.Sms)=="",
                     "Admission Yes alone is sufficient for Financial WhatsApp and SMS eligibility.");
+                var urdu=Guid.NewGuid();
+                await store.CallAsync("SaveTemplate",default,
+                    SqlCommunicationStore.P("@Id",urdu),
+                    SqlCommunicationStore.P("@Code","school_urdu_notice"),
+                    SqlCommunicationStore.P("@Version",1),
+                    SqlCommunicationStore.P("@Language","ur"),
+                    SqlCommunicationStore.P("@Category","Announcement"),
+                    SqlCommunicationStore.P("@Scope","Student"),
+                    SqlCommunicationStore.P("@Body","یہ اسکول کی اطلاع ہے"),
+                    SqlCommunicationStore.P("@ProviderTemplate","synthetic-approved-urdu"),
+                    SqlCommunicationStore.P("@Order","[]"),
+                    SqlCommunicationStore.P("@Approved",true));
+                var urduRows=await store.PreviewAsync(urdu,MessageChannel.WhatsApp,[linkedContact]);
+                report.Check(urduRows.Rows.Count==1 && Convert.ToString(urduRows.Rows[0]["Exclusion"])=="",
+                    "Admission Yes also permits reviewed Urdu announcements without a second guardian language or consent editor.");
                 var queued=Guid.NewGuid();
                 await store.CreateAsync(queued,template,MessageChannel.Sms,[linkedContact],
                     "School notice before withdrawal",new DateTime(2026,1,1));
