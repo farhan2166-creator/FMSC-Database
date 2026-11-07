@@ -151,8 +151,8 @@ function Find-FmscMaintenanceTool([string]$Name) {
     return $null
 }
 
-# After a verified app upgrade, remove only old GUID copies of the current
-# catalog versions; retain the selected verified bundle and other versions.
+# Only after successful app and SQL verification: retain one integrity-verified
+# current-version bundle per tool. Keep other catalog versions for recovery.
 function Remove-FmscSupersededMaintenanceTools {
     $root=Get-FmscMaintenanceRoot
     if(-not(Test-Path -LiteralPath $root -PathType Container)){return}
@@ -167,61 +167,7 @@ function Remove-FmscSupersededMaintenanceTools {
     }
     foreach($name in @('Git','SqlCmd','LocalDb')){
         $spec=Get-FmscToolSpec $name
-        $pattern='^'+[regex]::Escape($name+'-'+$spec.version+'-')+'[a-f0-9]{32}
-    $current=Find-FmscMaintenanceTool $Name
-    if($current){return $current}
-    $root=Get-FmscMaintenanceRoot
-    Initialize-FmscRecoveryStorage (Split-Path $root -Parent)
-    Initialize-FmscRecoveryStorage $root
-    $script:FmscToolTemporaryRoot=$root
-    $spec=Get-FmscToolSpec $Name
-    $stage=Join-Path $root ('stage-'+[Guid]::NewGuid().ToString('N'))
-    try {
-        $source=Join-Path (Join-Path $Application $spec.folder) $Name
-        # Git has its own tree; SQL tools have isolated integrity subdirectories.
-        if($Name -eq 'Git'){$source=Join-Path $Application $spec.folder}
-        if(Test-FmscTool $source $Name){
-            $null=New-Item -ItemType Directory -Path $stage
-            Get-ChildItem -LiteralPath $source -Force | Copy-Item -Destination $stage -Recurse -Force
-        } else {
-            # Direct HTTPS bootstrap works even when Git itself is broken.
-            Receive-FmscTool $Name $stage
-        }
-        if(-not(Test-FmscTool $stage $Name)){throw "Staged $Name is invalid."}
-        $destination=Join-Path $root ("$Name-$($spec.version)-"+[Guid]::NewGuid().ToString('N'))
-        # Normalize ownership before publishing; no unprivileged writer may
-        # modify a DLL between integrity verification and elevated SQL use.
-        if([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT){
-            foreach($item in (@((Get-Item $stage))+@(Get-ChildItem $stage -Recurse -Force))){
-                $acl=Get-Acl -LiteralPath $item.FullName
-                $acl.SetOwner((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')))
-                Set-Acl -LiteralPath $item.FullName -AclObject $acl
-            }
-        }
-        Move-Item -LiteralPath $stage -Destination $destination
-        Assert-FmscRecoveryStorage $destination
-        return $destination
-    } finally {if(Test-Path -LiteralPath $stage){Remove-Item -LiteralPath $stage -Recurse -Force}}
-}
-
-function Install-FmscMaintenanceTool([string]$Name,[string]$Application) {
-    $gate=New-Object Threading.Mutex($false,'Global\FMSC.MaintenanceTools.Install')
-    $held=$false
-    try {
-        try {$held=$gate.WaitOne(60000)}catch [Threading.AbandonedMutexException]{$held=$true}
-        if(-not $held){throw 'Another FMSC tool repair is running. Wait for it to finish.'}
-        return Install-FmscMaintenanceToolInternal $Name $Application
-    } finally {if($held){$gate.ReleaseMutex()};$gate.Dispose()}
-}
-
-if($Action -ne 'Library'){
-    . (Join-Path $PSScriptRoot 'UpdateRecovery.ps1')
-    $found=Find-FmscMaintenanceTool $Tool
-    if(-not $found -and $Action -eq 'Resolve'){exit 20}
-    if(-not $found){$found=Install-FmscMaintenanceTool $Tool $ApplicationDirectory}
-    @{root=$found;file=(Join-Path $found (Get-FmscToolSpec $Tool).required[0])} | ConvertTo-Json -Compress
-}
-
+        $pattern='^'+[regex]::Escape($name+'-'+$spec.version+'-')+'[a-f0-9]{32}$'
         foreach($candidate in @(Get-ChildItem -LiteralPath $root -Directory -Force)){
             if($candidate.Name -cnotmatch $pattern -or
                 $candidate.FullName -ieq $selected[$name]){continue}
