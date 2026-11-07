@@ -8,6 +8,7 @@ on:
       - 'Migrations/**'
       - 'Services/Communication/**'
       - 'Tests/LifecycleSqlChecks/**'
+      - 'Tests/Level3Checks/**'
       - 'Pages/Students/Admissions/**'
       - 'DatabaseHelper.cs'
       - 'Core/DatabaseCompatibilityRequirements.json'
