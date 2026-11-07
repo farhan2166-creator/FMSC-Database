@@ -1,7 +1,10 @@
 # DEVELOPMENT PC ONLY. Real v5 backup -> disposable SQL database -> migration faults.
 # Never uses RESTORE WITH REPLACE; never changes FMSC_DB or the real installer.
 [CmdletBinding()]
-param([string]$Backup = 'C:\ProgramData\FMSC_RecoveryTest_1.0.9\premigration.bak')
+param(
+    [string]$Backup = '',
+    [string]$DatabaseFilesRoot = ''
+)
 $ErrorActionPreference = 'Stop'
 function Require([bool]$pass,[string]$message) { if (-not $pass) { throw "CHAOS REFUSED: $message" } }
 $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -12,8 +15,32 @@ $exe = Join-Path $app 'FMSC_SMS.exe'
 Require ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion -match '^1\.0\.11(?:\+|$)') 'Expected installed FMSC 1.0.11.'
 $journal = Get-Content 'C:\ProgramData\FMSC_Updater\recovery.json' -Raw | ConvertFrom-Json
 Require ($journal.Phase -eq 'Completed' -and $journal.Version -eq '1.0.11') 'Live recovery must be completed.'
-Require ((Test-Path -LiteralPath $Backup -PathType Leaf) -and (Get-Item -LiteralPath $Backup).Length -gt 0) 'Historical backup unavailable.'
-$historical = [IO.Path]::GetFullPath($Backup)
+# A historical SQL .bak is optional. If the user has detached MDF/LDF instead,
+# copy those files and create the initial CHECKSUM backup from a temporary attach.
+# Never attach the ORIGINAL files or reuse the live FMSC_DB SQL database name.
+$usingFiles = [string]::IsNullOrWhiteSpace($Backup)
+$historical = $null
+if ($usingFiles) {
+    Require (-not [string]::IsNullOrWhiteSpace($DatabaseFilesRoot)) 'Supply -DatabaseFilesRoot pointing to the original detached v5 MDF/LDF folder.'
+    $fileRoot = [IO.Path]::GetFullPath($DatabaseFilesRoot).TrimEnd('\')
+    Require ($fileRoot -ine 'C:\ProgramData\FMSC_Database' -and
+        -not $fileRoot.StartsWith('C:\ProgramData\FMSC_Database\',[StringComparison]::OrdinalIgnoreCase)) 'Live database directory cannot be a chaos-test input.'
+    $sourceMdf = Join-Path $fileRoot 'FMSC_DB.mdf'
+    $sourceLdf = Join-Path $fileRoot 'FMSC_DB_log.ldf'
+    Require ((Test-Path -LiteralPath $sourceMdf -PathType Leaf) -and
+        (Test-Path -LiteralPath $sourceLdf -PathType Leaf) -and
+        (Get-Item -LiteralPath $sourceMdf).Length -gt 0 -and
+        (Get-Item -LiteralPath $sourceLdf).Length -gt 0) 'Expected FMSC_DB.mdf and FMSC_DB_log.ldf in -DatabaseFilesRoot.'
+    foreach ($source in @($sourceMdf,$sourceLdf)) {
+        for ($item = Get-Item -LiteralPath $source -Force; $null -ne $item; $item = $item.Parent) {
+            Require (-not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) 'Original source database path contains a link.'
+        }
+    }
+} else {
+    Require ((Test-Path -LiteralPath $Backup -PathType Leaf) -and
+        (Get-Item -LiteralPath $Backup).Length -gt 0) 'Historical backup unavailable.'
+    $historical = [IO.Path]::GetFullPath($Backup)
+}
 $liveHash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
 $id = [Guid]::NewGuid().ToString('N')
 $target = 'FMSC_Chaos_' + $id
@@ -81,14 +108,45 @@ function Apply([string]$Label) {
 try {
     $live = Version 'FMSC_DB'
     Require ($live -eq 7) 'Real school database must currently be schema 7.'
-    Write-Host 'TEST 1/5: verify and restore historical backup under a unique SQL database name.'
-    Sql master ("RESTORE VERIFYONLY FROM DISK=N'" + (Q $historical) + "' WITH CHECKSUM;")
+    Write-Host 'TEST 1/5: build verified schema-v5 recovery backup and restore under unique SQL database names.'
+    if ($usingFiles) {
+        # Refuse SQL files that are already attached to THIS LocalDB instance.
+        # Copying an in-use database's MDF and LDF is not a supported backup.
+        $attached = Sql master 'SELECT physical_name FROM sys.master_files;' -Rows
+        foreach ($entry in $attached.Rows) {
+            $physical = [IO.Path]::GetFullPath([string]$entry[0])
+            Require ($physical -ine $sourceMdf -and $physical -ine $sourceLdf) 'Source database is attached to LocalDB. Use SQL BACKUP instead of copying in-use MDF/LDF.'
+        }
+        $copyMdf = Join-Path $root 'detached-source.mdf'
+        $copyLdf = Join-Path $root 'detached-source_log.ldf'
+        Copy-Item -LiteralPath $sourceMdf -Destination $copyMdf -ErrorAction Stop
+        Copy-Item -LiteralPath $sourceLdf -Destination $copyLdf -ErrorAction Stop
+        foreach ($pair in @(@($sourceMdf,$copyMdf),@($sourceLdf,$copyLdf))) {
+            Require ((Get-FileHash -LiteralPath $pair[0] -Algorithm SHA256).Hash -eq
+                (Get-FileHash -LiteralPath $pair[1] -Algorithm SHA256).Hash) 'Original MDF/LDF changed during copying or copied bytes differ.'
+        }
+        $sql = "CREATE DATABASE [$target] ON (FILENAME=N'" + (Q $copyMdf) +
+            "'), (FILENAME=N'" + (Q $copyLdf) + "') FOR ATTACH;"
+        Sql master $sql
+        $created = $true
+        AssertFixtureFiles $target
+        Require ((Version $target) -eq 5) 'Copied MDF/LDF are not schema 5.'
+        $historical = Join-Path $root 'verified-v5-from-detached-files.bak'
+        Sql master ("BACKUP DATABASE [$target] TO DISK=N'" + (Q $historical) + "' WITH INIT, CHECKSUM;")
+        Sql master ("RESTORE VERIFYONLY FROM DISK=N'" + (Q $historical) + "' WITH CHECKSUM;")
+        # Drop ONLY the newly attached copy; not the original source files.
+        AssertFixtureFiles $target
+        Sql master ("ALTER DATABASE [$target] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$target];")
+        $created = $false
+    } else {
+        Sql master ("RESTORE VERIFYONLY FROM DISK=N'" + (Q $historical) + "' WITH CHECKSUM;")
+    }
     RestoreFixture $target $historical (Join-Path $root 'source')
     $created = $true
     AssertFixtureFiles $target
     Require ((Version $target) -eq 5) 'Historical backup is not schema 5.'
     CheckLive
-    Write-Host 'PASS: v5 backup verified and separately restored.' -ForegroundColor Green
+    Write-Host 'PASS: detached-source copy or backup verified, independently restored at v5.' -ForegroundColor Green
 
     $migrationRoot = Join-Path $root 'Migrations'
     $null = New-Item -ItemType Directory -Path $migrationRoot
