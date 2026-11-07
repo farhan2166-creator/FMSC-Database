@@ -89,6 +89,15 @@ function Invoke-ActualInstaller {
     # Retain synthetic diagnostics on the disposable runner only, never as artifacts.
     @($installerOutput,$installerError) | Set-Content -LiteralPath (Join-Path $root 'installer-private.log')
     if ($p.ExitCode -ne 0) {
+        # The private fixture repo has no real records or source-repository
+        # publishing credentials. Only there, expose a bounded diagnostic tail
+        # during the one-time integration proof; never print this in public CI.
+        if ($env:GITHUB_REPOSITORY -eq 'farhan2166-creator/FMSC-Sandbox' -and
+            $env:FMSC_DISPOSABLE_INSTALL -eq 'approved-synthetic-only') {
+            Write-Host 'PRIVATE SANDBOX INSTALLER DIAGNOSTIC (last 35 lines):'
+            $details=@(($installerOutput+"\n"+$installerError) -split "`r?`n" | Select-Object -Last 35)
+            foreach ($line in $details) { Write-Host $line.Substring(0,[Math]::Min(500,$line.Length)) }
+        }
         # Only fixed installer phase names and known error categories enter public
         # logs. Raw diagnostics can contain SQL/configuration and remain private.
         $phases=[regex]::Matches($installerOutput,'STEP [1-8] OF 8  -  [A-Z ]+')
@@ -292,6 +301,9 @@ try {
             $source=Join-Path $sourceRoot $name
             $destination=Join-Path $database $name
             Copy-Item -LiteralPath $source -Destination $destination -ErrorAction Stop
+            # Only disposable copies may become writable. Never change the LFS checkout.
+            $copied=Get-Item -LiteralPath $destination
+            if ($copied.IsReadOnly) { $copied.IsReadOnly=$false }
             if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne
                 (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash) {
                 throw 'Copied installation fixture hash mismatch.'
@@ -306,6 +318,10 @@ try {
         $probeLdf=Join-Path $probeRoot 'fixture_log.ldf'
         Copy-Item -LiteralPath (Join-Path $database 'FMSC_DB.mdf') -Destination $probeMdf
         Copy-Item -LiteralPath (Join-Path $database 'FMSC_DB_log.ldf') -Destination $probeLdf
+        foreach ($probeFile in @($probeMdf,$probeLdf)) {
+            $probeItem=Get-Item -LiteralPath $probeFile
+            if ($probeItem.IsReadOnly) { $probeItem.IsReadOnly=$false }
+        }
         $fixtureProbeName="FMSC_FixtureProbe_$FixtureSchema"
         $escapedMdf=$probeMdf.Replace("'","''")
         $escapedLdf=$probeLdf.Replace("'","''")
