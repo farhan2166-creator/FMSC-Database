@@ -1214,11 +1214,43 @@ function Test-PreparedUpdate {
     }
 }
 
+# Abort only when nothing from the attempted update has been activated and
+# the live SQL schema still matches the journal's recorded pre-migration state.
+# A partial migration or missing proof must remain pending for supervised recovery.
+function Invoke-FmscSafeUpdateAbort {
+    if (-not $script:RecoveryJournal -or $script:RecoveryJournal.Phase -notin @('Prepared','Migrating')) {
+        throw 'This recovery phase cannot be automatically abandoned.'
+    }
+    if (Get-Process -Name 'FMSC_SMS' -ErrorAction SilentlyContinue) {
+        throw 'Close FMSC before verifying and abandoning the failed update.'
+    }
+    $installedVersion = Get-InstalledApplicationVersion
+    if (-not $installedVersion -or
+        (Compare-ApplicationVersion $installedVersion $script:RecoveryJournal.Version) -ge 0) {
+        throw 'The previous application version cannot be verified. Recovery stopped.'
+    }
+    $observedSchema = 0
+    if ($script:RecoveryJournal.Phase -eq 'Migrating') {
+        if (-not $script:RecoveryJournal.Backup) {
+            throw 'The migration recovery backup is missing from the journal.'
+        }
+        Initialize-FmscRecoveryConnection
+        Assert-FmscRecoveryDatabaseIdentity
+        $observedSchema = Convert-ToDbVersion (Get-DatabaseVersion)
+        if ($observedSchema -ne $script:RecoveryJournal.BeforeSchema) {
+            throw 'The database schema changed during the failed update. Automatic recovery stopped to protect school data.'
+        }
+        Confirm-FmscRecoveryBackup -CurrentSchema $observedSchema
+    }
+    Complete-FmscAbortedTransaction -ObservedSchema $observedSchema -ApplicationDirectory $AppDir -RollbackDirectory $AppRollbackDir
+    Write-Log "Safe update abort verified: previous application $installedVersion, database schema $observedSchema, failed release $($script:RecoveryJournal.Version)."
+}
+
 try {
     Open-UpdateWindow
     $existingRecovery = Read-FmscRecoveryJournal $script:RecoveryRoot
     if ($ResumeUpdate) {
-        if (-not $existingRecovery -or $existingRecovery.Phase -eq 'Completed') {
+        if (-not $existingRecovery -or $existingRecovery.Phase -in @('Completed','Aborted')) {
             throw 'No unfinished update was found. Open FMSC from its shortcut.'
         }
         Assert-FmscResumeIdentity $existingRecovery $script:RecoveryRoot $AppVersion ([int]$DatabaseVersion) $PSCommandPath
@@ -1228,7 +1260,7 @@ try {
         $MigrationsDir = Join-Path $AppSource 'UpdateSupport/Migrations'
         $ReleaseRoot = $script:RecoveryRoot
         $script:RecoveryBackupPath = $existingRecovery.Backup
-    } elseif ($existingRecovery -and $existingRecovery.Phase -ne 'Completed') {
+    } elseif ($existingRecovery -and $existingRecovery.Phase -notin @('Completed','Aborted')) {
         throw 'An unfinished update exists. Use the FMSC desktop shortcut to recover it first.'
     }
     if ($PreparedRoot) {
@@ -1247,6 +1279,17 @@ try {
     if (-not $script:InstallerLockHeld) { throw 'Another FMSC installer is active. No update was installed.' }
     if ($ResumeUpdate -and (Get-Process -Name 'FMSC_SMS' -ErrorAction SilentlyContinue)) {
         throw 'Close all FMSC windows before recovering the update.'
+    }
+    if ($ResumeUpdate -and $script:RecoveryJournal.Phase -in @('Prepared','Migrating')) {
+        Invoke-FmscSafeUpdateAbort
+        Write-Success 'The failed update was safely abandoned. The previous application was not replaced.'
+        [Windows.Forms.MessageBox]::Show(
+            'The interrupted update was safely abandoned. Your existing application and database were preserved.' +
+            [Environment]::NewLine + [Environment]::NewLine +
+            'Open FMSC from its desktop shortcut to check for a newer update.',
+            'FMSC - Previous Installation Preserved', 'OK', 'Information') | Out-Null
+        Release-FmscInstallerLock
+        return
     }
     if ($ResumeUpdate -and $script:RecoveryJournal.Phase -eq 'Verified') {
         Initialize-FmscRecoveryConnection
@@ -1822,11 +1865,22 @@ try {
     Write-Host ''
 }
 catch {
+    $recoveryOutcome = ''
     try {
         Write-Log `
             "ERROR: $($_.Exception.Message)"
     }
     catch {
+    }
+    if ($script:RecoveryJournal -and $script:RecoveryJournal.Phase -in @('Prepared','Migrating')) {
+        try {
+            Invoke-FmscSafeUpdateAbort
+            $recoveryOutcome = 'Previous application and database baseline verified; failed update was safely abandoned.'
+        }
+        catch {
+            $recoveryOutcome = "Automatic recovery could not be verified: $($_.Exception.Message). Recovery files and backups were retained."
+        }
+        try { Write-Log $recoveryOutcome } catch { }
     }
     Write-Host ''
     Write-Host `
@@ -1843,6 +1897,10 @@ catch {
         "  $($_.Exception.Message)" `
         -ForegroundColor $ColorError
     Write-Host ''
+    if ($recoveryOutcome) {
+        Write-Host "  $recoveryOutcome" -ForegroundColor $ColorWarning
+        Write-Host ''
+    }
     # A failure is exactly when these two locations matter.
     if (Test-Path -LiteralPath $AppRollbackDir) {
         Write-Host `
@@ -1884,6 +1942,7 @@ catch {
         [Windows.Forms.MessageBox]::Show(
             "Update could not be completed. FMSC has not been restarted." + [Environment]::NewLine +
             [Environment]::NewLine + $_.Exception.Message + [Environment]::NewLine +
+            [Environment]::NewLine + $recoveryOutcome + [Environment]::NewLine +
             [Environment]::NewLine + "Log: $LogFile" + [Environment]::NewLine +
             "Previous application: $AppRollbackDir" + [Environment]::NewLine +
             "Database backup: $RecoveryBackupPath",
@@ -1892,6 +1951,7 @@ catch {
         [Windows.Forms.MessageBox]::Show($script:UpdateWindow,
             'Installation could not be completed.' + [Environment]::NewLine +
             [Environment]::NewLine + $_.Exception.Message + [Environment]::NewLine +
+            [Environment]::NewLine + $recoveryOutcome + [Environment]::NewLine +
             [Environment]::NewLine + "Installer log: $LogFile" + [Environment]::NewLine +
             "Previous application: $AppRollbackDir" + [Environment]::NewLine +
             "Database backup: $RecoveryBackupPath",
