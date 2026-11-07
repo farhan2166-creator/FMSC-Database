@@ -17,7 +17,7 @@
   ["L3-DB-01", "Create and verify disposable backup", ["L3-DB-01 | checksum backup and VERIFYONLY"], "", "Owned absent backup target, COPY_ONLY/CHECKSUM and successful VERIFYONLY; source unchanged."],
   ["L3-DB-02", "Restore into separate disposable database", ["L3-DB-02 | restore to absent owned catalog and new files"], "", "Absent destination catalog/files only; financial and academic hashes match after RESTORE."],
   ["L3-DB-03", "Restored compatibility and integrity", ["L3-DB-03 | restored compatibility, complete ledger and CHECKDB"], "", "Runtime schema contract and CHECKDB pass; students and full financial snapshot match."],
-  ["L3-DB-04", "Reject incompatible structures", ["L3-DB-04 | old, new and structurally incompatible schema refusal"], "", "Versions 5/7 and version 6 with a hidden required procedure are refused without changing records."],
+  ["L3-DB-04", "Reject incompatible structures", ["L3-DB-04 | old, new and structurally incompatible schema refusal"], "", "The versions immediately before/after the current schema and a structurally incomplete current schema are refused without changing records."],
   ["L3-DB-05", "Refuse unsafe database files/ownership", ["L3 database target guards | wrong owner and non-test catalog refusal"], "FILES", "Cloud catalog/ownership guards refuse unsafe targets; corrupt/locked/missing LocalDB pairs require an isolated VM."],
   ["L3-INS-01", "Fresh disposable Windows installation", [], "INSTALL", "Actual core.ps1 installs synthetic detached pair and staged app; installed verifier accepts base schema."],
   ["L3-INS-02", "Application-only update preserves data", [], "INSTALL", "Actual update without packaged MDF/LDF preserves SQL snapshot, database GUID and theme bytes."],
