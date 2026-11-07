@@ -69,6 +69,47 @@ try {
         Check ((Install-FmscMaintenanceTool $name $app) -eq $same) 'Unchanged tools must be reused'
     }
     Check ($script:downloads -eq 0) 'Healthy update/repair must not download tools'
+    # Three same-version GUID copies can be created by repair/reinstall. After
+    # success, prune only redundant ones, never the selected verified bundles
+    # or other catalog versions.
+    $duplicates=@()
+    foreach($name in @('Git','LocalDb','SqlCmd')){
+        $selected=Find-FmscMaintenanceTool $name
+        Check ([bool]$selected) "Missing selected $name tool before cleanup."
+        $spec=Get-FmscToolSpec $name
+        $copy=Join-Path $script:toolRoot ($name+'-'+$spec.version+'-'+[Guid]::NewGuid().ToString('N'))
+        Copy-Item -LiteralPath $selected -Destination $copy -Recurse -Force
+        if([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT){
+            foreach($entry in (@((Get-Item -LiteralPath $copy)) + @(Get-ChildItem -LiteralPath $copy -Recurse -Force))){
+                $acl=Get-Acl -LiteralPath $entry.FullName
+                $acl.SetOwner((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')))
+                Set-Acl -LiteralPath $entry.FullName -AclObject $acl
+            }
+        }
+        Check (Test-FmscTool $copy $name) "Old $name GUID copy should validate."
+        $duplicates+=,$copy
+    }
+    $unrelatedVersion=Join-Path $script:toolRoot ('Git-prior-version-'+[Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $unrelatedVersion | Out-Null
+    if([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT){
+        $acl=Get-Acl -LiteralPath $unrelatedVersion
+        $acl.SetOwner((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')))
+        Set-Acl -LiteralPath $unrelatedVersion -AclObject $acl
+    }
+    $selectedBefore=@{}
+    foreach($name in @('Git','LocalDb','SqlCmd')) {
+        $selectedBefore[$name]=Find-FmscMaintenanceTool $name
+    }
+    Remove-FmscSupersededMaintenanceTools
+    foreach($name in @('Git','LocalDb','SqlCmd')){
+        $spec=Get-FmscToolSpec $name
+        $remaining=@(Get-ChildItem $script:toolRoot -Directory -Filter "$name-$($spec.version)-*")
+        Check ($remaining.Count -eq 1 -and $remaining[0].FullName -eq $selectedBefore[$name] -and
+            (Test-FmscTool $remaining[0].FullName $name)) "Current $name cache cleanup removed selected bundle or kept redundant copies."
+    }
+    Check (Test-Path $unrelatedVersion) 'Pruning unexpectedly removed a different tool version.'
+    Remove-FmscSupersededMaintenanceTools
+    Check (@(Get-ChildItem $script:toolRoot -Directory -Filter 'Git-*').Count -eq 2) 'Tool pruning is not idempotent or removed prior versions.'
     $old=Find-FmscMaintenanceTool 'Git'
     [IO.File]::WriteAllText((Join-Path $old 'support.dll'),'corrupt DLL')
     Check (-not(Test-FmscTool $old 'Git')) 'Corrupt supporting DLL must be rejected'
@@ -95,6 +136,9 @@ try {
     [IO.File]::WriteAllText((Join-Path $msi 'SqlLocalDB.msi'),'not signed')
     Write-FmscToolManifest $msi 'LocalDb'
     Check (-not(Test-FmscTool $msi 'LocalDb')) 'A matching hash cannot bless an unsigned MSI'
+    $refusedPrune=$false
+    try { Remove-FmscSupersededMaintenanceTools } catch { $refusedPrune=$_.Exception.Message -like '*cannot be verified*' }
+    Check $refusedPrune 'Pruning must refuse to run when a current maintenance tool is corrupt.'
     $local=Join-Path $work 'owner-Tools'
     Seed 'Git' (Join-Path $local 'MinGit')
     Seed 'SqlCmd' (Join-Path $local 'SqlCmd')

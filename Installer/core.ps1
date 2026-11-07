@@ -1023,6 +1023,11 @@ function Complete-VerifiedApplicationUpdate {
     $result = Invoke-InstallationDatabaseCheck -Application (Join-Path $ApplicationDirectory 'FMSC_SMS.exe')
     if ($result -notin @(0,10)) { throw "Activated application verification failed (code $result). Recovery files have been kept." }
     if ($script:RecoveryJournal) { Complete-FmscRecoveryTransaction }
+    # Prune superseded admin-owned tool bundles only after successful app/SQL
+    # verification. Retain the currently integrity-verified copies and all
+    # other catalog versions; a failed update must never delete maintenance.
+    try { Remove-FmscSupersededMaintenanceTools }
+    catch { Write-WarningMessage "Update succeeded; redundant maintenance-tool cleanup is pending: $($_.Exception.Message)" }
     try { Remove-OldPreMigrationBackups }
     catch { Write-WarningMessage "Update succeeded; pre-migration backup cleanup is pending: $($_.Exception.Message)" }
     $rollback = "$ApplicationDirectory.rollback"

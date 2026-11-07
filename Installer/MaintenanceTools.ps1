@@ -150,6 +150,42 @@ function Find-FmscMaintenanceTool([string]$Name) {
     }
     return $null
 }
+
+# Only after successful app and SQL verification: retain one integrity-verified
+# current-version bundle per tool. Keep other catalog versions for recovery.
+function Remove-FmscSupersededMaintenanceTools {
+    $root=Get-FmscMaintenanceRoot
+    if(-not(Test-Path -LiteralPath $root -PathType Container)){return}
+    Assert-FmscRecoveryStorage $root
+    $selected=@{}
+    foreach($name in @('Git','SqlCmd','LocalDb')){
+        $current=Find-FmscMaintenanceTool $name
+        if(-not $current -or -not(Test-FmscTool $current $name)){
+            throw "Current $name maintenance tool cannot be verified; pruning refused."
+        }
+        $selected[$name]=[IO.Path]::GetFullPath($current).TrimEnd('\')
+    }
+    foreach($name in @('Git','SqlCmd','LocalDb')){
+        $spec=Get-FmscToolSpec $name
+        $pattern='^'+[regex]::Escape($name+'-'+$spec.version+'-')+'[a-f0-9]{32}$'
+        foreach($candidate in @(Get-ChildItem -LiteralPath $root -Directory -Force)){
+            if($candidate.Name -cnotmatch $pattern -or
+                $candidate.FullName -ieq $selected[$name]){continue}
+            try {
+                Assert-FmscToolPaths $candidate.FullName
+                $expected=Join-Path $root $candidate.Name
+                if([IO.Path]::GetFullPath($expected).TrimEnd('\') -ine
+                    [IO.Path]::GetFullPath($candidate.FullName).TrimEnd('\')){
+                    throw 'Tool cache path changed; deletion refused.'
+                }
+                Remove-Item -LiteralPath $candidate.FullName -Recurse -Force -ErrorAction Stop
+            } catch {
+                Write-Warning "Retained old $name tool cache $($candidate.Name): $($_.Exception.Message)"
+            }
+        }
+    }
+}
+
 function Install-FmscMaintenanceToolInternal([string]$Name,[string]$Application) {
     $current=Find-FmscMaintenanceTool $Name
     if($current){return $current}

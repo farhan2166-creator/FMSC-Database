@@ -48,6 +48,12 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
     {
         if (!UpdateDeviceKey.IsEnrolled)
             throw new InvalidOperationException("This computer has not yet generated an update authorization key.");
+        // Reclaim abandoned private-Git workspaces from earlier interrupted checks.
+        // Only strictly named, >24h-old directories can be pruned; active
+        // download sessions and device-key.v1.dpapi remain untouched.
+        try { PruneAbandonedWorkspaces(UpdateDeviceKey.StateDirectory, DateTime.UtcNow); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+            or InvalidDataException) { /* Stale cache must not block a new update check. */ }
         string root = Path.Combine(UpdateDeviceKey.StateDirectory,
             "git-read-" + Guid.NewGuid().ToString("N"));
         var session = new UpdateGitSession(root);
@@ -320,6 +326,64 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
         return recent.ToString();
     }
 
+    // For regression tests, pass an isolated root and deterministic clock.
+    // Refuse to traverse links or prune unknown directories, even under an
+    // otherwise correctly named workspace.
+    internal static int PruneAbandonedWorkspaces(string stateRoot, DateTime utcNow)
+    {
+        if (!Directory.Exists(stateRoot)) return 0;
+        UpdatePartDownload.RejectLinks(stateRoot);
+        int removed = 0;
+        foreach (string folder in Directory.EnumerateDirectories(
+            stateRoot, "git-read-*", SearchOption.TopDirectoryOnly))
+        {
+            string name = Path.GetFileName(folder);
+            if (!Regex.IsMatch(name, @"\Agit-read-[a-f0-9]{32}\z", RegexOptions.CultureInvariant) ||
+                Directory.GetLastWriteTimeUtc(folder) > utcNow.AddHours(-24))
+                continue;
+            try
+            {
+                RemovePrivateGitWorkspace(folder);
+                removed++;
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException
+                or InvalidDataException)
+            {
+                // A still-locked or suspect workspace is never forcibly removed.
+            }
+        }
+        return removed;
+    }
+
+    private static void RemovePrivateGitWorkspace(string folder)
+    {
+        if (!Directory.Exists(folder)) return;
+        UpdatePartDownload.RejectLinks(folder);
+        var stack = new Stack<string>();
+        var entries = new List<(string Path, FileAttributes Attributes)>();
+        stack.Push(folder);
+        while (stack.Count > 0)
+        {
+            string current = stack.Pop();
+            foreach (string entry in Directory.EnumerateFileSystemEntries(current))
+            {
+                FileAttributes attributes = File.GetAttributes(entry);
+                if (attributes.HasFlag(FileAttributes.ReparsePoint))
+                    throw new InvalidDataException("Linked private update workspace refused.");
+                entries.Add((entry, attributes));
+                if (attributes.HasFlag(FileAttributes.Directory)) stack.Push(entry);
+            }
+        }
+        // All descendants have passed link checks before any mutation.
+        foreach (var (entry, attributes) in entries)
+            if (attributes.HasFlag(FileAttributes.ReadOnly))
+                File.SetAttributes(entry, attributes & ~FileAttributes.ReadOnly);
+        FileAttributes rootAttributes = File.GetAttributes(folder);
+        if (rootAttributes.HasFlag(FileAttributes.ReadOnly))
+            File.SetAttributes(folder, rootAttributes & ~FileAttributes.ReadOnly);
+        Directory.Delete(folder, recursive: true);
+    }
+
     public ValueTask DisposeAsync()
     {
         if (_disposed) return ValueTask.CompletedTask;
@@ -329,15 +393,11 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
         {
             string pem = Path.Combine(_workspace, "device.pem");
             if (File.Exists(pem)) File.Delete(pem); // Remove plaintext key before any optional Git cleanup can fail.
-            if (Directory.Exists(_workspace))
-            {
-                foreach (string path in Directory.EnumerateFiles(_workspace, "*", SearchOption.AllDirectories))
-                    if (File.GetAttributes(path).HasFlag(FileAttributes.ReadOnly)) File.SetAttributes(path, FileAttributes.Normal);
-                Directory.Delete(_workspace, recursive: true);
-            }
+            if (Directory.Exists(_workspace)) RemovePrivateGitWorkspace(_workspace);
         }
         catch (IOException) { /* Never delete a live application file. */ }
         catch (UnauthorizedAccessException) { /* Temporary user-only folder. */ }
+        catch (InvalidDataException) { /* Refuse linked or suspicious remnants. */ }
         return ValueTask.CompletedTask;
     }
 }

@@ -9,6 +9,12 @@ foreach ($name in @('Remove-VerifiedUpdateDirectory','Remove-OldPreMigrationBack
     Invoke-Expression $definition.Extent.Text
 }
 function Get-FmscDownloadParent { return $script:state }
+$script:maintenancePruneCalls = 0
+$script:failMaintenancePrune = $false
+function Remove-FmscSupersededMaintenanceTools {
+    $script:maintenancePruneCalls++
+    if($script:failMaintenancePrune){throw 'Synthetic maintenance cleanup failure'}
+}
 function Write-Log { param($Message) }
 function Write-WarningMessage { param($Message) $script:warnings++ }
 function Test-StagedApplication { param($Source,$Staging) if ($script:badFiles) { throw 'Damaged activated files' } }
@@ -48,6 +54,7 @@ try {
             throw "Recovery files were not preserved after $failure failure."
         }
     }
+    if($script:maintenancePruneCalls -ne 0){throw 'Maintenance cleanup ran before application or database verification.'}
     $script:badFiles = $false; $script:badManifest = $false; $script:verification = 0; $script:warnings = 0
     $refused = $false
     try { Remove-VerifiedUpdateDirectory $root $rollback } catch { $refused = $true }
@@ -93,7 +100,15 @@ try {
     if ($activation -lt 0 -or $cleanup -le $activation) { throw 'Cleanup must follow activation.' }
     $completed = $source.IndexOf("'STEP 8 OF 8  -  COMPLETED'")
     if ($completed -le $cleanup) { throw 'Completed must follow activated-application verification.' }
-    Write-Output 'PASS: verification failures preserve recovery; successful activation keeps latest prepared package, prunes old packages and chunks, ignores unrelated files, handles locks, protects backup and enrollment.'
+    $pruneBefore = $script:maintenancePruneCalls
+    $warningBefore = $script:warnings
+    $script:failMaintenancePrune = $true
+    Complete-VerifiedApplicationUpdate $app $app
+    if($script:maintenancePruneCalls -ne $pruneBefore + 1 -or $script:warnings -ne $warningBefore + 1 -or
+        -not (Test-Path $app) -or -not (Test-Path $key)){
+        throw 'Maintenance prune error must emit warning after success, preserving the installation and enrollment.'
+    }
+    Write-Output 'PASS: verification failures preserve recovery; successful activation prunes after verification, keeps latest prepared, ignores unrelated files, warns on failed maintenance cleanup, protects school backups and enrollment.'
 } finally {
     $absolute = [IO.Path]::GetFullPath($root)
     if (-not $absolute.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()), [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe fixture cleanup.' }
