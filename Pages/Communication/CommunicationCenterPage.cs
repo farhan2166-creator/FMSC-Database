@@ -381,7 +381,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
             try{rows.Columns.Add("Include",typeof(bool));recipients.DataSource=rows;foreach(DataGridViewColumn c in recipients.Columns)c.ReadOnly=c.Name!="Include";
                 recipients.Columns["Include"].DisplayIndex=0;ApplyMessageColumns();ApplyTicks();}
             finally{populating=false;}
-            selection.Text=$"Page {recipientPage+1} · {rows.Rows.Count} contacts shown · {included.Count} selected across all pages. Preview checks consent. "+TemplateHint();
+            selection.Text=$"Page {recipientPage+1} · {rows.Rows.Count} contacts shown · {included.Count} selected across all pages. Admission Yes covers guardian school messages; preview checks current eligibility. "+TemplateHint();
         },EmptyRecipients());
     }
     private async Task PreviewAsync()
@@ -393,7 +393,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
             ApplyTicks();
             selection.Text="The only matching contact is selected.";
         }
-        if(included.Count==0)throw new ArgumentException("Select contacts first. Add verified, consented contacts in Settings → Contacts & Consent if none are listed.");
+        if(included.Count==0)throw new ArgumentException("Select contacts first. For students, record Yes on Admission and choose Find Contacts or Preview to use the saved guardian number.");
         if(templateChoice.SelectedItem is not DataRowView chosen || !TemplateMatchesAudience(chosen.Row))
             throw new ArgumentException("Choose a reviewed template that matches the recipients before previewing.");
         string signature=Signature();prepare.Enabled=false;sendNow.Enabled=false;previewSignature="";
