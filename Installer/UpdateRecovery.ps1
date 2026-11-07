@@ -250,9 +250,12 @@ function Complete-FmscAbortedTransaction {
     } elseif ($record.Backup -or $record.BeforeSchema -ne 0 -or $record.LastSchema -ne 0) {
         throw 'The update may have begun migrating despite its Prepared phase. Recovery stopped.'
     }
-    # Durable terminal state prevents the desktop launcher from retrying the
-    # failed migration indefinitely. Preserve the snapshot and SQL backup.
-    Set-FmscRecoveryPhase 'Aborted'
+    # The previous installed application may be older and understand only the
+    # original five phases. Commit a backward-compatible terminal phase, with
+    # an explicit failure outcome, so even an older startup guard can launch.
+    # A later approved update can create a new transaction; retain the backup.
+    $record | Add-Member -NotePropertyName Outcome -NotePropertyValue 'Aborted' -Force
+    Set-FmscRecoveryPhase 'Completed'
 }
 function Complete-FmscRecoveryTransaction {
     if (-not $script:RecoveryJournal) { return }
