@@ -1,6 +1,6 @@
 # Real installation acceptance on a GitHub-hosted disposable Windows runner.
 # Runs the production installer against a pinned schema-only, record-free test fixture.
-param([string]$ProjectDirectory = (Split-Path $PSScriptRoot -Parent), [switch]$Level3)
+param([string]$ProjectDirectory = (Split-Path $PSScriptRoot -Parent), [switch]$Level3, [string]$FixtureRoot = '', [int]$FixtureSchema = 0)
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows' -or
@@ -33,6 +33,7 @@ $ownedDatabase=$false
 $ownedInstallation=$false
 $ownedRoot=$false
 $fixtureFiles=@()
+$fixtureProbeName=''
 $cleanupResult='NOT_REQUIRED'
 $stage='Runner isolation'
 $checks=[Collections.Generic.List[string]]::new()
@@ -113,7 +114,7 @@ function WriteEvidence {
         limitations=@(
           'GitHub-hosted Windows 2022 is disposable but may include preinstalled LocalDB.',
           'When LocalDB was preinstalled this run does not cover a pristine MSI installation or its interactive fallback.',
-          'Only the data-free SQL test model and synthetic version marker are installed; no school data is used.',
+          'Only vetted record-free sandbox SQL fixtures or the separate first-production schema model are used; no school data is used.',
           'Graphical login, printing, real production upgrades and Windows reboot scenarios remain manual.',
           'A passing run is not authorization to install on live school computers.'
         )
@@ -138,41 +139,80 @@ try {
     $ownedRoot=$true
     $checks.Add('No existing FMSC application or target database found')
 
-    Stage 'Data-free SQL test fixture safety'
-    $fixture=Join-Path $project 'Tests/LifecycleSqlChecks/Baseline/schema.dacpac'
-    if (-not (Test-Path -LiteralPath $fixture -PathType Leaf)) { throw 'Disposable SQL test fixture is missing.' }
-    Add-Type -AssemblyName System.IO.Compression
-    $zip=[IO.Compression.ZipFile]::OpenRead($fixture)
-    try {
-        $names=@($zip.Entries | ForEach-Object { $_.FullName } | Sort-Object)
-        $allowed=@('[Content_Types].xml','_rels/.rels','DacMetadata.xml','model.xml','Origin.xml' | Sort-Object)
-        if (($names -join '|') -ne ($allowed -join '|') -or $names.Count -ne 5) {
-            throw 'Unexpected SQL test fixture entries: exported data/scripts are forbidden.'
+    Stage 'Approved SQL fixture integrity'
+    if ($FixtureRoot) {
+        if ($FixtureSchema -notin @(3,7)) { throw 'Private fixture must explicitly select supported schema 3 or 7.' }
+        $sandbox=[IO.Path]::GetFullPath($FixtureRoot).TrimEnd([IO.Path]::DirectorySeparatorChar)
+        $workspace=[IO.Path]::GetFullPath($env:GITHUB_WORKSPACE).TrimEnd([IO.Path]::DirectorySeparatorChar)
+        $expectedRoot=Join-Path $workspace 'fmsc-sandbox'
+        if ($sandbox -ine $expectedRoot -or -not (Test-Path -LiteralPath $sandbox -PathType Container)) {
+            throw 'Fixture location must be the trusted private sandbox checkout under the runner workspace.'
         }
-        function Read-SqlFixtureEntry($archive, [string]$name) {
-            $entry=$archive.GetEntry($name)
-            if ($null -eq $entry) { throw "Missing SQL fixture entry: $name" }
-            $reader=[IO.StreamReader]::new($entry.Open())
-            try { return $reader.ReadToEnd() }
-            finally { $reader.Dispose() }
+        $manifestPath=Join-Path $sandbox 'Tests/manifest.json'
+        if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw 'Private fixture manifest is missing.' }
+        $manifest=Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+        if ($manifest.format -ne 'fmsc-sandbox-fixtures/v1') { throw 'Unrecognized SQL fixture manifest.' }
+        $selected=@($manifest.fixtures | Where-Object { $_.schema -eq $FixtureSchema })
+        if ($selected.Count -ne 1) { throw 'Exactly one approved fixture entry is required for this schema.' }
+        $record=$selected[0]
+        if ($record.status -ne 'extracted-schema-only-pending-sql-validation' -and $record.status -ne 'validated-schema-only') {
+            throw 'Fixture is not in an accepted data-free review state.'
         }
-        [xml]$origin=(Read-SqlFixtureEntry $zip 'Origin.xml')
-        if ($origin.SelectNodes("//*[local-name()='ExportStatistics' or local-name()='Server' or local-name()='DataPhaseTables']").Count -gt 0) {
-            throw 'SQL test fixture contains export/source metadata.'
+        if ($record.mdf -cne "Database/v$FixtureSchema/FMSC_DB.mdf" -or
+            $record.ldf -cne "Database/v$FixtureSchema/FMSC_DB_log.ldf") {
+            throw 'Fixture manifest contains an unexpected path.'
         }
-        foreach ($flag in $origin.SelectNodes("//*[local-name()='ContainsExportedData']")) {
-            if ($flag.InnerText.Trim().ToLowerInvariant() -ne 'false') { throw 'SQL test fixture contains exported-data marker.' }
+        foreach ($item in @(
+            @{path=$record.mdf;sha=$record.mdfSha256;bytes=8388608},
+            @{path=$record.ldf;sha=$record.ldfSha256;bytes=75497472}
+        )) {
+            $source=Join-Path $sandbox ($item.path.Replace('/','\'))
+            $file=Get-Item -LiteralPath $source -ErrorAction Stop
+            if (($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+                $file.Length -ne $item.bytes -or
+                $item.sha -notmatch '^[a-fA-F0-9]{64}$' -or
+                (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash -ine $item.sha) {
+                throw 'Private fixture failed size, LFS-smudge or SHA-256 verification.'
+            }
         }
-        [xml]$relationships=(Read-SqlFixtureEntry $zip '_rels/.rels')
-        if ($relationships.SelectNodes('//*[@Target]').Count -gt 0) {
-            throw 'SQL test fixture contains a prohibited package relationship.'
-        }
-        [xml]$model=(Read-SqlFixtureEntry $zip 'model.xml')
-        if ($model.SelectNodes("//*[local-name()='Model']/*[local-name()='Element' and @Type='SqlProcedure']").Count -eq 0) {
-            throw 'SQL test fixture has no deployable stored procedures.'
-        }
-    } finally { $zip.Dispose() }
-    $checks.Add('Data-free SQL fixture contains schema-only entries and no export relationships')
+        $checks.Add("Private schema-$FixtureSchema MDF/LDF are exact Git LFS bytes checked against the sandbox manifest")
+    } else {
+        $fixture=Join-Path $project 'Tests/LifecycleSqlChecks/Baseline/schema.dacpac'
+        if (-not (Test-Path -LiteralPath $fixture -PathType Leaf)) { throw 'Disposable SQL test fixture is missing.' }
+        Add-Type -AssemblyName System.IO.Compression
+        $zip=[IO.Compression.ZipFile]::OpenRead($fixture)
+        try {
+            $names=@($zip.Entries | ForEach-Object { $_.FullName } | Sort-Object)
+            $allowed=@('[Content_Types].xml','_rels/.rels','DacMetadata.xml','model.xml','Origin.xml' | Sort-Object)
+            if (($names -join '|') -ne ($allowed -join '|') -or $names.Count -ne 5) {
+                throw 'Unexpected SQL test fixture entries: exported data/scripts are forbidden.'
+            }
+            function Read-SqlFixtureEntry($archive, [string]$name) {
+                $entry=$archive.GetEntry($name)
+                if ($null -eq $entry) { throw "Missing SQL fixture entry: $name" }
+                $reader=[IO.StreamReader]::new($entry.Open())
+                try { return $reader.ReadToEnd() }
+                finally { $reader.Dispose() }
+            }
+            [xml]$origin=(Read-SqlFixtureEntry $zip 'Origin.xml')
+            if ($origin.SelectNodes("//*[local-name()='ExportStatistics' or local-name()='Server' or local-name()='DataPhaseTables']").Count -gt 0) {
+                throw 'SQL test fixture contains export/source metadata.'
+            }
+            foreach ($flag in $origin.SelectNodes("//*[local-name()='ContainsExportedData']")) {
+                if ($flag.InnerText.Trim().ToLowerInvariant() -ne 'false') { throw 'SQL test fixture contains exported-data marker.' }
+            }
+            [xml]$relationships=(Read-SqlFixtureEntry $zip '_rels/.rels')
+            if ($relationships.SelectNodes('//*[@Target]').Count -gt 0) {
+                throw 'SQL test fixture contains a prohibited package relationship.'
+            }
+            [xml]$model=(Read-SqlFixtureEntry $zip 'model.xml')
+            if ($model.SelectNodes("//*[local-name()='Model']/*[local-name()='Element' and @Type='SqlProcedure']").Count -eq 0) {
+                throw 'SQL test fixture has no deployable stored procedures.'
+            }
+        } finally { $zip.Dispose() }
+        $checks.Add('Data-free SQL fixture contains schema-only entries and no export relationships')
+    
+    }
 
     Stage 'Real Microsoft SQL Server LocalDB prerequisite'
     $existing=LocalDbExe
@@ -236,37 +276,82 @@ try {
     }
     $checks.Add('Actual validated PortableRelease published with MSI, sqlcmd and migrations')
 
-    Stage 'Provision and detach synthetic first-release baseline LocalDB'
+    Stage 'Provision owned synthetic SQL installation source'
     $prior=@(Sql 'master' "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.databases WHERE name=N'FMSC_DB';")
     if (($prior -join '').Trim() -ne '0') { throw 'FMSC_DB already exists; refusing to overwrite it.' }
-    $ownedDatabase=$true # Catalog absent on this explicitly isolated runner; covers partial publish failure too.
-    Push-Location (Join-Path $project 'Tests/LifecycleSqlChecks')
-    try {
-        & dotnet tool restore
-        NativeOk 'Pinned SQLPackage tool restore'
-        $conn="Server=$instance;Database=FMSC_DB;Integrated Security=True;Encrypt=False;TrustServerCertificate=True"
-        & dotnet tool run sqlpackage -- '/Action:Publish' "/SourceFile:$fixture" "/TargetConnectionString:$conn" '/p:CreateNewDatabase=True'
-        NativeOk 'Publish record-free SQL test fixture'
-    } finally { Pop-Location }
-    $seed=@'
+    $ownedDatabase=$true
+    if ($FixtureRoot) {
+        $sourceRoot=Join-Path $sandbox "Database/v$FixtureSchema"
+        foreach ($name in @('FMSC_DB.mdf','FMSC_DB_log.ldf')) {
+            $source=Join-Path $sourceRoot $name
+            $destination=Join-Path $database $name
+            Copy-Item -LiteralPath $source -Destination $destination -ErrorAction Stop
+            if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne
+                (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash) {
+                throw 'Copied installation fixture hash mismatch.'
+            }
+        }
+
+        # Inspect another independent copy before the real installer touches its
+        # installation template. Never attach the master LFS checkout itself.
+        $probeRoot=Join-Path $root 'fixture-probe'
+        New-Item -ItemType Directory -Path $probeRoot -Force | Out-Null
+        $probeMdf=Join-Path $probeRoot 'fixture.mdf'
+        $probeLdf=Join-Path $probeRoot 'fixture_log.ldf'
+        Copy-Item -LiteralPath (Join-Path $database 'FMSC_DB.mdf') -Destination $probeMdf
+        Copy-Item -LiteralPath (Join-Path $database 'FMSC_DB_log.ldf') -Destination $probeLdf
+        $fixtureProbeName="FMSC_FixtureProbe_$FixtureSchema"
+        $escapedMdf=$probeMdf.Replace("'","''")
+        $escapedLdf=$probeLdf.Replace("'","''")
+        try {
+            Sql 'master' "CREATE DATABASE [$fixtureProbeName] ON (FILENAME=N'$escapedMdf'),(FILENAME=N'$escapedLdf') FOR ATTACH;" | Out-Null
+            $actual=@(Sql $fixtureProbeName 'SET NOCOUNT ON; SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;')
+            if (($actual -join '').Trim() -ne [string]$FixtureSchema) { throw 'Private SQL file schema version does not match its manifest.' }
+            Sql $fixtureProbeName @'
 SET NOCOUNT ON;
-IF EXISTS(SELECT 1 FROM dbo.DatabaseVersion) THROW 51000, 'Nonempty version fixture', 1;
-IF EXISTS(SELECT 1 FROM dbo.Students) THROW 51001, 'Unexpected student rows', 1;
-IF EXISTS(SELECT 1 FROM dbo.Users) THROW 51002, 'Unexpected user rows', 1;
-EXEC sys.sp_addextendedproperty @name=N'FMSC_DisposableFixture',@value=N'approved-synthetic-only';
-'@
-    Sql 'FMSC_DB' $seed | Out-Null
-    Sql 'FMSC_DB' (Get-Content (Join-Path $project 'Tests/LifecycleSqlChecks/Baseline/Initialize.sql') -Raw) | Out-Null
-    $paths=@(& $sqlcmd -S $instance -E -d 'FMSC_DB' -b -h -1 -W -Q 'SET NOCOUNT ON; SELECT physical_name FROM sys.database_files;' 2>&1)
-    NativeOk 'Find fixture MDF and LDF'
-    $mdf=$paths | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -match '^[A-Za-z]:\\.+\.mdf$' } | Select-Object -First 1
-    $ldf=$paths | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -match '^[A-Za-z]:\\.+\.ldf$' } | Select-Object -First 1
-    if (-not $mdf -or -not $ldf) { throw 'Synthetic LocalDB MDF/LDF paths unavailable.' }
-    $fixtureFiles=@($mdf,$ldf)
-    Sql 'master' "ALTER DATABASE [FMSC_DB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; EXEC sys.sp_detach_db @dbname=N'FMSC_DB';" | Out-Null
-    Copy-Item -LiteralPath $mdf -Destination (Join-Path $database 'FMSC_DB.mdf')
-    Copy-Item -LiteralPath $ldf -Destination (Join-Path $database 'FMSC_DB_log.ldf')
-    $checks.Add('Generated a record-free first-release baseline-1 MDF/LDF pair from the reviewed SQL model')
+IF EXISTS(SELECT 1 FROM dbo.Students) OR EXISTS(SELECT 1 FROM dbo.Users)
+    THROW 51008,'Sandbox fixture must be empty of personal school records',1;
+IF NOT EXISTS(SELECT 1 FROM sys.extended_properties WHERE class=0 AND name=N'FMSC_DisposableFixture')
+    THROW 51009,'Sandbox fixture is missing its dedicated disposable owner marker',1;
+DBCC CHECKDB WITH NO_INFOMSGS;
+'@ | Out-Null
+            $checks.Add("Attached copied sandbox schema-$FixtureSchema MDF/LDF, verified declared version and passed DBCC CHECKDB")
+        } finally {
+            if ($fixtureProbeName) {
+                Sql 'master' "IF DB_ID(N'$fixtureProbeName') IS NOT NULL BEGIN ALTER DATABASE [$fixtureProbeName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$fixtureProbeName]; END;" | Out-Null
+                $fixtureProbeName=''
+            }
+        }
+    } else {
+        Push-Location (Join-Path $project 'Tests/LifecycleSqlChecks')
+        try {
+            & dotnet tool restore
+            NativeOk 'Pinned SQLPackage tool restore'
+            $conn="Server=$instance;Database=FMSC_DB;Integrated Security=True;Encrypt=False;TrustServerCertificate=True"
+            & dotnet tool run sqlpackage -- '/Action:Publish' "/SourceFile:$fixture" "/TargetConnectionString:$conn" '/p:CreateNewDatabase=True'
+            NativeOk 'Publish record-free SQL test fixture'
+        } finally { Pop-Location }
+        $seed=@'
+    SET NOCOUNT ON;
+    IF EXISTS(SELECT 1 FROM dbo.DatabaseVersion) THROW 51000, 'Nonempty version fixture', 1;
+    IF EXISTS(SELECT 1 FROM dbo.Students) THROW 51001, 'Unexpected student rows', 1;
+    IF EXISTS(SELECT 1 FROM dbo.Users) THROW 51002, 'Unexpected user rows', 1;
+    EXEC sys.sp_addextendedproperty @name=N'FMSC_DisposableFixture',@value=N'approved-synthetic-only';
+    '@
+        Sql 'FMSC_DB' $seed | Out-Null
+        Sql 'FMSC_DB' (Get-Content (Join-Path $project 'Tests/LifecycleSqlChecks/Baseline/Initialize.sql') -Raw) | Out-Null
+        $paths=@(& $sqlcmd -S $instance -E -d 'FMSC_DB' -b -h -1 -W -Q 'SET NOCOUNT ON; SELECT physical_name FROM sys.database_files;' 2>&1)
+        NativeOk 'Find fixture MDF and LDF'
+        $mdf=$paths | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -match '^[A-Za-z]:\\.+\.mdf$' } | Select-Object -First 1
+        $ldf=$paths | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -match '^[A-Za-z]:\\.+\.ldf$' } | Select-Object -First 1
+        if (-not $mdf -or -not $ldf) { throw 'Synthetic LocalDB MDF/LDF paths unavailable.' }
+        $fixtureFiles=@($mdf,$ldf)
+        Sql 'master' "ALTER DATABASE [FMSC_DB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; EXEC sys.sp_detach_db @dbname=N'FMSC_DB';" | Out-Null
+        Copy-Item -LiteralPath $mdf -Destination (Join-Path $database 'FMSC_DB.mdf')
+        Copy-Item -LiteralPath $ldf -Destination (Join-Path $database 'FMSC_DB_log.ldf')
+        $checks.Add('Generated a record-free first-release baseline-1 MDF/LDF pair from the reviewed SQL model')
+    
+    }
 
     Stage 'Actual FMSC Windows installer execution'
     $exit=Invoke-ActualInstaller
@@ -282,6 +367,7 @@ EXEC sys.sp_addextendedproperty @name=N'FMSC_DisposableFixture',@value=N'approve
         throw 'Installer did not activate application and attach the synthetic database.'
     }
     $checks.Add('Ran actual core.ps1; application and LocalDB database installed successfully')
+    if ($FixtureRoot) { $checks.Add("Actual installer processed source schema-$FixtureSchema through the release migration path to schema $expectedSchema") }
     . (Join-Path $project 'Installer/UpdateRecovery.ps1')
     Assert-FmscRecoveryStorage $recoveryStorage
     $installedShortcut=(New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
@@ -410,6 +496,9 @@ catch {
 }
 finally {
     try {
+        if ($fixtureProbeName) {
+            Sql 'master' "IF DB_ID(N'$fixtureProbeName') IS NOT NULL BEGIN ALTER DATABASE [$fixtureProbeName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$fixtureProbeName]; END;" | Out-Null
+        }
         if ($ownedDatabase) {
             if ($Level3 -and $ownedTheme) { Assert-Level3Database }
             Sql 'master' "IF DB_ID(N'FMSC_DB') IS NOT NULL BEGIN ALTER DATABASE [FMSC_DB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [FMSC_DB]; END;" | Out-Null
