@@ -97,7 +97,14 @@ function Read-FmscRecoveryJournal {
         throw 'Recorded migration backup information is invalid.'
     }
     $databaseGuid = [Guid]::Empty
+    # A Prepared transaction can safely abort before any SQL connection was
+    # made. Keep its terminal Completed/Aborted record readable by the new
+    # launcher AND the installed pre-1.0.10 application startup guard.
+    $preSqlAbort = $record.Phase -eq 'Completed' -and
+        $record.Outcome -eq 'Aborted' -and $record.BeforeSchema -eq 0 -and
+        $record.LastSchema -eq 0 -and -not $record.Backup
     if ($record.Phase -in @('Migrating','Activating','Verified','Completed') -and
+        -not $preSqlAbort -and
         -not [Guid]::TryParse([string]$record.DatabaseIdentity,[ref]$databaseGuid)) {
         throw 'Recorded database identity is invalid.'
     }
