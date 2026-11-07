@@ -341,13 +341,15 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
             throw new ArgumentException("Choose a campus before previewing a group message.");
         if(AudienceMode()==1 && classId==0)
             throw new ArgumentException("Choose a class before previewing a class/section message.");
-        if(recipientFilter.SelectedIndex is not (0 or 1))
-            throw new ArgumentException("Choose the student or outstanding-balance filter for a school group.");
+        if(AudienceMode() is not (0 or 1 or 2))
+            throw new ArgumentException("Choose a campus, class or outstanding-fee group before selecting matching students.");
         // Creating recipient contacts from consent happens only when the user
         // explicitly requests a group preview, never on page open or admission save.
         await store.CallAsync("SyncAdmissionContacts",lifetime.Token);
         string term=search.Text;
-        string filter=recipientFilter.SelectedIndex==0?"":"Outstanding";
+        // Group messages must not accidentally include family/manual contacts,
+        // even when those contacts resolve to the same campus or student.
+        string filter=AudienceMode()==2?"Outstanding":"Student";
         SqlParameter[] Scope()=>[SqlCommunicationStore.P("@Campus",campusId),SqlCommunicationStore.P("@Year",yearId),
             SqlCommunicationStore.P("@Class",classId),SqlCommunicationStore.P("@Section",sectionId)];
         var settings=await ReadAsync("Operational");
