@@ -30,6 +30,10 @@ on:
         required: false
         type: string
         default: complete
+    secrets:
+      FMSC_SANDBOX_READ_TOKEN:
+        description: 'Fine-grained read-only access to private FMSC-Sandbox fixture repository'
+        required: false
 permissions:
   contents: read
 
@@ -39,9 +43,16 @@ concurrency:
 
 jobs:
   clean-install:
-    name: Real Windows installer with approved synthetic LocalDB
+    name: Real Windows installer / schema ${{ matrix.fixture_schema }}
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: windows-2022
     timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      # PR code never receives private-repository tokens. The trusted main
+      # release gate tests BOTH permanent schema-3 and schema-7 databases.
+      matrix:
+        fixture_schema: ${{ fromJSON(github.event_name == 'pull_request' && '[3]' || '[3,7]') }}
     env:
       FMSC_DISPOSABLE_INSTALL: approved-synthetic-only
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
@@ -49,6 +60,28 @@ jobs:
       - name: Check out this commit (no school data or secrets)
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
+
+      - name: Require private fixture read-only token on trusted release runs
+        if: github.event_name != 'pull_request' && inputs.test_scope != 'sql'
+        shell: pwsh
+        env:
+          SANDBOX_READ_TOKEN: ${{ secrets.FMSC_SANDBOX_READ_TOKEN }}
+        run: |
+          if (-not $env:SANDBOX_READ_TOKEN) {
+            throw 'FMSC_SANDBOX_READ_TOKEN is missing. Configure fine-grained Contents read permission for FMSC-Sandbox in FMSC-Source Actions secrets. Release blocked.'
+          }
+
+      - name: Fetch pinned private schema-3 and schema-7 MDF/LDF fixtures
+        if: github.event_name != 'pull_request' && inputs.test_scope != 'sql'
+        uses: actions/checkout@v7
+        with:
+          repository: farhan2166-creator/FMSC-Sandbox
+          # Approved one-time fixture extraction, no subsequent mutable updates.
+          ref: 5a8c5130c9d7b76552bb73a753cd44c4d192d2d0
+          path: fmsc-sandbox
+          token: ${{ secrets.FMSC_SANDBOX_READ_TOKEN }}
+          lfs: true
           persist-credentials: false
 
       - name: Set up .NET 8 SDK
@@ -61,11 +94,20 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install full FMSC package on disposable Windows with synthetic SQL
+      - name: Install full FMSC package against historical or current SQL snapshot
         if: ${{ inputs.test_scope != 'sql' }}
         shell: pwsh
         timeout-minutes: 45
-        run: .\Tools\RunDisposableWindowsInstall.ps1 -ProjectDirectory . -Level3
+        run: |
+          if ('${{ github.event_name }}' -eq 'pull_request') {
+            # Public PRs retain independent data-free baseline checks; NEVER
+            # expose FMSC-Sandbox tokens to pull-request code.
+            .\Tools\RunDisposableWindowsInstall.ps1 -ProjectDirectory . -Level3
+          } else {
+            .\Tools\RunDisposableWindowsInstall.ps1 -ProjectDirectory . -Level3 `
+              -FixtureRoot (Join-Path $env:GITHUB_WORKSPACE 'fmsc-sandbox') `
+              -FixtureSchema ${{ matrix.fixture_schema }}
+          }
 
       - name: Restore pinned SQL test tooling for focused acceptance
         if: ${{ inputs.test_scope == 'sql' }}
@@ -87,14 +129,15 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: fmsc-disposable-install-evidence-${{ github.run_id }}
+          name: fmsc-disposable-install-evidence-${{ github.run_id }}-v${{ matrix.fixture_schema }}
           path: |
             ${{ runner.temp }}/fmsc-install-evidence/report.json
             ${{ runner.temp }}/fmsc-install-evidence/summary.md
           if-no-files-found: warn
           retention-days: 7
 
-# This opt-in / focused same-repository PR test runs actual core.ps1 with synthetic
-# MDF/LDF pair. It never imports, packages, commits or uploads any school database.
-# On GitHub-hosted images LocalDB might be preinstalled; the report records the
-# missing pristine-MSI coverage instead of claiming it was tested.
+# Trusted main release testing obtains an exact, review-pinned private Git LFS
+# checkout and runs the real installer from the permanent historical v3 and
+# latest-baseline v7 SQL fixtures; no DACPAC is needed for publication acceptance.
+# Public PRs continue independent synthetic DACPAC smoke checks WITHOUT tokens.
+# No fixture databases may enter upload-artifact or published update bundles.
