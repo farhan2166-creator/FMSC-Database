@@ -169,7 +169,7 @@ jobs:
           # app-only update. School database files and arbitrary MSIs are forbidden.
           $forbidden = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object {
             $rel = [IO.Path]::GetRelativePath($root, $_.FullName).Replace('\', '/')
-            $_.Extension.ToLowerInvariant() -in @('.mdf','.ldf','.bak') -or
+            $_.Extension.ToLowerInvariant() -in @('.mdf','.ldf','.ndf','.bak','.bacpac','.dacpac') -or
             ($_.Extension.ToLowerInvariant() -eq '.msi' -and $rel -cne 'UpdateSupport/Tools/LocalDb/SqlLocalDB.msi')
           })
           if ($forbidden.Count -gt 0) { throw 'Unauthorized database or installer assets in application ZIP.' }
