@@ -150,9 +150,9 @@ function Find-FmscMaintenanceTool([string]$Name) {
     }
     return $null
 }
-# Successful-activation housekeeping only. Refuse to remove anything unless
-# all three current tool versions have one fully verified copy to keep.
-# Different catalog versions remain available for older app recovery.
+
+# After a verified app upgrade, remove only old GUID copies of the current
+# catalog versions; retain the selected verified bundle and other versions.
 function Remove-FmscSupersededMaintenanceTools {
     $root=Get-FmscMaintenanceRoot
     if(-not(Test-Path -LiteralPath $root -PathType Container)){return}
@@ -239,6 +239,7 @@ if($Action -ne 'Library'){
         }
     }
 }
+
 function Install-FmscMaintenanceToolInternal([string]$Name,[string]$Application) {
     $current=Find-FmscMaintenanceTool $Name
     if($current){return $current}
