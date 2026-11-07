@@ -8,7 +8,28 @@ on:
         type: choice
         options: [complete, sql]
         default: complete
+  # Every PR that changes migration or installer behavior must prove the
+  # complete Windows + SQL path on a disposable runner before merge.
+  pull_request:
+    paths:
+      - 'Migrations/**'
+      - 'Installer/**'
+      - 'DatabaseHelper.cs'
+      - 'Core/DatabaseCompatibility.cs'
+      - 'Services/Communication/Schema.sql'
+      - 'Tests/LifecycleSqlChecks/Baseline/**'
+      - 'Tools/RunDisposableWindowsInstall.ps1'
+      - 'Tools/TestPreparedUpdateRecovery.ps1'
+      - 'Tools/TestUpdateRecoverySql.ps1'
+      - '.github/workflows/fmsc-disposable-windows-install.yml'
+      - '.github/workflows/fmsc-windows-download.yml'
   workflow_call:
+    inputs:
+      test_scope:
+        description: 'Acceptance mode requested by the release gate'
+        required: false
+        type: string
+        default: complete
 permissions:
   contents: read
 
