@@ -343,6 +343,9 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
             throw new ArgumentException("Choose a class before previewing a class/section message.");
         if(recipientFilter.SelectedIndex is not (0 or 1))
             throw new ArgumentException("Choose the student or outstanding-balance filter for a school group.");
+        // Creating recipient contacts from consent happens only when the user
+        // explicitly requests a group preview, never on page open or admission save.
+        await store.CallAsync("SyncAdmissionContacts",lifetime.Token);
         string term=search.Text;
         string filter=recipientFilter.SelectedIndex==0?"":"Outstanding";
         SqlParameter[] Scope()=>[SqlCommunicationStore.P("@Campus",campusId),SqlCommunicationStore.P("@Year",yearId),
