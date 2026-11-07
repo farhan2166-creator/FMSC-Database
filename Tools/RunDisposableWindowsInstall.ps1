@@ -542,7 +542,10 @@ VALUES(1,N'Fictional Level 3 Install School',SYSUTCDATETIME(),SYSUTCDATETIME(),@
         $checks.Add('L3-INS-04 cloud subset | Missing application prerequisite refused without replacing live app/data; MSI refusal is separately unit tested')
         Stage 'L3-INS-05 simulated partial activation failure and actual filesystem rollback'
         Assert-Level3Database
-        & (Join-Path $project 'Tests/Level3Checks/TestActivation.ps1') -ProjectDirectory $project -ScratchRoot $root
+        # This independent rollback fault seam owns only its temporary files.
+        # SQL MDF/LDF copies live in LOCALAPPDATA for LocalDB access; this
+        # unrelated test must remain under the separately approved RUNNER_TEMP.
+        & (Join-Path $project 'Tests/Level3Checks/TestActivation.ps1') -ProjectDirectory $project -ScratchRoot $env:RUNNER_TEMP
         if ((Install-Snapshot) -ne $before) { throw 'Activation fault test changed the installed SQL snapshot.' }
         $checks.Add('L3-INS-05 | Test-only injected partial directory move exercises production rollback; exact previous bytes restored and partial output removed; not a power-loss test')
         Stage 'Level 3 complete installer ZIP integrity, no database files'
