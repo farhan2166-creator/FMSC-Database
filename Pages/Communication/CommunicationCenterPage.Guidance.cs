@@ -14,15 +14,15 @@ public sealed partial class CommunicationCenterPage
         read(view,[SqlCommunicationStore.P("@Page",page),SqlCommunicationStore.P("@Search",search),SqlCommunicationStore.P("@Filter",filter),..scope]);
 
     private string EmptyRecipients()=>CurrentUser.HasPermission("Communication.Configure")
-        ? "No saved contacts match these filters. Clear or widen the filters, or open Settings → Contacts & Consent → Add From School Records to register a guardian or staff contact. Student phone numbers are not added as consented contacts automatically."
-        : "No saved contacts match these filters. Clear or widen the filters, or ask an authorized administrator to add and verify the contact and record consent.";
+        ? "No contacts match. For student guardians, record Yes on Admission, then choose Find Contacts or Preview to link them automatically. For other contacts, check Settings → Contacts."
+        : "No contacts match. Check campus or class filters. Student guardians only need Yes recorded on Admission; Find Contacts or Preview links them automatically.";
     private void ConfigureGuidance()
     {
         foreach(var item in new[]{(recipients,"Find contacts to choose recipients. "+EmptyRecipients()),(preview,"Choose a reviewed template and contacts, then select Preview Messages. No message is sent by previewing."),
             (history,"No messages found. Send a message or clear the search and status filter. Scheduled work appears once submitted."),
-            (contacts,"No communication contacts are recorded on this page. Use Add From School Records or Add Manual Contact, then verify ownership and record consent."),
+            (contacts,"No saved contacts are listed. Student guardian contacts come from Admission Yes when recipients are searched or previewed; other contacts can be entered here."),
             (templates,"No templates are available on this page. Return to the previous page or use New Version / Review."),
-            (rules,"No automation rules are configured. Review a student-context template first, then use New / Edit Rule. Rules remain disabled until explicitly enabled.")})
+            (rules,"No existing automation rules. Automatic messaging is optional and is not enabled from this workspace.")})
         {UiHelper.SetGridEmptyMessage(item.Item1,item.Item2);UiHelper.SetGridPlaceholderMessage(item.Item1,item.Item2);}
         tabs.Selecting+=(_,e)=>{if(IsBusy)e.Cancel=true;};
         tabs.SelectedIndexChanged+=async(_,_)=>{
