@@ -46,6 +46,32 @@ try
     Require(transport.GitExecutable == gitExe && transport.SshExecutable == sshExe,
         "Updater must select Git and SSH from its verified tool root, not executables on PATH.");
 
+    // Prune old, named Git check workspaces without touching recent sessions,
+    // protected enrollment files or unknown user folders.
+    string workspaceRoot = Path.Combine(root, "git-cache");
+    Directory.CreateDirectory(workspaceRoot);
+    string stale = Path.Combine(workspaceRoot, "git-read-" + Guid.NewGuid().ToString("N"));
+    string active = Path.Combine(workspaceRoot, "git-read-" + Guid.NewGuid().ToString("N"));
+    string unknown = Path.Combine(workspaceRoot, "git-read-not-a-valid-id");
+    foreach (string folder in new[] { stale, active, unknown })
+    {
+        Directory.CreateDirectory(Path.Combine(folder, "feed", "objects"));
+        File.WriteAllText(Path.Combine(folder, "feed", "objects", "object"), "inert Git test fixture");
+    }
+    File.SetAttributes(Path.Combine(stale, "feed", "objects", "object"), FileAttributes.ReadOnly);
+    Directory.SetLastWriteTimeUtc(stale, DateTime.UtcNow.AddDays(-3));
+    Directory.SetLastWriteTimeUtc(active, DateTime.UtcNow);
+    Directory.SetLastWriteTimeUtc(unknown, DateTime.UtcNow.AddDays(-3));
+    string enrollmentNeighbor = Path.Combine(workspaceRoot, "device-key.v1.dpapi");
+    File.WriteAllText(enrollmentNeighbor, "preserve enrollment-neighbor fixture");
+    Require(UpdateGitSession.PruneAbandonedWorkspaces(workspaceRoot, DateTime.UtcNow) == 1,
+        "Exactly one stale private-Git workspace should be reclaimed.");
+    Require(!Directory.Exists(stale) && Directory.Exists(active) && Directory.Exists(unknown)
+        && File.Exists(enrollmentNeighbor),
+        "Old Git workspaces must not cause active, unknown or enrollment paths to be removed.");
+    Require(UpdateGitSession.PruneAbandonedWorkspaces(workspaceRoot, DateTime.UtcNow) == 0,
+        "Old Git workspace cleanup must be idempotent.");
+
     string first = Path.Combine(root, "device1");
     string second = Path.Combine(root, "device2");
     string pub1 = UpdateDeviceKey.GenerateEnrollment(first);
