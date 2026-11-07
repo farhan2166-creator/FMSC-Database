@@ -17,8 +17,21 @@ permissions:
   contents: read
 
 jobs:
+  # Mandatory on every build and publication attempt. The reusable workflow
+  # checks out the SAME commit as this workflow and runs the real installer
+  # against an approved, record-free disposable SQL LocalDB instance.
+  sql-install-acceptance:
+    name: Block publication unless real Windows SQL installation passes
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/fmsc-disposable-windows-install.yml
+    with:
+      test_scope: complete
+    permissions:
+      contents: read
+
   package:
     name: Verify and package Windows x64
+    needs: sql-install-acceptance
     if: github.ref == 'refs/heads/main'
     runs-on: windows-2022
     timeout-minutes: 45
