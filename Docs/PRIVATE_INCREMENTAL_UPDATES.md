@@ -479,12 +479,14 @@ verification, the installer retains the newest two pre-migration backups in
 older files with the installer’s pre-migration naming pattern. If verification
 fails, all backups are retained. Regular school backups are outside this policy.
 
-Successful prepared updates also remove their own `prepared-<guid>` directory
-and hashed chunk-cache directories. The computer's enrollment key, database files
-and regular database backups are outside this cleanup. Absolute-path checks and link
-refusal limit recursive deletion. A locked file produces a cleanup warning without
-turning a verified activation into a failed installation; the next successful
-installation retries removal of the fixed rollback directory. Older staging
-directories from installations predating this change are not swept automatically.
-Disposable-folder tests exercise verification failures, successful cleanup,
-locked files, scope refusal and preservation of enrollment and database backups.
+After a successful, verified application activation, retain the latest
+`prepared-<guid>` package used for that installation. Prune older GUID-named
+prepared packages in the current Windows user's `FMSC/Updates` directory and
+redundant SHA-256-named chunk-cache directories. Failed/interrupted updates never
+trigger this pruning. The computer enrollment key, other unrecognized files,
+database files, and database backups are outside its scope. Exact canonical
+directory checks and link refusal guard recursive deletion. A locked file
+produces a cleanup warning rather than reversing a verified installation;
+the next successful update can retry pruning. Disposable-folder checks cover
+failed-update retention, the latest package, old packages, chunk-cache cleanup,
+locked files, scope refusal, and preservation of enrollment and database backups.

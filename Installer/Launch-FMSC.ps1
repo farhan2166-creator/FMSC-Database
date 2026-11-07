@@ -15,7 +15,7 @@ try {
             $active.ReleaseMutex()
         }
     } finally { if ($active) { $active.Dispose() } }
-    if ($record -and $record.Phase -ne 'Completed') {
+    if ($record -and $record.Phase -notin @('Completed','Aborted')) {
         if ($record.UserSid -ne [Security.Principal.WindowsIdentity]::GetCurrent().User.Value) {
             throw 'Sign in as the Windows user who started this update to recover it.'
         }

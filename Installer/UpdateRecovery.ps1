@@ -84,7 +84,7 @@ function Read-FmscRecoveryJournal {
     if ((Get-Item -LiteralPath $path).Length -gt 32768) { throw 'Recovery record is too large.' }
     $record = [IO.File]::ReadAllText($path,[Text.Encoding]::UTF8) | ConvertFrom-Json
     if ($record.Format -ne 'fmsc-recovery/v1' -or $record.Transaction -notmatch '^[a-f0-9]{32}$' -or
-        $record.Phase -notin @('Prepared','Migrating','Activating','Verified','Completed') -or
+        $record.Phase -notin @('Prepared','Migrating','Activating','Verified','Completed','Aborted') -or
         $record.UserSid -notmatch '^S-1-5-21-[0-9-]+$' -or
         $record.Version -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z.-]+)?$' -or
         ($record.Schema -isnot [int] -and $record.Schema -isnot [long]) -or $record.Schema -le 0 -or $record.Schema -gt [int]::MaxValue -or
@@ -97,7 +97,14 @@ function Read-FmscRecoveryJournal {
         throw 'Recorded migration backup information is invalid.'
     }
     $databaseGuid = [Guid]::Empty
+    # A Prepared transaction can safely abort before any SQL connection was
+    # made. Keep its terminal Completed/Aborted record readable by the new
+    # launcher AND the installed pre-1.0.10 application startup guard.
+    $preSqlAbort = $record.Phase -eq 'Completed' -and
+        $record.Outcome -eq 'Aborted' -and $record.BeforeSchema -eq 0 -and
+        $record.LastSchema -eq 0 -and -not $record.Backup
     if ($record.Phase -in @('Migrating','Activating','Verified','Completed') -and
+        -not $preSqlAbort -and
         -not [Guid]::TryParse([string]$record.DatabaseIdentity,[ref]$databaseGuid)) {
         throw 'Recorded database identity is invalid.'
     }
@@ -148,7 +155,7 @@ function Initialize-FmscRecoveryTransaction {
     param([string]$Prepared, [string]$Root, [string]$Version, [int]$Schema, [string]$UserSid)
     Initialize-FmscRecoveryStorage $Root
     $prior = Read-FmscRecoveryJournal $Root
-    if ($prior -and $prior.Phase -ne 'Completed') { throw 'An unfinished update must be recovered before installing another release.' }
+    if ($prior -and $prior.Phase -notin @('Completed','Aborted')) { throw 'An unfinished update must be recovered before installing another release.' }
     $transaction = [Guid]::NewGuid().ToString('N')
     $bytes = [long](Get-ChildItem -LiteralPath (Join-Path $Prepared 'application') -Recurse -File | Measure-Object Length -Sum).Sum
     $drive = New-Object IO.DriveInfo([IO.Path]::GetPathRoot($Root))
@@ -226,6 +233,36 @@ function Initialize-FmscRecoveryConnection {
     $endpoint = [regex]::Match(($info -join "`n"),$pattern)
     if (-not $endpoint.Success) { throw 'Cannot confirm the LocalDB endpoint for recovery.' }
     $script:SqlInstance = 'np:' + $endpoint.Groups[1].Value
+}
+# A failed update may be marked terminal only while the previous application
+# is still in place and SQL is proven to be at its original schema. This helper
+# never restores a database, deletes an update snapshot, or changes application files.
+# Its caller must first confirm SQL database identity and checksum-verify the backup.
+function Complete-FmscAbortedTransaction {
+    param([int]$ObservedSchema, [string]$ApplicationDirectory, [string]$RollbackDirectory)
+    $record = $script:RecoveryJournal
+    if (-not $record -or $record.Phase -notin @('Prepared','Migrating')) {
+        throw 'Only a pre-activation update can be safely abandoned.'
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $ApplicationDirectory 'FMSC_SMS.exe') -PathType Leaf) -or
+        (Test-Path -LiteralPath $RollbackDirectory)) {
+        throw 'The previous application baseline cannot be confirmed. Recovery stopped.'
+    }
+    if ($record.Phase -eq 'Migrating') {
+        if (-not $record.Backup -or $record.BeforeSchema -le 0 -or
+            $record.LastSchema -gt $record.BeforeSchema -or
+            $ObservedSchema -ne $record.BeforeSchema) {
+            throw 'Database schema is not at the verified pre-update baseline. Manual recovery is required.'
+        }
+    } elseif ($record.Backup -or $record.BeforeSchema -ne 0 -or $record.LastSchema -ne 0) {
+        throw 'The update may have begun migrating despite its Prepared phase. Recovery stopped.'
+    }
+    # The previous installed application may be older and understand only the
+    # original five phases. Commit a backward-compatible terminal phase, with
+    # an explicit failure outcome, so even an older startup guard can launch.
+    # A later approved update can create a new transaction; retain the backup.
+    $record | Add-Member -NotePropertyName Outcome -NotePropertyValue 'Aborted' -Force
+    Set-FmscRecoveryPhase 'Completed'
 }
 function Complete-FmscRecoveryTransaction {
     if (-not $script:RecoveryJournal) { return }

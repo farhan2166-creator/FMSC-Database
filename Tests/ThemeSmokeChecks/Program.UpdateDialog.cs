@@ -55,10 +55,10 @@ internal static partial class Program
             }
         }
         var prepared = new PreparedUpdate("1.2.0", "unused-stage", "unused-metadata", UpdateDownloadChoice.Full, false);
-        foreach (string phase in new[] { "Prepared", "Migrating", "Activating", "Verified", "Completed" })
+        foreach (string phase in new[] { "Prepared", "Migrating", "Activating", "Verified", "Completed", "Aborted" })
             Check(UpdateStartupGuard.RequiresRecovery(System.Text.Encoding.UTF8.GetBytes(
-                "{\"Format\":\"fmsc-recovery/v1\",\"Phase\":\"" + phase + "\"}")) == (phase != "Completed"),
-                "Direct startup requires recovery until completion: " + phase);
+                "{\"Format\":\"fmsc-recovery/v1\",\"Phase\":\"" + phase + "\"}")) == (phase != "Completed" && phase != "Aborted"),
+                "Direct startup must not loop after verified completion or abort: " + phase);
         foreach (string invalid in new[] { "{}", "[]", "{\"Format\":\"fmsc-recovery/v1\",\"Phase\":\"Unknown\"}",
             "{\"Format\":\"other\",\"Phase\":\"Completed\"}", "{\"Format\":\"fmsc-recovery/v1\",\"Phase\":100}" })
         {
