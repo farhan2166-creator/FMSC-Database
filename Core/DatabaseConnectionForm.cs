@@ -34,6 +34,7 @@ internal sealed class DatabaseConnectionView : UserControl
     internal const string WindowTitle = "FMSC — Management System Connection";
     private readonly Form _host;
     private readonly Action<DatabaseConnectionView>? _connected;
+    private readonly Func<bool, (bool Connected, string Message, Exception? Failure)> _connect;
     private readonly Label _message = new() { Dock = DockStyle.Top, AutoSize = true };
     private readonly Label _status = new() { Dock = DockStyle.Fill, AutoSize = false };
     private readonly ProgressBar _progress = new() { Dock = DockStyle.Fill, Style = ProgressBarStyle.Marquee };
@@ -53,10 +54,12 @@ internal sealed class DatabaseConnectionView : UserControl
     internal IButtonControl AcceptAction => _reconnect;
     internal IButtonControl CancelAction => _close;
 
-    internal DatabaseConnectionView(Form host, Action<DatabaseConnectionView>? connected)
+    internal DatabaseConnectionView(Form host, Action<DatabaseConnectionView>? connected,
+        Func<bool, (bool Connected, string Message, Exception? Failure)>? connect = null)
     {
         _host = host;
         _connected = connected;
+        _connect = connect ?? CheckConnection;
         Dock = DockStyle.Fill;
         AutoScaleMode = AutoScaleMode.None;
         int gap = UiDesignSystem.Spacing.Md;
@@ -120,9 +123,11 @@ internal sealed class DatabaseConnectionView : UserControl
             button.Margin = new Padding(UiDesignSystem.Spacing.Sm / 2, 0, UiDesignSystem.Spacing.Sm / 2, 0);
             actions.Controls.Add(button);
         }
-        var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
-        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        _reconnect.Width = _restart.Width;
+        var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, AppScale.S(100)));
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         var detailsLink = new LinkLabel {
             Text = "Show connection details", Dock = DockStyle.Fill,
             LinkColor = AppTheme.Primary, ActiveLinkColor = AppTheme.PrimaryHover, VisitedLinkColor = AppTheme.Primary,
@@ -188,13 +193,9 @@ internal sealed class DatabaseConnectionView : UserControl
         _details.Text = ConnectionDetails(_status.Text);
         try
         {
-            var result = await Task.Run(() => {
-                DatabaseHelper.RefreshDatabaseConnection(restart);
-                bool connected = DatabaseHelper.TestConnection(out string message, out var failure);
-                return (connected, message, failure);
-            });
+            var result = await Task.Run(() => _connect(restart));
             if (IsDisposed) return;
-            if (result.connected)
+            if (result.Connected)
             {
                 _canRestart = true;
                 _canRepair = false;
@@ -205,7 +206,7 @@ internal sealed class DatabaseConnectionView : UserControl
                 SetBusy(false);
                 _connected?.Invoke(this);
             }
-            else ShowFailure(result.message, result.failure);
+            else ShowFailure(result.Message, result.Failure);
         }
         catch (Exception ex)
         {
@@ -214,6 +215,13 @@ internal sealed class DatabaseConnectionView : UserControl
                 ex);
         }
         finally { if (!IsDisposed) SetBusy(false); }
+    }
+
+    private static (bool Connected, string Message, Exception? Failure) CheckConnection(bool restart)
+    {
+        DatabaseHelper.RefreshDatabaseConnection(restart);
+        bool connected = DatabaseHelper.TestConnection(out string message, out var failure);
+        return (connected, message, failure);
     }
 
     private void ShowFailure(string message, Exception? failure = null)

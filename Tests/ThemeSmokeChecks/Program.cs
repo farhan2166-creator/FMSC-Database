@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--login-connection"))
+        {
+            CheckLoginConnection();
+            Console.WriteLine($"PASS: {checks} combined login/connection visibility and recovery checks (no database connection).");
+            return;
+        }
         if(args.Contains("--compact-management-reports"))
         {
             CheckCompactReceiptScenarios();CheckCompactFinancialScenarios();Console.WriteLine($"PASS: {checks} compact management report PDF checks.");return;

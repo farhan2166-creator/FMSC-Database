@@ -12,7 +12,9 @@ public sealed class LoginForm : ApplicationWindowForm
     internal LoginForm(bool checkConnectionOnStartup) : this(AttemptSignIn, checkConnectionOnStartup) { }
     public LoginForm() : this(AttemptSignIn) { }
     internal LoginForm(Func<string, string, (bool Success, string Message, Exception? ConnectionFailure)> signIn,
-        bool checkConnectionOnStartup = false)
+        bool checkConnectionOnStartup = false,
+        Func<bool, (bool Connected, string Message, Exception? Failure)>? connect = null,
+        Func<bool>? completeFirstRun = null)
     {
         this.signIn = signIn;
         FormClosing += (_, e) => { if (signingIn) e.Cancel = true; };
@@ -177,7 +179,11 @@ public sealed class LoginForm : ApplicationWindowForm
         card.Controls.Add(root);
         shell.Controls.Add(brand, 0, 0);
         shell.Controls.Add(card, 1, 0);
-        Controls.Add(shell);
+        // Keep both startup stages under one root. The window's responsive
+        // viewport must not wrap the hidden login shell over the connection view.
+        var content = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
+        content.Controls.Add(shell);
+        Controls.Add(content);
         FormClosed += (_, _) => logo.Image?.Dispose();
         AcceptButton = login;
         // Login must retain username -> Tab -> password -> Enter to sign in.
@@ -188,7 +194,7 @@ public sealed class LoginForm : ApplicationWindowForm
         {
             var connection = new DatabaseConnectionView(this, view =>
             {
-                if (!CompleteFirstRun())
+                if (!(completeFirstRun ?? CompleteFirstRun)())
                 {
                     DialogResult = DialogResult.Cancel;
                     return;
@@ -196,15 +202,16 @@ public sealed class LoginForm : ApplicationWindowForm
 
                 AcceptButton = login;
                 CancelButton = null;
-                Controls.Remove(view);
+                content.Controls.Remove(view);
                 view.Dispose();
                 Text = "FMSC - Sign In";
                 ClientSize = AppMetrics.StartupDialogClientSize;
                 shell.Visible = true;
                 user.Focus();
-            });
-            Controls.Add(connection);
+            }, connect);
+            content.Controls.Add(connection);
             shell.Visible = false;
+            connection.BringToFront();
             Text = DatabaseConnectionView.WindowTitle;
             AcceptButton = connection.AcceptAction;
             CancelButton = connection.CancelAction;
