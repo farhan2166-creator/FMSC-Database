@@ -58,6 +58,41 @@ function Sql([string]$Db, [string]$Query) {
     }
     return $result
 }
+function Assert-EmbeddedDatabaseContract([string]$Db) {
+    # Execute the same SQL structural contract embedded in the application, not
+    # a weak check of version + a handful of table names.
+    Add-Type -AssemblyName System.Data
+    $source=Get-Content -LiteralPath (Join-Path $project 'Core/DatabaseCompatibility.cs') -Raw
+    $match=[regex]::Match($source,'(?s)using var command = new SqlCommand\("""\s*(.*?)\s*""", connection\)')
+    if (-not $match.Success) { throw 'Cannot locate production structural SQL compatibility query.' }
+    $requirements=Get-Content -LiteralPath (Join-Path $project 'Core/DatabaseCompatibilityRequirements.json') -Raw
+    $cn=[System.Data.SqlClient.SqlConnection]::new("Data Source=$script:instance;Initial Catalog=$Db;Integrated Security=True;Encrypt=False")
+    try {
+        $cn.Open()
+        $cmd=$cn.CreateCommand()
+        $cmd.CommandText='SELECT compatibility_level FROM sys.databases WHERE database_id=DB_ID();'
+        if ([int]$cmd.ExecuteScalar() -lt 130) { throw 'SQL compatibility level below production minimum 130.' }
+        $version=@(Sql $Db 'SET NOCOUNT ON; SELECT TOP(1) CONVERT(nvarchar(50),VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;')
+        if (($version -join '').Trim() -ne $expectedSchema) {
+            throw 'Installed schema version differs from required application version.'
+        }
+        $cmd.CommandText=$match.Groups[1].Value
+        $cmd.CommandTimeout=120
+        [void]$cmd.Parameters.Add('@Requirements',[System.Data.SqlDbType]::NVarChar,-1)
+        $cmd.Parameters['@Requirements'].Value=$requirements
+        $result=[System.Data.DataSet]::new()
+        $adapter=[System.Data.SqlClient.SqlDataAdapter]::new($cmd)
+        [void]$adapter.Fill($result)
+        if ($result.Tables.Count -lt 2) { throw 'Structural compatibility SQL returned incomplete results.' }
+        $count=[int]$result.Tables[0].Rows[0][0]
+        if ($count -ne 0) {
+            $sample=@($result.Tables[1].Rows | ForEach-Object { $_[0].ToString() } | Select-Object -First 12)
+            throw "Production SQL compatibility contract rejects $count requirements: $($sample -join '; ')"
+        }
+        $checks.Add("Verified all embedded SQL compatibility requirements after schema-$FixtureSchema installation")
+    } finally { $cn.Dispose() }
+}
+
 function LocalDbExe {
     $exe=Get-Command sqllocaldb.exe -ErrorAction SilentlyContinue
     if ($exe) { return $exe.Source }
@@ -414,7 +449,10 @@ EXEC sys.sp_addextendedproperty @name=N'FMSC_DisposableFixture',@value=N'approve
         throw 'Installer did not activate application and attach the synthetic database.'
     }
     $checks.Add('Ran actual core.ps1; application and LocalDB database installed successfully')
-    if ($FixtureRoot) { $checks.Add("Actual installer processed source schema-$FixtureSchema through the release migration path to schema $expectedSchema") }
+    if ($FixtureRoot) {
+        Assert-EmbeddedDatabaseContract 'FMSC_DB'
+        $checks.Add("Actual installer processed source schema-$FixtureSchema through the release migration path to schema $expectedSchema")
+    }
     . (Join-Path $project 'Installer/UpdateRecovery.ps1')
     Assert-FmscRecoveryStorage $recoveryStorage
     $installedShortcut=(New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
