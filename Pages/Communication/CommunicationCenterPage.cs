@@ -133,7 +133,12 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         Row(HumanUi.Field("Send to",audience),72);
         int filtersRow=root.RowCount;Row(filters,78);
         search.PlaceholderText="Contact or student name";search.Width=220;
-        var findContacts=Button("Find Contacts",async()=>{recipientPage=0;await RefreshRecipients();},"Communication.Compose");
+        var findContacts=Button("Find Contacts",async()=>{
+            recipientPage=0;
+            if(AudienceMode()<4 && CurrentUser.HasPermission("Students.View"))
+                await store.CallAsync("SyncAdmissionContacts",lifetime.Token);
+            await RefreshRecipients();
+        },"Communication.Compose");
         search.KeyDown+=(_,e)=>{if(e.KeyCode==Keys.Enter){e.SuppressKeyPress=true;findContacts.PerformClick();}};
         var contactToolbar=Bar([recipientFilter,search,findContacts,
             ..Paging(recipients,()=>recipientPage,value=>recipientPage=value,RefreshRecipients,"Communication.Compose"),
