@@ -95,7 +95,7 @@ function Invoke-ActualInstaller {
         if ($env:GITHUB_REPOSITORY -eq 'farhan2166-creator/FMSC-Sandbox' -and
             $env:FMSC_DISPOSABLE_INSTALL -eq 'approved-synthetic-only') {
             Write-Host 'PRIVATE SANDBOX INSTALLER DIAGNOSTIC (last 35 lines):'
-            $details=@(($installerOutput+"\n"+$installerError) -split "`r?`n" | Select-Object -Last 35)
+            $details=@(($installerOutput+"`n"+$installerError) -split '\r?\n' | Select-Object -Last 35)
             foreach ($line in $details) { Write-Host $line.Substring(0,[Math]::Min(500,$line.Length)) }
         }
         # Only fixed installer phase names and known error categories enter public
